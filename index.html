@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>집품·트럭 현황 대시보드</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%234f46e5'/%3E%3Cpath d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%234f46e5'/%3E%3Cpath d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="js/vendor/tailwindcss.browser.js"></script>
+<script src="js/vendor/JsBarcode.all.min.js"></script>
+<style>
+  body { font-family: 'Inter', 'Noto Sans KR', sans-serif; }
+  button:not(:disabled), [role="button"] { cursor: pointer; }
+  .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media print {
+    @page pick-label { size: 5cm 4cm; margin: 0; }
+    @page truck-a4 { size: A4 landscape; margin: 15mm; }
+    #printArea { page: pick-label; }
+    #truckPrintArea { page: truck-a4; }
+
+    html, body { margin: 0; padding: 0; background: #fff !important; }
+    #printArea, #printArea .gt-label { margin: 0; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    /* --- 트럭 출력 전용 내부 레이아웃 룰 --- */
+    .p-notes { border:2px solid #000;padding:6px;margin-bottom:8px;min-height:50px;font-size:16pt;font-weight:bold;white-space:pre-wrap; }
+    .p-row { display:flex; gap:10px; align-items:stretch; margin-bottom: 6px; width: 100%; }
+    .p-col { flex: 1; border: 2px solid #000; padding: 6px; display: flex; flex-direction: column; min-height: 60px; }
+    .p-col-title { font-size:10pt;font-weight:bold;height:28px;margin-bottom:0; color: #555; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
+    .p-col-content { flex: 1; display: flex; align-items: center; justify-content: center; font-size:16pt; font-weight:bold; text-align: center; word-break: break-all; }
+    .p-col-content svg { margin-top: 8px; }
+
+    /* --- 트럭 출력 전용 테이블 룰 --- */
+    .p-table { width:100%;border-collapse:collapse;text-align:center;font-size:12pt;page-break-inside:avoid;}
+    .p-table th, .p-table td { border:1px solid #000;padding:4px;}
+    .p-table th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: bold; }
+
+    /* --- 날짜별 구분 섹션 (다중 날짜 출력) --- */
+    .p-date-section { margin-bottom: 15px; page-break-inside: avoid; }
+    .p-date-heading {
+        font-size: 13pt;
+        font-weight: bold;
+        background-color: #f3f4f6 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        border-left: 4px solid #4f46e5;
+        padding: 4px 10px;
+        margin-bottom: 6px;
+    }
+
+    /* --- 트럭주기 라벨 출력 (업체명/순번/CT바코드, 행 1개당 A4 1페이지) --- */
+    .p-label-page {
+        display: flex;
+        flex-direction: column;
+        height: 170mm;
+        padding: 10mm 0 6mm;
+        text-align: center;
+        page-break-inside: avoid;
+    }
+    .p-label-page:not(:last-child) {
+        page-break-after: always;
+    }
+    .p-label-company { flex: 1.2; display: flex; align-items: flex-start; justify-content: center; padding-top: 3mm; font-size: 64pt; font-weight: bold; word-break: break-all; white-space: pre-wrap; }
+    .p-label-seq { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 60pt; font-weight: bold; }
+    .p-label-barcode { flex: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 3mm; }
+  }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+<header id="appSwitcherBar" class="print:hidden bg-indigo-600 sticky top-0 z-50 shadow-sm">
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-12 flex items-center gap-2">
+    <button id="switchToPickBtn" type="button" class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors bg-white text-indigo-700 shadow-sm">집품 현황</button>
+    <button id="switchToTruckBtn" type="button" class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors bg-indigo-500/40 text-white hover:bg-indigo-500/60">트럭 현황</button>
+  </div>
+</header>
+
+<div id="pickApp">
+
+<header class="print:hidden bg-white border-b border-slate-200 sticky top-12 z-40 shadow-sm">
+  <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-md shadow-indigo-100">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품 현황</h1>
+        <p class="text-xs text-slate-500 font-medium">엑셀 업로드·붙여넣기 기반 집품 데이터 대시보드</p>
+      </div>
+    </div>
+    <button id="resetBtn" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">데이터 초기화</button>
+  </div>
+</header>
+
+<div class="print:hidden max-w-[1600px] mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 py-8">
+
+  <aside class="w-48 shrink-0 space-y-2">
+    <button id="navHomeBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <span>홈</span>
+    </button>
+    <button id="navAssignBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-4-4 4 4 0 004 4z"/></svg>
+      <span>집품 할당</span>
+    </button>
+  </aside>
+
+  <div class="flex-1 min-w-0">
+
+  <div id="homeView" class="space-y-8">
+
+  <div class="space-y-3">
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div id="dropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
+        <h2 class="text-sm font-semibold text-slate-900 mb-1">엑셀 업로드</h2>
+        <p class="text-xs text-slate-500 mb-3">.xlsx / .xls / .csv 파일을 끌어다 놓거나 선택하세요</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
+        <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="fileSelectBtn">파일 선택</button>
+        <span id="fileName" class="ml-3 text-xs text-slate-500"></span>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900 mb-1">직접 붙여넣기</h2>
+        <p class="text-xs text-slate-500 mb-3">엑셀에서 머리글 포함 영역을 복사해 붙여넣으세요</p>
+        <textarea id="pasteArea" rows="4" class="w-full resize-y bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="그룹번호&#9;마감일시&#9;생성일시&#9;매입유형&#9;업체명&#9;상태&#9;운송타입&#9;존&#9;수량"></textarea>
+        <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="pasteApplyBtn">붙여넣기 적용</button>
+      </div>
+    </section>
+
+    <div id="statusMsg" class="text-xs text-slate-500"></div>
+
+    <div class="border-b border-slate-200 pb-1">
+      <div id="dateTabsContainer" class="flex flex-wrap gap-2"></div>
+    </div>
+  </div>
+
+  <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+    <h2 class="text-sm font-semibold text-slate-900 mb-1">층별 인원 배치 계산</h2>
+    <p class="text-xs text-slate-500 mb-4">존에서 알파벳을 제외한 값을 층으로 집계합니다 (예: 72L → 72층). 체크 해제한 층은 계산에서 제외됩니다.</p>
+    <div class="flex items-center gap-5 flex-wrap mb-4">
+      <label class="text-sm text-slate-600 flex items-center gap-2">총 투입 인원
+        <input type="number" id="laborInput" min="0" step="1" placeholder="예: 10" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+      <span class="text-sm text-slate-500">전체 수량: <span id="floorTotalQty" class="font-bold tabular-nums text-slate-900">0개</span></span>
+      <span class="text-sm text-slate-500">1인당 할당량: <span id="floorPerPersonQty" class="font-bold tabular-nums text-slate-900">-</span></span>
+    </div>
+    <div id="floorBars" class="flex flex-col gap-2"></div>
+  </section>
+
+  <section class="flex items-center gap-2 flex-wrap" id="filterBar">
+    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">필터</span>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="groupNo" type="button">그룹번호 <span class="text-[9px]">▾</span></button></div>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="deadline" type="button">마감일시 <span class="text-[9px]">▾</span></button></div>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="createdAt" type="button">생성일시 <span class="text-[9px]">▾</span></button></div>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="purchaseType" type="button">매입유형 <span class="text-[9px]">▾</span></button></div>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="company" type="button">업체명 <span class="text-[9px]">▾</span></button></div>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="status" type="button">상태 <span class="text-[9px]">▾</span></button></div>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="transportType" type="button">운송타입 <span class="text-[9px]">▾</span></button></div>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="zone" type="button">존 <span class="text-[9px]">▾</span></button></div>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="quantity" type="button">수량 <span class="text-[9px]">▾</span></button></div>
+    <div class="relative inline-block"><button class="filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-key="groupCompanyTotal" type="button">업체 총수량 <span class="text-[9px]">▾</span></button></div>
+    <button id="filterResetAllBtn" type="button" class="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">필터 초기화</button>
+  </section>
+
+  <section class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-auto">
+    <table id="dataTable" class="w-full border-collapse text-left text-xs min-w-[1050px]">
+      <thead>
+        <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">
+          <th data-key="groupNo" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">그룹번호</span></th>
+          <th data-key="deadline" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">마감일시</span></th>
+          <th data-key="createdAt" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">생성일시</span></th>
+          <th data-key="purchaseType" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">매입유형</span></th>
+          <th data-key="company" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">업체명</span></th>
+          <th data-key="status" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">상태</span></th>
+          <th data-key="transportType" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">운송타입</span></th>
+          <th data-key="zone" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">존</span></th>
+          <th data-key="quantity" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">수량</span></th>
+          <th data-key="groupCompanyTotal" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap bg-indigo-50/50"><span class="th-label">업체 총수량</span></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+    </table>
+    <div id="emptyState" class="hidden text-center text-slate-500 text-sm py-16">아직 데이터가 없습니다. 엑셀을 업로드하거나 붙여넣어 주세요.</div>
+  </section>
+
+  </div>
+
+  <div id="assignView" class="hidden space-y-6">
+    <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+      <div>
+        <h2 class="text-sm font-semibold text-slate-900">GT 바코드 데이터 관리</h2>
+        <p class="text-xs text-slate-500 mt-1">엑셀/스프레드시트에서 복사한 GT 바코드 데이터를 붙여넣으세요. (예: GC-GT91-475-1, 한 줄/여러 줄 모두 가능하며 탭·스페이스·쉼표·줄바꿈으로 여러 건 구분)</p>
+      </div>
+      <textarea id="gtPasteArea" rows="4" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="GC-GT91-475-1&#10;GC-GT91-475-2&#10;..."></textarea>
+      <div class="flex justify-between items-center flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <button id="gtSaveBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">GT 데이터 저장</button>
+          <button id="gtClearBtn" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">GT 데이터 초기화</button>
+          <button id="gtPrintBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">GT 출력</button>
+          <button id="customLabelBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">커스텀 라벨 출력</button>
+        </div>
+        <span class="text-sm text-slate-500">사용 가능 GT: <span id="gtAvailableCount" class="font-bold text-indigo-600">0</span>건</span>
+      </div>
+      <div id="gtAvailableList" class="overflow-x-auto overflow-y-auto max-h-40 bg-slate-50 border border-slate-100 rounded-lg p-2 min-h-[2.5rem]">
+        <span class="text-xs text-slate-400">저장된 GT 데이터가 없습니다.</span>
+      </div>
+    </section>
+
+    <section class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <h2 class="text-sm font-semibold text-slate-900 mb-1">집품 할당</h2>
+      <p class="text-xs text-slate-500 mb-4">층수를 입력하면 존에서 알파벳을 제외한 층 코드가 그 값으로 시작하는 존을 모두 모아 인원수만큼 균등하게 배분합니다. (예: "7" → 72, 73 등 7로 시작하는 존 전부 / "72" → 72만)</p>
+      <div class="flex items-end gap-3 flex-wrap">
+        <label class="text-sm text-slate-600 flex flex-col gap-1">층수
+          <input type="text" id="assignFloorInput" placeholder="예: 7 또는 72" class="w-32 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </label>
+        <label class="text-sm text-slate-600 flex flex-col gap-1">투입 인원
+          <input type="number" id="assignCountInput" min="1" step="1" placeholder="예: 3" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </label>
+        <button id="assignAddBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">추가</button>
+        <span id="assignMsg" class="text-xs"></span>
+      </div>
+      <div class="mt-3">
+        <div class="text-sm text-slate-600 mb-1.5">포함할 생성일자</div>
+        <div id="assignDateCheckboxes" class="flex flex-wrap gap-x-4 gap-y-1.5 max-h-24 overflow-y-auto bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs">
+          <span class="text-xs text-slate-400">업로드된 데이터가 없습니다.</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="border-b border-slate-200 pb-1">
+      <div id="assignTabsContainer" class="flex flex-wrap gap-2"></div>
+    </div>
+
+    <div id="assignTableContainer"></div>
+  </div>
+
+  </div>
+</div>
+
+<div id="customLabelModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <h3 class="text-sm font-semibold text-slate-900">커스텀 라벨 출력</h3>
+    <label class="flex flex-col gap-1 text-sm text-slate-600">업체 선택(입력해서 검색, 목록에서 선택 시 나머지 자동 입력)
+      <div class="relative">
+        <input type="text" id="customLabelCompanySearch" autocomplete="off" placeholder="검색..." class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <div id="customLabelCompanyDropdown" class="hidden absolute top-full left-0 mt-1 z-10 bg-white border border-slate-200 rounded-xl shadow-xl p-2 w-full max-h-48 overflow-y-auto flex flex-col gap-1"></div>
+      </div>
+    </label>
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <label class="flex flex-col gap-1 text-slate-600">그룹번호
+        <input type="text" id="customLabelGroupNo" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+      <label class="flex flex-col gap-1 text-slate-600">마감일시
+        <input type="text" id="customLabelDeadline" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+      <label class="flex flex-col gap-1 text-slate-600">매입유형
+        <input type="text" id="customLabelPurchaseType" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+      <label class="flex flex-col gap-1 text-slate-600 col-span-2">업체명
+        <input type="text" id="customLabelCompany" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+      <label class="flex flex-col gap-1 text-slate-600">운송타입
+        <input type="text" id="customLabelTransportType" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+    </div>
+    <label class="flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer">
+      <input type="checkbox" id="customLabelAutoMatch" class="accent-indigo-600"> GT 자동매칭 사용
+    </label>
+    <label class="flex flex-col gap-1 text-sm text-slate-600">GT 코드(수동 입력, 자동매칭 미사용 시)
+      <input type="text" id="customLabelGtCode" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="예: GC-GT91-475-1">
+    </label>
+    <label class="flex flex-col gap-1 text-sm text-slate-600">출력 수량
+      <input type="number" id="customLabelQty" min="1" step="1" value="1" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <div class="flex gap-2 pt-2">
+      <button id="customLabelPrintBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">출력</button>
+      <button id="customLabelCancelBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">취소</button>
+    </div>
+  </div>
+</div>
+
+<div id="gtPrintModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+    <h3 class="text-sm font-semibold text-slate-900">GT 출력</h3>
+    <p class="text-xs text-slate-500">사용 가능: <span id="gtPrintAvailableCount" class="font-bold text-indigo-600">0</span>건</p>
+    <label class="flex flex-col gap-1 text-sm text-slate-600">출력 수량
+      <input type="number" id="gtPrintQty" min="1" step="1" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <p id="gtPrintModalMsg" class="text-xs text-rose-600"></p>
+    <div class="flex gap-2 pt-2">
+      <button id="gtPrintModalPrintBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">출력</button>
+      <button id="gtPrintModalCancelBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">취소</button>
+    </div>
+  </div>
+</div>
+
+<div id="sparePrintModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+    <h3 class="text-sm font-semibold text-slate-900">여분 출력</h3>
+    <label class="flex flex-col gap-1 text-sm text-slate-600">임계값(이 수량 이상인 그룹번호+업체명 조합만 대상)
+      <input type="number" id="sparePrintThreshold" min="1" step="1" value="40" class="w-28 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <label class="flex flex-col gap-1 text-sm text-slate-600">분할 단위(몇 개씩 나눠 뽑을지)
+      <input type="number" id="sparePrintSplitSize" min="1" step="1" value="15" class="w-28 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <div id="sparePrintGroupList" class="max-h-48 overflow-y-auto space-y-1 bg-slate-50 border border-slate-100 rounded-lg p-2">
+      <span class="text-xs text-slate-400">임계값·분할단위를 입력해주세요.</span>
+    </div>
+    <label class="flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer">
+      <input type="checkbox" id="sparePrintLeadingBlank" class="accent-indigo-600"> 맨 앞에 빈 라벨 추가
+    </label>
+    <p class="text-xs text-slate-500">예상 매수: <span id="sparePrintPreview" class="font-bold text-indigo-600">0</span>장</p>
+    <p id="sparePrintModalMsg" class="text-xs text-rose-600"></p>
+    <div class="flex gap-2 pt-2">
+      <button id="sparePrintModalPrintBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">출력</button>
+      <button id="sparePrintModalCancelBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">취소</button>
+    </div>
+  </div>
+</div>
+
+<div id="printArea" class="hidden print:block"></div>
+
+</div>
+
+<div id="truckApp" class="hidden">
+
+    <header class="print:hidden bg-white border-b border-slate-200 sticky top-12 z-40 shadow-sm">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-md shadow-indigo-100">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 2 0 01-2-2V5a2 2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">트럭 현황</h1>
+                    <p class="text-xs text-slate-500 font-medium">물류 데이터 자동 가공 및 누적 관리 대시보드</p>
+                </div>
+            </div>
+            <div id="activeFileInfo" class="hidden text-sm bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 font-medium max-w-xs truncate flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="fileNameDisplay">데이터 로드됨</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="print:hidden flex-1 max-w-[1600px] w-full mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 py-8">
+
+        <aside class="w-48 shrink-0 space-y-2">
+            <button id="truckNavHomeBtn" onclick="truckSwitchView('home')" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center space-x-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                <span>홈</span>
+            </button>
+            <button id="navCycleBtn" onclick="truckSwitchView('cycle')" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center space-x-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                <span>트럭주기</span>
+            </button>
+        </aside>
+
+        <div class="flex-1 min-w-0 space-y-8">
+
+        <div id="toastContainer" class="fixed top-20 right-4 z-50 space-y-2 pointer-events-none max-w-sm w-full"></div>
+
+        <div id="truckHomeView" class="space-y-8">
+
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-md font-semibold text-slate-900 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span>업로드 가이드라인</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">지정된 양식의 엑셀 데이터 파일(A~I열)을 업로드해 주세요.</p>
+
+                    <div class="mt-4 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">필수 인식 머리글 (1행)</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">그룹번호</span>
+                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">생성일시</span>
+                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">업체명</span>
+                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-rose-50 text-rose-700 border border-rose-100">운송타입 (트럭)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-400 mt-4 pt-4 border-t border-slate-100 space-y-1.5">
+                    <p>💡 시스템이 자동으로 <strong>중복 행 제거</strong>, <strong>업체명 정렬</strong>을 수행합니다.</p>
+                    <p>⚠️ <strong>주의:</strong> 운송타입이 '트럭'인 데이터만 가져옵니다.</p>
+                    <p>🔄 추가 업로드 시 기존 데이터와 <strong>병합(누적)</strong>됩니다.</p>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2">
+                <div id="truckDropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200 h-full min-h-[220px]">
+                    <input type="file" id="excelFile" accept=".xlsx, .xls" class="hidden">
+                    <div class="p-4 bg-indigo-50 rounded-full text-indigo-600 mb-4 shadow-inner">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                    </div>
+                    <p class="text-sm font-semibold text-slate-900">클릭하거나 엑셀 파일을 이곳에 끌어다 놓으세요</p>
+                    <p class="text-xs text-slate-400 mt-1">XLSX, XLS 파일 형식만 지원 (최대 20MB)</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="truckEmptyState" class="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+            <div class="max-w-md mx-auto flex flex-col items-center">
+                <div class="text-slate-300 mb-4">
+                    <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-medium text-slate-900">대시보드가 비어 있습니다</h3>
+                <p class="text-sm text-slate-500 mt-2">상단의 업로드 영역에 엑셀 데이터를 등록하시면 생성일시 기준 자동 가공 및 테이블 인터페이스가 활성화됩니다.</p>
+            </div>
+        </section>
+
+        <section id="dashboardContainer" class="hidden space-y-6">
+
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">데이터 실시간 입력 현황</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">예상 팔레트는 빈 GT 기준 소수점 한자리 반올림되어 자동 계산됩니다.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="clearData()" class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <span>초기화</span>
+                    </button>
+                    <button onclick="openPrintModal()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        <span>출력</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="border-b border-slate-200 pb-1">
+                <div id="tabsContainer" class="flex flex-wrap gap-2">
+                </div>
+            </div>
+
+            <div id="tableContainer">
+            </div>
+        </section>
+
+        </div>
+        <div id="cycleView" class="hidden space-y-6">
+
+            <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <div>
+                    <h2 class="text-md font-semibold text-slate-900">CT 바코드 데이터 관리</h2>
+                    <p class="text-xs text-slate-500 mt-1">엑셀/스프레드시트에서 복사한 CT 바코드 데이터를 붙여넣으세요. (예: CT26-0302-12345, 한 줄/여러 줄 모두 가능하며 탭·스페이스·쉼표·줄바꿈으로 여러 건 구분)</p>
+                </div>
+                <textarea id="ctPasteArea" rows="4" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="CT26-0302-12345&#10;CT26-0302-12346&#10;..."></textarea>
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <button onclick="saveCtPaste()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+                            <span>CT 데이터 저장</span>
+                        </button>
+                        <button onclick="clearCtPool()" class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                            <span>CT 데이터 초기화</span>
+                        </button>
+                    </div>
+                    <span class="text-sm text-slate-500">사용 가능 CT: <span id="ctAvailableCount" class="font-bold text-indigo-600">0</span>건</span>
+                </div>
+                <div id="ctAvailableList" class="max-h-40 overflow-y-auto bg-slate-50 border border-slate-100 rounded-lg">
+                    <span class="block p-2 text-xs text-slate-400">저장된 CT 데이터가 없습니다.</span>
+                </div>
+            </section>
+
+            <section class="space-y-4">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">업체별 트럭 주기</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">홈에서 업로드한 생성일시별로 업체를 선택해 주기(수량)를 생성하고, CT 바코드를 매칭합니다.</p>
+                    </div>
+                    <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
+                        <button onclick="clearCycleData()" class="shrink-0 inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            <span>트럭주기 초기화</span>
+                        </button>
+                        <button onclick="openCycleGenModal()" class="shrink-0 inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            <span>생성</span>
+                        </button>
+                        <button onclick="autoMatchCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                            <span>미사용 자동 매칭</span>
+                        </button>
+                        <button onclick="toggleSelectAllCycleRows()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                            <span>전체 선택/해제</span>
+                        </button>
+                        <button onclick="executeCyclePrint()" class="shrink-0 inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            <span>출력</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border-b border-slate-200 pb-1">
+                    <div id="cycleTabsContainer" class="flex flex-wrap gap-2">
+                    </div>
+                </div>
+
+                <div id="cycleTableContainer">
+                </div>
+            </section>
+        </div>
+
+        </div>
+    </div>
+
+    <footer class="print:hidden bg-white border-t border-slate-200 py-4 mt-12">
+        <div class="max-w-[1600px] mx-auto px-4 text-center text-xs text-slate-400 font-medium">
+            &copy; 2026 트럭 현황 관리 보드 시스템 v1.1. All Rights Reserved.
+        </div>
+    </footer>
+
+    <div id="printModal" class="print:hidden fixed inset-0 bg-slate-900/60 z-[100] hidden items-center justify-center opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-200" id="printModalBox">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="text-lg font-bold text-slate-800">출력 양식 설정</h3>
+                <button onclick="closePrintModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-5">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-sm font-semibold text-slate-700">출력할 생성일시 선택</label>
+                        <button type="button" onclick="toggleSelectAllDates()" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">전체 선택/해제</button>
+                    </div>
+                    <p class="text-xs text-slate-400 mb-2">선택한 날짜별로 구분되어 출력됩니다. 유의사항/상차제한 항목은 공통으로 적용됩니다.</p>
+                    <div id="pDateCheckboxList" class="max-h-40 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">유의사항 (Notes)</label>
+                    <textarea id="pInputNotes" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="출력물 상단에 표기될 유의사항을 입력하세요."></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">날짜 상차제한</label>
+                        <input type="text" id="pInputDateLimit" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="예: 2026-07-05 제한">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">그룹번호 상차제한</label>
+                        <input type="text" id="pInputGroupLimit" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="바코드(Code128)로 변환됨">
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end space-x-2">
+                <button onclick="closePrintModal()" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">취소</button>
+                <button onclick="executePrint()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 flex items-center space-x-1.5 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    <span>인쇄 실행</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cycleGenModal" class="print:hidden fixed inset-0 bg-slate-900/60 z-[100] hidden items-center justify-center opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform scale-95 transition-transform duration-200" id="cycleGenModalBox">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="text-lg font-bold text-slate-800">트럭 주기 생성</h3>
+                <button onclick="closeCycleGenModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">생성일시 선택</label>
+                    <select id="cGenDate" onchange="renderCycleGenCompanyList()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-sm font-semibold text-slate-700">업체명 선택 (다중 선택 가능)</label>
+                        <button type="button" onclick="toggleSelectAllGenCompanies()" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">전체 선택/해제</button>
+                    </div>
+                    <p class="text-xs text-slate-400 mb-2">업체를 체크하고 각 업체별 수량을 입력하세요.</p>
+                    <div class="grid grid-cols-[1.25rem_1fr_4.5rem_4.5rem_5rem_5rem_5.5rem] gap-2 items-center px-3 py-2 text-xs font-bold text-slate-500 bg-slate-100 border border-b-0 border-slate-200 rounded-t-lg">
+                        <span></span>
+                        <span>업체명</span>
+                        <span class="text-right">빈GT</span>
+                        <span class="text-right">팔레트집품</span>
+                        <span class="text-right">32BOX</span>
+                        <span class="text-right">24BOX</span>
+                        <span class="text-center">수량</span>
+                    </div>
+                    <div id="cGenCompanyList" class="max-h-56 overflow-y-auto bg-slate-50 border border-slate-200 rounded-b-lg px-3 divide-y divide-slate-200 text-sm">
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end space-x-2">
+                <button onclick="closeCycleGenModal()" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">취소</button>
+                <button onclick="confirmGenerateCycle()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm">생성</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="truckPrintArea" class="hidden print:block">
+    </div>
+
+</div>
+
+<script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/app.js"></script>
+<script src="js/truck.js"></script>
+<script src="js/shell.js"></script>
+</body>
+</html>
