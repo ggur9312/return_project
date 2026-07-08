@@ -1,0 +1,1953 @@
+(function () {
+  "use strict";
+
+  var COLUMNS = [
+    { key: "groupNo", label: "그룹번호", type: "string" },
+    { key: "deadline", label: "마감일시", type: "date" },
+    { key: "createdAt", label: "생성일시", type: "date" },
+    { key: "purchaseType", label: "매입유형", type: "string" },
+    { key: "company", label: "업체명", type: "string" },
+    { key: "status", label: "상태", type: "string" },
+    { key: "transportType", label: "운송타입", type: "string" },
+    { key: "zone", label: "존", type: "string" },
+    { key: "quantity", label: "수량", type: "number" }
+  ];
+
+  var AGG_COLUMN = { key: "groupCompanyTotal", label: "업체 총수량", type: "number" };
+  var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN]);
+
+  var LABEL_BARCODE_OPTS = { fontSize: 25, height: 42, width: 1.3 };
+
+  var STORAGE_KEY = "pickListData";
+  var LABOR_STORAGE_KEY = "pickListLaborInput";
+  var ASSIGN_CONFIGS_KEY = "pickListAssignConfigs";
+  var ASSIGN_ACTIVE_KEY = "pickListAssignActiveId";
+  var DATE_TAB_KEY = "pickListActiveDateTab";
+  var GT_CODES_KEY = "pickListGtCodes";
+  var GT_ASSIGNMENTS_KEY = "pickListGtAssignments";
+  var GT_PRINTED_KEY = "pickListGtPrinted";
+  var BADGE_CLASSES = [
+    "bg-emerald-50 text-emerald-700 border border-emerald-100",
+    "bg-blue-50 text-blue-700 border border-blue-100",
+    "bg-amber-50 text-amber-700 border border-amber-100",
+    "bg-rose-50 text-rose-700 border border-rose-100"
+  ];
+  var FILTER_BTN_INACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
+  var FILTER_BTN_ACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-indigo-600 text-white shadow-md shadow-indigo-100 font-medium text-xs px-3 py-1.5 rounded-lg transition-all";
+
+  var NAV_BTN_ACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100";
+  var NAV_BTN_INACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50";
+  var ASSIGN_TAB_ACTIVE = "px-4 py-2.5 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100 flex items-center gap-2 transition-all duration-200";
+  var ASSIGN_TAB_INACTIVE = "px-4 py-2.5 text-sm font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-all duration-200";
+
+  var initialFilters = {};
+  COLUMNS.forEach(function (c) { initialFilters[c.key] = null; }); // null = 전체 허용(필터 없음)
+  initialFilters[AGG_COLUMN.key] = null;
+
+  var state = {
+    rows: [],
+    sortKey: null,
+    sortDir: 1,
+    filters: initialFilters,
+    floorExcluded: new Set(),
+    statusBadgeMap: {},
+    assignConfigs: [],
+    assignActiveId: null,
+    assignActiveWorkerIdx: null,
+    gtCodes: [],
+    gtAssignments: {},
+    gtPrinted: [],
+    activeDateTab: null
+  };
+
+  var els = {
+    dropZone: document.getElementById("dropZone"),
+    fileInput: document.getElementById("fileInput"),
+    fileSelectBtn: document.getElementById("fileSelectBtn"),
+    fileName: document.getElementById("fileName"),
+    pasteArea: document.getElementById("pasteArea"),
+    pasteApplyBtn: document.getElementById("pasteApplyBtn"),
+    statusMsg: document.getElementById("statusMsg"),
+    resetBtn: document.getElementById("resetBtn"),
+    laborInput: document.getElementById("laborInput"),
+    floorTotalQty: document.getElementById("floorTotalQty"),
+    floorPerPersonQty: document.getElementById("floorPerPersonQty"),
+    floorBars: document.getElementById("floorBars"),
+    dateTabsContainer: document.getElementById("dateTabsContainer"),
+    filterBar: document.getElementById("filterBar"),
+    filterResetAllBtn: document.getElementById("filterResetAllBtn"),
+    table: document.getElementById("dataTable"),
+    emptyState: document.getElementById("emptyState"),
+    tableBody: document.getElementById("tableBody"),
+    theadRow: document.querySelector("#dataTable thead tr"),
+    navHomeBtn: document.getElementById("navHomeBtn"),
+    navAssignBtn: document.getElementById("navAssignBtn"),
+    homeView: document.getElementById("homeView"),
+    assignView: document.getElementById("assignView"),
+    assignFloorInput: document.getElementById("assignFloorInput"),
+    assignCountInput: document.getElementById("assignCountInput"),
+    assignAddBtn: document.getElementById("assignAddBtn"),
+    assignMsg: document.getElementById("assignMsg"),
+    assignDateCheckboxes: document.getElementById("assignDateCheckboxes"),
+    assignTabsContainer: document.getElementById("assignTabsContainer"),
+    assignTableContainer: document.getElementById("assignTableContainer"),
+    gtPasteArea: document.getElementById("gtPasteArea"),
+    gtSaveBtn: document.getElementById("gtSaveBtn"),
+    gtClearBtn: document.getElementById("gtClearBtn"),
+    gtPrintBtn: document.getElementById("gtPrintBtn"),
+    gtAvailableCount: document.getElementById("gtAvailableCount"),
+    gtAvailableList: document.getElementById("gtAvailableList"),
+    customLabelBtn: document.getElementById("customLabelBtn"),
+    customLabelModal: document.getElementById("customLabelModal"),
+    customLabelCompanySearch: document.getElementById("customLabelCompanySearch"),
+    customLabelCompanyDropdown: document.getElementById("customLabelCompanyDropdown"),
+    customLabelGroupNo: document.getElementById("customLabelGroupNo"),
+    customLabelDeadline: document.getElementById("customLabelDeadline"),
+    customLabelPurchaseType: document.getElementById("customLabelPurchaseType"),
+    customLabelCompany: document.getElementById("customLabelCompany"),
+    customLabelTransportType: document.getElementById("customLabelTransportType"),
+    customLabelAutoMatch: document.getElementById("customLabelAutoMatch"),
+    customLabelGtCode: document.getElementById("customLabelGtCode"),
+    customLabelQty: document.getElementById("customLabelQty"),
+    customLabelPrintBtn: document.getElementById("customLabelPrintBtn"),
+    customLabelCancelBtn: document.getElementById("customLabelCancelBtn"),
+    gtPrintModal: document.getElementById("gtPrintModal"),
+    gtPrintAvailableCount: document.getElementById("gtPrintAvailableCount"),
+    gtPrintQty: document.getElementById("gtPrintQty"),
+    gtPrintModalMsg: document.getElementById("gtPrintModalMsg"),
+    gtPrintModalPrintBtn: document.getElementById("gtPrintModalPrintBtn"),
+    gtPrintModalCancelBtn: document.getElementById("gtPrintModalCancelBtn"),
+    sparePrintModal: document.getElementById("sparePrintModal"),
+    sparePrintThreshold: document.getElementById("sparePrintThreshold"),
+    sparePrintSplitSize: document.getElementById("sparePrintSplitSize"),
+    sparePrintLeadingBlank: document.getElementById("sparePrintLeadingBlank"),
+    sparePrintGroupList: document.getElementById("sparePrintGroupList"),
+    sparePrintPreview: document.getElementById("sparePrintPreview"),
+    sparePrintModalMsg: document.getElementById("sparePrintModalMsg"),
+    sparePrintModalPrintBtn: document.getElementById("sparePrintModalPrintBtn"),
+    sparePrintModalCancelBtn: document.getElementById("sparePrintModalCancelBtn"),
+    printArea: document.getElementById("printArea")
+  };
+
+  var filterEls = {}; // key -> { wrapper, btn, dropdown }
+
+  function trim(v) {
+    return (v === null || v === undefined ? "" : String(v)).trim();
+  }
+
+  function splitLine(line) {
+    var delimiter = line.indexOf("\t") !== -1 ? "\t" : ",";
+    return line.split(delimiter).map(trim);
+  }
+
+  function textToMatrix(text) {
+    return text
+      .split(/\r\n|\r|\n/)
+      .filter(function (line) { return line.trim().length > 0; })
+      .map(splitLine);
+  }
+
+  // 존 원본 값에서 "숫자+글자"(글자 뒤 숫자는 버림, 예: 53L106 → 53L) 또는
+  // "글자+숫자"(숫자까지 포함, 예: AGV1-1 → AGV1) 패턴 중 첫 매치만 추출.
+  // 매치가 없으면(이미 깨끗하거나 패턴이 없는 값) 원본 그대로 사용.
+  function normalizeZone(raw) {
+    var s = String(raw || "").trim();
+    var m = s.match(/\d+[A-Za-z]+|[A-Za-z]+\d+/);
+    return m ? m[0] : s;
+  }
+
+  function matrixToRows(matrix) {
+    if (!matrix.length) {
+      return { rows: [], error: "데이터가 비어 있습니다." };
+    }
+    var header = matrix[0];
+    var colIndex = {};
+    COLUMNS.forEach(function (col) {
+      var idx = header.findIndex(function (h) { return h === col.label; });
+      if (idx !== -1) colIndex[col.key] = idx;
+    });
+
+    var missing = COLUMNS.filter(function (col) {
+      return colIndex[col.key] === undefined;
+    });
+    if (missing.length) {
+      return {
+        rows: [],
+        error: "머리글에서 다음 컬럼을 찾을 수 없습니다: " + missing.map(function (c) { return c.label; }).join(", ")
+      };
+    }
+
+    var rows = [];
+    for (var i = 1; i < matrix.length; i++) {
+      var line = matrix[i];
+      if (line.every(function (c) { return c === ""; })) continue;
+      var obj = {};
+      COLUMNS.forEach(function (col) {
+        var raw = trim(line[colIndex[col.key]]);
+        if (col.type === "number") {
+          var n = parseFloat(raw.replace(/,/g, ""));
+          obj[col.key] = isNaN(n) ? 0 : n;
+        } else if (col.key === "zone") {
+          obj[col.key] = normalizeZone(raw);
+        } else {
+          obj[col.key] = raw;
+        }
+      });
+      rows.push(obj);
+    }
+    return { rows: rows, error: null };
+  }
+
+  function loadFromStorage() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      state.rows = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      state.rows = [];
+    }
+  }
+
+  function saveToStorage() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.rows));
+  }
+
+  function setStatusMsg(msg, kind) {
+    var color = kind === "error" ? "text-rose-600" : kind === "ok" ? "text-emerald-600" : "text-slate-500";
+    els.statusMsg.textContent = msg || "";
+    els.statusMsg.className = "text-xs " + color;
+  }
+
+  function applyParsedRows(rows) {
+    var existingKeys = {};
+    state.rows.forEach(function (r) { existingKeys[dedupKey(r)] = true; });
+    var added = [];
+    var skipped = 0;
+    rows.forEach(function (r) {
+      var key = dedupKey(r);
+      if (existingKeys[key]) { skipped++; return; }
+      existingKeys[key] = true;
+      added.push(r);
+    });
+    state.rows = state.rows.concat(added);
+    saveToStorage();
+    refreshAll();
+    return { added: added.length, skipped: skipped };
+  }
+
+  function handleParsedMatrix(matrix, sourceLabel) {
+    var result = matrixToRows(matrix);
+    if (result.error) {
+      setStatusMsg(result.error, "error");
+      return;
+    }
+    if (!result.rows.length) {
+      setStatusMsg("적용할 데이터가 없습니다.", "error");
+      return;
+    }
+    var applyResult = applyParsedRows(result.rows);
+    setStatusMsg(sourceLabel + "에서 " + applyResult.added + "건을 추가했습니다." +
+      (applyResult.skipped ? " (중복 " + applyResult.skipped + "건 제외)" : ""), "ok");
+  }
+
+  function handleFile(file) {
+    if (!file) return;
+    els.fileName.textContent = file.name;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, { type: "array" });
+        var wsName = wb.SheetNames[0];
+        var ws = wb.Sheets[wsName];
+        var matrix = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+        handleParsedMatrix(matrix, "엑셀 파일");
+      } catch (err) {
+        setStatusMsg("엑셀 파일을 읽는 중 오류가 발생했습니다: " + err.message, "error");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function debounce(fn, wait) {
+    var timer = null;
+    return function () {
+      var args = arguments, ctx = this;
+      clearTimeout(timer);
+      timer = setTimeout(function () { fn.apply(ctx, args); }, wait);
+    };
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function uniqueValuesFrom(rows, getter) {
+    var set = {};
+    rows.forEach(function (r) {
+      var v = getter(r);
+      if (v !== "" && v !== null && v !== undefined) set[v] = true;
+    });
+    return Object.keys(set).sort();
+  }
+
+  // 여러 형식(연-월-일 시:분, 또는 Date가 파싱 가능한 그 외 형식)의 날짜 문자열을
+  // Date 객체로 변환. formatMonthDay/getCreatedDate가 공통으로 사용.
+  function parseFlexibleDate(str) {
+    var raw = String(str || "").trim();
+    var m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    var parsed = new Date(raw);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  // 생성일시(createdAt)에서 시간을 뺀 날짜 부분만 "YYYY-MM-DD"로 반환 — 중복제거,
+  // 날짜별 탭, 집품 할당의 생성일자 선택에서 공통으로 쓰는 그룹핑 키.
+  function getCreatedDate(row) {
+    var d = parseFlexibleDate(row && row.createdAt);
+    if (!d) return String((row && row.createdAt) || "");
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // 현재 활성 날짜 탭(state.activeDateTab)으로 좁혀진 행 — null이면 전체
+  function getDateScopedRows() {
+    if (state.activeDateTab === null) return state.rows;
+    return state.rows.filter(function (r) { return getCreatedDate(r) === state.activeDateTab; });
+  }
+
+  // 업로드 중복 판정 키: 그룹번호 + 생성일자 + 업체명 + 존
+  function dedupKey(r) {
+    return r.groupNo + "|" + getCreatedDate(r) + "|" + r.company + "|" + r.zone;
+  }
+
+  function uniqueValues(key) {
+    var values = uniqueValuesFrom(getDateScopedRows(), function (r) { return r[key]; });
+    var col = COLUMNS.find(function (c) { return c.key === key; });
+    if (col && col.type === "number") {
+      values.sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
+    }
+    return values;
+  }
+
+  function getPreFilteredRowsFrom(baseRows) {
+    return baseRows.filter(function (r) {
+      for (var i = 0; i < COLUMNS.length; i++) {
+        var col = COLUMNS[i];
+        var filterSet = state.filters[col.key];
+        if (filterSet === null || filterSet === undefined) continue;
+        if (!filterSet.has(String(r[col.key]))) return false;
+      }
+      return true;
+    });
+  }
+
+  function computeGroupCompanyTotals(rows) {
+    var map = {};
+    rows.forEach(function (r) {
+      var k = r.groupNo + "" + r.company;
+      map[k] = (map[k] || 0) + (r.quantity || 0);
+    });
+    return map;
+  }
+
+  // 헤더 필터 드롭다운의 후보값 목록: 원본 컬럼은 활성 날짜 탭 범위 전체 기준,
+  // 파생 컬럼(groupCompanyTotal)은 다른 9개 컬럼 필터만 적용한 중간 결과 기준
+  // (자기 자신의 필터와는 순환 참조되지 않도록)
+  function getCandidateValues(key) {
+    if (key === AGG_COLUMN.key) {
+      var preFiltered = getPreFilteredRowsFrom(getDateScopedRows());
+      var gcMap = computeGroupCompanyTotals(preFiltered);
+      return uniqueValuesFrom(preFiltered, function (r) { return gcMap[r.groupNo + "" + r.company]; })
+        .sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
+    }
+    return uniqueValues(key);
+  }
+
+  // 컬럼 필터 + 집계(groupCompanyTotal) 필터를 baseRows 위에 적용 — 홈 화면
+  // (날짜 탭으로 스코프된 행)과 집품 할당(날짜 탭과 무관, 자체 생성일자 선택)이
+  // 서로 다른 baseRows로 재사용
+  function computeFilteredRows(baseRows) {
+    var preFiltered = getPreFilteredRowsFrom(baseRows);
+    var gcMap = computeGroupCompanyTotals(preFiltered);
+    var withAgg = preFiltered.map(function (r) {
+      var clone = Object.assign({}, r);
+      clone.groupCompanyTotal = gcMap[r.groupNo + "" + r.company];
+      return clone;
+    });
+    var aggFilterSet = state.filters[AGG_COLUMN.key];
+    if (aggFilterSet === null || aggFilterSet === undefined) return withAgg;
+    return withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+  }
+
+  function getFilteredRows() {
+    return computeFilteredRows(getDateScopedRows());
+  }
+
+  // 집품 할당 전용 — 컬럼/집계 필터는 반영하되 홈 화면의 활성 날짜 탭 스코프는
+  // 배제(집품 할당은 자체 생성일자 다중 선택으로 별도 범위를 지정하므로)
+  function getAssignBaseRows() {
+    return computeFilteredRows(state.rows);
+  }
+
+  // --- 정렬 (테이블 헤더 라벨 클릭) ---
+
+  function setupSortLabels() {
+    Array.prototype.forEach.call(els.theadRow.querySelectorAll("th[data-key]"), function (th) {
+      var key = th.dataset.key;
+      th.addEventListener("click", function () {
+        if (state.sortKey === key) {
+          state.sortDir = state.sortDir * -1;
+        } else {
+          state.sortKey = key;
+          state.sortDir = 1;
+        }
+        refreshAll();
+      });
+    });
+  }
+
+  function updateSortHeaderClasses() {
+    Array.prototype.forEach.call(els.theadRow.querySelectorAll("th[data-key]"), function (th) {
+      var key = th.dataset.key;
+      var label = th.querySelector(".th-label");
+      var arrow = label.querySelector(".sort-arrow");
+      if (state.sortKey === key) {
+        if (!arrow) {
+          arrow = document.createElement("span");
+          arrow.className = "sort-arrow ml-1 text-indigo-600";
+          label.appendChild(arrow);
+        }
+        arrow.textContent = state.sortDir === 1 ? "▲" : "▼";
+      } else if (arrow) {
+        arrow.remove();
+      }
+    });
+  }
+
+  // --- 별도 필터 바 (검색 + 다중 선택, "적용" 버튼을 눌러야 실제 반영) ---
+
+  var pendingFilterDrafts = {}; // key -> Set, 드롭다운이 열려있는 동안의 임시 선택 상태(미적용)
+
+  function getEffectiveSet(key) {
+    if (pendingFilterDrafts[key]) return new Set(pendingFilterDrafts[key]);
+    var s = state.filters[key];
+    if (s === null || s === undefined) return new Set(getCandidateValues(key));
+    return new Set(s);
+  }
+
+  function getSearchedValues(key, term) {
+    var values = getCandidateValues(key);
+    if (!term) return values;
+    var lower = term.toLowerCase();
+    return values.filter(function (v) { return String(v).toLowerCase().indexOf(lower) !== -1; });
+  }
+
+  function commitFilterSet(key, set) {
+    var allValues = getCandidateValues(key);
+    state.filters[key] = set.size === allValues.length ? null : set;
+  }
+
+  function setupFilterBar() {
+    Array.prototype.forEach.call(els.filterBar.querySelectorAll(".filter-bar-btn"), function (btn) {
+      var key = btn.dataset.key;
+      var wrapper = btn.parentElement;
+      filterEls[key] = { wrapper: wrapper, btn: btn, dropdown: null };
+
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        toggleDropdown(key);
+      });
+    });
+
+    document.addEventListener("click", function (e) {
+      Object.keys(filterEls).forEach(function (key) {
+        var entry = filterEls[key];
+        if (entry.dropdown && !entry.dropdown.classList.contains("hidden") && !entry.dropdown.contains(e.target) && e.target !== entry.btn) {
+          closeDropdown(key);
+        }
+      });
+    });
+
+    els.filterResetAllBtn.addEventListener("click", function () {
+      Object.keys(filterEls).forEach(function (key) { closeDropdown(key); });
+      ALL_COLUMNS.forEach(function (c) { state.filters[c.key] = null; });
+      pendingFilterDrafts = {};
+      refreshAll();
+    });
+  }
+
+  function buildDropdown(key) {
+    var div = document.createElement("div");
+    div.className = "th-filter-dropdown hidden absolute top-full left-0 mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 font-normal whitespace-normal text-left";
+    div.innerHTML =
+      '<input type="text" class="th-filter-search w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs mb-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="검색...">' +
+      '<label class="flex items-center gap-1.5 text-xs pb-1.5 mb-1.5 border-b border-slate-200 text-slate-500"><input type="checkbox" class="th-filter-selectall-cb accent-indigo-600"> 전체 선택</label>' +
+      '<div class="th-filter-list max-h-44 overflow-y-auto flex flex-col gap-1"></div>' +
+      '<div class="flex gap-2 mt-2 pt-2 border-t border-slate-200">' +
+      '<button type="button" class="th-filter-apply flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg py-1.5 transition-colors">적용</button>' +
+      '<button type="button" class="th-filter-reset flex-1 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-lg py-1.5 transition-colors">초기화</button>' +
+      "</div>";
+    div.addEventListener("click", function (e) { e.stopPropagation(); });
+
+    var searchInput = div.querySelector(".th-filter-search");
+    var selectAllCb = div.querySelector(".th-filter-selectall-cb");
+
+    searchInput.addEventListener("input", debounce(function () {
+      var term = searchInput.value;
+      var visible = getSearchedValues(key, term);
+      pendingFilterDrafts[key] = new Set(visible);
+      renderDropdownItems(key);
+    }, 150));
+
+    selectAllCb.addEventListener("change", function () {
+      var term = searchInput.value;
+      var visible = getSearchedValues(key, term);
+      var set = getEffectiveSet(key);
+      visible.forEach(function (v) {
+        if (selectAllCb.checked) set.add(v); else set.delete(v);
+      });
+      pendingFilterDrafts[key] = set;
+      renderDropdownItems(key);
+    });
+
+    div.querySelector(".th-filter-apply").addEventListener("click", function () {
+      if (pendingFilterDrafts[key]) {
+        commitFilterSet(key, pendingFilterDrafts[key]);
+        delete pendingFilterDrafts[key];
+        refreshAll();
+      }
+      closeDropdown(key);
+    });
+
+    div.querySelector(".th-filter-reset").addEventListener("click", function () {
+      state.filters[key] = null;
+      delete pendingFilterDrafts[key];
+      renderDropdownItems(key);
+      refreshAll();
+    });
+
+    return div;
+  }
+
+  function renderDropdownItems(key) {
+    var entry = filterEls[key];
+    var dropdown = entry.dropdown;
+    var searchInput = dropdown.querySelector(".th-filter-search");
+    var selectAllCb = dropdown.querySelector(".th-filter-selectall-cb");
+    var listEl = dropdown.querySelector(".th-filter-list");
+    var term = searchInput.value;
+    var visible = getSearchedValues(key, term);
+    var effectiveSet = getEffectiveSet(key);
+
+    listEl.innerHTML = visible.map(function (v) {
+      var checked = effectiveSet.has(v) ? " checked" : "";
+      var displayText = (key === "deadline" || key === "createdAt") ? formatDateOnly(v) : v;
+      return (
+        '<label class="th-filter-item flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" class="th-filter-item-cb accent-indigo-600" value="' + escapeHtml(v) + '"' + checked + "> " + escapeHtml(displayText) + "</label>"
+      );
+    }).join("");
+
+    var visibleCheckedCount = visible.filter(function (v) { return effectiveSet.has(v); }).length;
+    selectAllCb.checked = visible.length > 0 && visibleCheckedCount === visible.length;
+    selectAllCb.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visible.length;
+
+    Array.prototype.forEach.call(listEl.querySelectorAll(".th-filter-item-cb"), function (cb) {
+      cb.addEventListener("change", function () {
+        var set = getEffectiveSet(key);
+        if (cb.checked) set.add(cb.value); else set.delete(cb.value);
+        pendingFilterDrafts[key] = set;
+        renderDropdownItems(key);
+      });
+    });
+  }
+
+  function openDropdown(key) {
+    Object.keys(filterEls).forEach(function (k) {
+      if (k !== key && filterEls[k].dropdown && !filterEls[k].dropdown.classList.contains("hidden")) {
+        closeDropdown(k);
+      }
+    });
+    var entry = filterEls[key];
+    if (!entry.dropdown) {
+      entry.dropdown = buildDropdown(key);
+      entry.wrapper.appendChild(entry.dropdown);
+    }
+    delete pendingFilterDrafts[key]; // 매번 열 때 커밋된 상태에서 새로 시작
+    renderDropdownItems(key);
+    entry.dropdown.classList.remove("hidden");
+  }
+
+  function closeDropdown(key) {
+    var entry = filterEls[key];
+    if (!entry.dropdown || entry.dropdown.classList.contains("hidden")) return;
+    entry.dropdown.classList.add("hidden");
+    delete pendingFilterDrafts[key]; // 적용 없이 닫으면 임시 선택은 버림
+    var searchInput = entry.dropdown.querySelector(".th-filter-search");
+    if (searchInput) searchInput.value = ""; // 검색창에 직접 입력한 검색어도 닫으면 초기화
+  }
+
+  function toggleDropdown(key) {
+    var entry = filterEls[key];
+    var isHidden = !entry.dropdown || entry.dropdown.classList.contains("hidden");
+    if (isHidden) {
+      openDropdown(key);
+    } else {
+      closeDropdown(key);
+    }
+  }
+
+  function updateFilterButtonStates() {
+    Object.keys(filterEls).forEach(function (key) {
+      var btn = filterEls[key].btn;
+      var active = state.filters[key] !== null && state.filters[key] !== undefined;
+      var label = ALL_COLUMNS.find(function (c) { return c.key === key; }).label;
+      btn.className = active ? FILTER_BTN_ACTIVE : FILTER_BTN_INACTIVE;
+      btn.innerHTML = escapeHtml(label) + ' <span class="text-[9px]">▾</span>';
+    });
+  }
+
+  function updateStatusBadgeMap() {
+    var statuses = uniqueValues("status");
+    var map = {};
+    statuses.forEach(function (s, i) {
+      map[s] = BADGE_CLASSES[i % BADGE_CLASSES.length];
+    });
+    state.statusBadgeMap = map;
+  }
+
+  function compareValues(a, b, col) {
+    if (col.type === "number") {
+      return (a[col.key] || 0) - (b[col.key] || 0);
+    }
+    if (col.type === "date") {
+      var ta = Date.parse(a[col.key]);
+      var tb = Date.parse(b[col.key]);
+      if (!isNaN(ta) && !isNaN(tb)) return ta - tb;
+    }
+    return String(a[col.key]).localeCompare(String(b[col.key]), "ko");
+  }
+
+  function getSortedRows(rows) {
+    if (!state.sortKey) return rows;
+    var col = ALL_COLUMNS.find(function (c) { return c.key === state.sortKey; });
+    if (!col) return rows;
+    var copy = rows.slice();
+    copy.sort(function (a, b) { return compareValues(a, b, col) * state.sortDir; });
+    return copy;
+  }
+
+  function getFloor(zone) {
+    var s = String(zone || "").trim();
+    if (!s) return "(미지정)";
+    if (/^[A-Za-z]/.test(s)) return s;
+    var f = s.replace(/[A-Za-z]/g, "").trim();
+    return f || "(미지정)";
+  }
+
+  function floorSortKey(label) {
+    var n = parseFloat(label);
+    return isNaN(n) ? Infinity : n;
+  }
+
+  function renderFloorPanel(rows) {
+    var byFloor = {};
+    rows.forEach(function (r) {
+      var floor = getFloor(r.zone);
+      byFloor[floor] = (byFloor[floor] || 0) + (r.quantity || 0);
+    });
+    var floors = Object.keys(byFloor).sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); });
+
+    var includedFloors = floors.filter(function (f) { return !state.floorExcluded.has(f); });
+    var totalQty = includedFloors.reduce(function (sum, f) { return sum + byFloor[f]; }, 0);
+    els.floorTotalQty.textContent = totalQty.toLocaleString("ko-KR") + "개";
+
+    var labor = parseFloat(els.laborInput.value);
+    var hasLabor = !isNaN(labor) && labor > 0 && totalQty > 0;
+    els.floorPerPersonQty.textContent = hasLabor ? Math.round(totalQty / labor).toLocaleString("ko-KR") + "개" : "-";
+    var maxQty = floors.reduce(function (m, f) { return Math.max(m, byFloor[f]); }, 0) || 1;
+
+    els.floorBars.innerHTML = floors.map(function (f) {
+      var qty = byFloor[f];
+      var widthPct = (qty / maxQty) * 100;
+      var excluded = state.floorExcluded.has(f);
+      var laborHtml;
+      var perPersonHtml;
+      if (excluded) {
+        laborHtml = '<span class="text-slate-400">제외됨</span>';
+        perPersonHtml = '<span class="text-slate-400">-</span>';
+      } else if (hasLabor) {
+        var laborForFloorRaw = labor * (qty / totalQty);
+        laborHtml = '<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 text-sm font-bold px-3 py-1 rounded-full">' + laborForFloorRaw.toFixed(1) + "명</span>";
+        var roundedLabor = Math.round(laborForFloorRaw);
+        perPersonHtml = roundedLabor > 0
+          ? Math.round(qty / roundedLabor).toLocaleString("ko-KR") + "개/인"
+          : '<span class="text-slate-400">-</span>';
+      } else {
+        laborHtml = '<span class="text-slate-400">-</span>';
+        perPersonHtml = '<span class="text-slate-400">-</span>';
+      }
+      return (
+        '<div class="grid grid-cols-[24px_60px_1fr_90px_110px_100px] items-center gap-2.5 text-xs' + (excluded ? " opacity-40" : "") + '">' +
+        '<input type="checkbox" class="floor-checkbox accent-indigo-600 cursor-pointer" data-floor="' + escapeHtml(f) + '"' + (excluded ? "" : " checked") + ">" +
+        '<div class="text-slate-500 whitespace-nowrap">' + escapeHtml(f) + "층</div>" +
+        '<div class="bg-slate-100 rounded-full overflow-hidden h-[10px]"><div class="bg-indigo-500 h-full rounded-full" style="width:' + widthPct + '%"></div></div>' +
+        '<div class="text-right tabular-nums text-slate-700">' + qty.toLocaleString("ko-KR") + "개</div>" +
+        '<div class="text-right tabular-nums">' + laborHtml + "</div>" +
+        '<div class="text-right tabular-nums text-slate-500">' + perPersonHtml + "</div>" +
+        "</div>"
+      );
+    }).join("");
+
+    Array.prototype.forEach.call(els.floorBars.querySelectorAll(".floor-checkbox"), function (cb) {
+      cb.addEventListener("change", function () {
+        var floor = cb.dataset.floor;
+        if (cb.checked) state.floorExcluded.delete(floor); else state.floorExcluded.add(floor);
+        renderFloorPanel(getFilteredRows());
+      });
+    });
+  }
+
+  // --- 생성일자별 탭 (홈) ---
+
+  function saveDateTabState() {
+    localStorage.setItem(DATE_TAB_KEY, state.activeDateTab === null ? "" : state.activeDateTab);
+  }
+
+  function loadDateTabState() {
+    var raw = localStorage.getItem(DATE_TAB_KEY);
+    state.activeDateTab = raw ? raw : null;
+  }
+
+  function getAllCreatedDates() {
+    return uniqueValuesFrom(state.rows, getCreatedDate).sort();
+  }
+
+  function renderDateTabs() {
+    var dates = getAllCreatedDates();
+    els.dateTabsContainer.innerHTML = "";
+
+    var allBtn = document.createElement("button");
+    allBtn.className = state.activeDateTab === null ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
+    allBtn.innerHTML = "<span>전체</span>";
+    allBtn.addEventListener("click", function () {
+      state.activeDateTab = null;
+      saveDateTabState();
+      refreshAll();
+    });
+    els.dateTabsContainer.appendChild(allBtn);
+
+    dates.forEach(function (date) {
+      var isActive = state.activeDateTab === date;
+      var tabBtn = document.createElement("button");
+      tabBtn.className = isActive ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
+      tabBtn.innerHTML =
+        "<span>" + escapeHtml(date) + "</span>" +
+        '<span class="date-tab-close text-xs opacity-70 hover:opacity-100 ml-1">✕</span>';
+      tabBtn.addEventListener("click", function (e) {
+        if (e.target.closest(".date-tab-close")) {
+          removeRowsByDate(date);
+        } else {
+          state.activeDateTab = date;
+          saveDateTabState();
+          refreshAll();
+        }
+      });
+      els.dateTabsContainer.appendChild(tabBtn);
+    });
+  }
+
+  function removeRowsByDate(date) {
+    var count = state.rows.filter(function (r) { return getCreatedDate(r) === date; }).length;
+    if (!confirm("생성일자 '" + date + "' 데이터 " + count + "건을 모두 삭제할까요?")) return;
+    state.rows = state.rows.filter(function (r) { return getCreatedDate(r) !== date; });
+    if (state.activeDateTab === date) state.activeDateTab = null;
+    saveToStorage();
+    saveDateTabState();
+    refreshAll();
+  }
+
+  // --- 뷰 전환 (홈 / 집품 할당) ---
+
+  function switchView(view) {
+    if (view === "assign") {
+      els.homeView.classList.add("hidden");
+      els.assignView.classList.remove("hidden");
+      els.navHomeBtn.className = NAV_BTN_INACTIVE;
+      els.navAssignBtn.className = NAV_BTN_ACTIVE;
+    } else {
+      els.assignView.classList.add("hidden");
+      els.homeView.classList.remove("hidden");
+      els.navAssignBtn.className = NAV_BTN_INACTIVE;
+      els.navHomeBtn.className = NAV_BTN_ACTIVE;
+    }
+    // refreshAll()은 숨겨진 화면의 렌더링을 건너뛰므로, 방금 보이게 된 화면이
+    // 숨겨져 있는 동안 놓쳤을 수 있는 갱신을 따라잡도록 전환 직후 한 번 그려준다.
+    refreshAll();
+  }
+
+  // --- 집품 할당 ---
+
+  function saveAssignState() {
+    localStorage.setItem(ASSIGN_CONFIGS_KEY, JSON.stringify(state.assignConfigs));
+    localStorage.setItem(ASSIGN_ACTIVE_KEY, state.assignActiveId === null ? "" : String(state.assignActiveId));
+  }
+
+  function loadAssignState() {
+    try {
+      var raw = localStorage.getItem(ASSIGN_CONFIGS_KEY);
+      state.assignConfigs = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      state.assignConfigs = [];
+    }
+    var activeRaw = localStorage.getItem(ASSIGN_ACTIVE_KEY);
+    state.assignActiveId = activeRaw ? parseInt(activeRaw, 10) : null;
+    if (!state.assignConfigs.some(function (c) { return c.id === state.assignActiveId; })) {
+      state.assignActiveId = state.assignConfigs.length ? state.assignConfigs[0].id : null;
+    }
+  }
+
+  // --- GT 바코드 ---
+
+  function saveGtState() {
+    localStorage.setItem(GT_CODES_KEY, JSON.stringify(state.gtCodes));
+    localStorage.setItem(GT_ASSIGNMENTS_KEY, JSON.stringify(state.gtAssignments));
+    localStorage.setItem(GT_PRINTED_KEY, JSON.stringify(state.gtPrinted));
+  }
+
+  function loadGtState() {
+    try {
+      var codesRaw = localStorage.getItem(GT_CODES_KEY);
+      state.gtCodes = codesRaw ? JSON.parse(codesRaw) : [];
+    } catch (e) {
+      state.gtCodes = [];
+    }
+    try {
+      var assignRaw = localStorage.getItem(GT_ASSIGNMENTS_KEY);
+      state.gtAssignments = assignRaw ? JSON.parse(assignRaw) : {};
+    } catch (e) {
+      state.gtAssignments = {};
+    }
+    try {
+      var printedRaw = localStorage.getItem(GT_PRINTED_KEY);
+      state.gtPrinted = printedRaw ? JSON.parse(printedRaw) : [];
+    } catch (e) {
+      state.gtPrinted = [];
+    }
+  }
+
+  function parseGtTokens(text) {
+    return text
+      .split(/[\t,\s]+/)
+      .map(function (t) { return t.trim(); })
+      .filter(function (t) { return t.length > 0; });
+  }
+
+  function getGtUsedSet() {
+    var used = {};
+    Object.keys(state.gtAssignments).forEach(function (k) { used[state.gtAssignments[k]] = true; });
+    state.gtPrinted.forEach(function (c) { used[c] = true; });
+    return used;
+  }
+
+  function getAvailableGtCodes() {
+    var used = getGtUsedSet();
+    return state.gtCodes.filter(function (code) { return !used[code]; });
+  }
+
+  function renderGtAvailableList() {
+    var used = getGtUsedSet();
+    var availableCount = state.gtCodes.filter(function (code) { return !used[code]; }).length;
+    els.gtAvailableCount.textContent = availableCount;
+    if (!state.gtCodes.length) {
+      els.gtAvailableList.innerHTML = '<span class="text-xs text-slate-400">저장된 GT 데이터가 없습니다.</span>';
+      return;
+    }
+    // 자동매칭/GT출력과 동일한 역순(나중에 붙여넣은 것부터)으로 보여줘서
+    // 1행이 곧 다음 매칭에 쓰일 코드임을 그대로 확인할 수 있게 함
+    var matchOrder = state.gtCodes.slice().reverse();
+    var rowsHtml = matchOrder.map(function (code, idx) {
+      var isUsed = !!used[code];
+      var statusHtml = isUsed
+        ? '<span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 text-[10px] font-semibold">사용중</span>'
+        : '<span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold">사용가능</span>';
+      return (
+        '<tr class="border-b border-slate-100 last:border-b-0">' +
+        '<td class="px-2 py-1 text-slate-400 text-right w-10">' + (idx + 1) + "</td>" +
+        '<td class="px-2 py-1 font-mono font-medium ' + (isUsed ? "text-slate-400" : "text-indigo-700") + '">' + escapeHtml(code) + "</td>" +
+        '<td class="px-2 py-1 text-right">' + statusHtml + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+    els.gtAvailableList.innerHTML =
+      '<table class="w-full text-xs border-collapse">' +
+      '<thead><tr class="text-slate-400 border-b border-slate-200"><th class="px-2 py-1 text-right font-medium w-10">순번</th><th class="px-2 py-1 text-left font-medium">GT 코드</th><th class="px-2 py-1 text-right font-medium">상태</th></tr></thead>' +
+      "<tbody>" + rowsHtml + "</tbody>" +
+      "</table>";
+  }
+
+  function setAssignGt(key, code) {
+    if (code) {
+      state.gtAssignments[key] = code;
+    } else {
+      delete state.gtAssignments[key];
+    }
+    saveGtState();
+    renderGtAvailableList();
+    // change 이벤트가 이 input의 blur 처리 중일 수 있으므로, 그 처리가 끝난 뒤
+    // 다음 틱에 컨테이너를 다시 그려서 "노드가 더 이상 자식이 아님" 오류를 피함.
+    setTimeout(renderAssignPanel, 0);
+  }
+
+  function autoMatchGtForWorker(cfg, workerIdx, detailRows) {
+    // 입력된 순서 그대로 저장된 GT 목록을 뒤에서부터(역순으로) 소진
+    var available = getAvailableGtCodes().slice().reverse();
+    var ai = 0;
+    detailRows.forEach(function (r, rowIdx) {
+      var key = cfg.id + ":" + workerIdx + ":" + rowIdx;
+      if (state.gtAssignments[key]) return;
+      if (ai >= available.length) return;
+      state.gtAssignments[key] = available[ai];
+      ai++;
+    });
+    saveGtState();
+    renderGtAvailableList();
+    renderAssignPanel();
+  }
+
+  function resetGtForWorker(cfg, workerIdx) {
+    var prefix = cfg.id + ":" + workerIdx + ":";
+    Object.keys(state.gtAssignments).forEach(function (key) {
+      if (key.indexOf(prefix) === 0) delete state.gtAssignments[key];
+    });
+    saveGtState();
+    renderGtAvailableList();
+    renderAssignPanel();
+  }
+
+  function formatMonthDay(dateStr) {
+    var d = parseFlexibleDate(dateStr);
+    if (!d) return dateStr || "";
+    return String(d.getMonth() + 1).padStart(2, "0") + "/" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // 테이블 표시용 — 원본 형식과 무관하게 날짜 부분을 YYYY-MM-DD로 통일하고,
+  // 원본에 시:분이 있었다면 그대로 이어붙임
+  function formatDateDisplay(dateStr) {
+    var d = parseFlexibleDate(dateStr);
+    if (!d) return dateStr || "";
+    var time = String(dateStr).match(/(\d{1,2}:\d{2})/);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0") + (time ? " " + time[1] : "");
+  }
+
+  // 업체 선택 시 마감일시 입력칸에 시간 없이 날짜만 YYYY-MM-DD로 채우는 용도
+  function formatDateOnly(dateStr) {
+    var d = parseFlexibleDate(dateStr);
+    if (!d) return dateStr || "";
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+  }
+
+  // 값이 없으면 완전히 빈칸(괄호도 표시 안 함)
+  function bracketPart(val) {
+    return val ? "[" + escapeHtml(val) + "]" : "";
+  }
+
+  // 출력물 전용 매입유형 표시 매핑(홈/할당 화면 테이블 표시는 원본 값 그대로 유지)
+  function formatPurchaseTypeLabel(val) {
+    if (val === "업체보관상품") return "업체상품";
+    if (val === "쿠팡상품") return "일반상품";
+    return val;
+  }
+
+  function buildBarcodeHtml(gtCode) {
+    return gtCode ? '<svg class="gt-label-barcode-svg" data-code="' + escapeHtml(gtCode) + '"></svg>' : "";
+  }
+
+  // 라벨 4종이 공유하는 바코드 셀 마크업 — sizingClass로 박스 전체를 채울지
+  // (flex-1, buildLabelHtml) 내용 크기만큼만 차지할지(shrink-0, printGtLabels) 결정
+  function buildBarcodeCellHtml(barcodeHtml, sizingClass) {
+    return '<div class="' + sizingClass + ' flex flex-col items-center justify-center pt-1 px-1 overflow-hidden">' + barcodeHtml + "</div>";
+  }
+
+  // 집품 할당/커스텀/여분 라벨이 공유하는 4칸 라벨 마크업 — 값이 없는 필드는
+  // bracketPart/빈 문자열을 그대로 넘기면 완전히 빈칸으로 표시됨
+  function buildLabelHtml(line1, companyText, line3, barcodeHtml) {
+    return (
+      '<div class="gt-label break-after-page w-[5cm] h-[4cm] flex flex-col divide-y divide-black text-center text-black box-border overflow-hidden">' +
+      '<div class="shrink-0 flex items-center justify-center py-0.5 overflow-hidden"><span class="text-xs font-bold leading-none text-black">' + line1 + "</span></div>" +
+      '<div class="flex-1 flex items-center justify-center px-1 overflow-hidden"><span class="text-base font-bold leading-tight text-black break-words line-clamp-2">' + escapeHtml(companyText || "") + "</span></div>" +
+      '<div class="shrink-0 flex items-center justify-center py-0.5 overflow-hidden"><span class="text-sm font-bold leading-none text-black">' + line3 + "</span></div>" +
+      buildBarcodeCellHtml(barcodeHtml, "flex-1") +
+      "</div>"
+    );
+  }
+
+  function renderLabelBarcodes(container, barcodeOpts) {
+    Array.prototype.forEach.call(container.querySelectorAll(".gt-label-barcode-svg"), function (svg) {
+      try {
+        JsBarcode(svg, svg.dataset.code, Object.assign({ format: "CODE128", displayValue: true, margin: 0, lineColor: "#000000", fontOptions: "bold", font: "'Noto Sans KR', sans-serif" }, barcodeOpts));
+        // 코드 길이가 늘어나면 JsBarcode가 SVG 너비만 늘리고 높이(=barcodeOpts.height/fontSize
+        // 기반, 코드 내용과 무관하게 항상 동일)는 그대로 두는데, CSS에서 이 SVG를 max-w-full
+        // h-auto로 비율 유지 축소해버리면 너비가 넘치는 라벨만 높이까지 같이 줄어들어 라벨마다
+        // 바코드/글씨 크기가 들쭉날쭉해 보였다. 높이는 방금 계산된 고정값 그대로 CSS에 얼리고,
+        // 너비만 라벨 폭에 맞춰 채우되 preserveAspectRatio=none으로 세로 왜곡 없이 가로만
+        // 늘어나거나 압축되게 해서, 코드 길이와 무관하게 항상 같은 절대 크기로 보이게 한다.
+        svg.style.height = svg.getAttribute("height");
+        svg.style.width = "100%";
+        svg.setAttribute("preserveAspectRatio", "none");
+        // JsBarcode가 <text>에 style="font:bold ..." 인라인 스타일을 직접 박아넣어서
+        // font-weight를 attribute로 지정해봐야 인라인 style에 밀려 무시된다.
+        // 같은 인라인 style 안의 font-weight 롱핸드를 직접 덮어써야 실제로 적용됨.
+        // 다만 Noto Sans KR은 700 굵기까지만 로드되어 있어 font-weight만으로는
+        // 브라우저가 700으로 클램프할 수 있으므로, stroke로 페이크 볼드를 덧입혀
+        // 폰트의 실제 굵기 지원 여부와 무관하게 항상 두껍게 보이도록 함
+        Array.prototype.forEach.call(svg.querySelectorAll("text"), function (t) {
+          t.style.fontWeight = "900";
+          t.setAttribute("stroke", "#000000");
+          t.setAttribute("stroke-width", "0.5");
+          t.style.paintOrder = "stroke";
+        });
+      } catch (e) {
+        // 바코드 라이브러리를 못 불러온 경우(오프라인 등) 코드 텍스트만 표시
+        svg.outerHTML = '<div class="text-lg font-bold font-mono text-black" style="font-weight:900">' + escapeHtml(svg.dataset.code) + "</div>";
+      }
+    });
+  }
+
+  // innerHTML 갱신 직후 곧바로 print()를 호출하면 브라우저가 레이아웃을 아직
+  // 반영하지 않아 이전 인쇄 내용이 나올 수 있음 — 두 번의 rAF로 페인트를 기다린 뒤 인쇄
+  function triggerPrint() {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        window.print();
+      });
+    });
+  }
+
+  function printWorkerLabels(cfg, workerIdx, detailRows) {
+    if (!detailRows.length) return;
+    var labelsHtml = detailRows.map(function (r, rowIdx) {
+      var gtKey = cfg.id + ":" + workerIdx + ":" + rowIdx;
+      var gtCode = state.gtAssignments[gtKey] || "";
+      var line1 = bracketPart(formatPurchaseTypeLabel(r.purchaseType)) + bracketPart(r.transportType) + bracketPart(r.groupNo);
+      var line3 = bracketPart(formatMonthDay(r.deadline)) + (r.zone ? "[" + escapeHtml(r.zone) + "/" + Number(r.quantity || 0) + "EA]" : "");
+      return buildLabelHtml(line1, r.company, line3, buildBarcodeHtml(gtCode));
+    }).join("");
+
+    els.printArea.innerHTML = labelsHtml;
+    renderLabelBarcodes(els.printArea, LABEL_BARCODE_OPTS);
+    triggerPrint();
+  }
+
+  // 집품 할당과 무관하게 GT 바코드 자체만 담긴 라벨을 인쇄. 최근 붙여넣은
+  // 순서부터(역순) 요청한 수량만큼 뽑아 인쇄하며, 인쇄된 코드는 gtPrintBtn
+  // 핸들러에서 state.gtPrinted로 소진 처리되어 재사용/중복 인쇄가 불가능해짐.
+  function printGtLabels(codes) {
+    if (!codes.length) return;
+    // 빈 문자열을 그대로 넘기면 브라우저가 그 줄의 줄박스를 아예 생략해버려
+    // (내용이 있는 다른 라벨보다) 위 3줄이 낮아지고 바코드 행이 더 커져버린다.
+    // 화면엔 안 보이지만 줄 높이는 그대로 확보하는 스페이스 한 칸으로 채워
+    // 다른 라벨과 정확히 같은 크기/위치가 되도록 한다.
+    var blank = " ";
+    var labelsHtml = codes.map(function (code) {
+      return buildLabelHtml(blank, blank, blank, buildBarcodeHtml(code));
+    }).join("");
+
+    els.printArea.innerHTML = labelsHtml;
+    renderLabelBarcodes(els.printArea, LABEL_BARCODE_OPTS);
+    triggerPrint();
+  }
+
+  // 데이터와 무관하게 사용자가 직접 값을 입력해 라벨을 발행. 자동매칭이면 장마다
+  // 다른 GT 코드를 순서대로 소진(gtPrinted에 반영), 수동 입력이면 모든 장에 같은
+  // 코드를 사용(가용 목록과 무관한 임의 문자열일 수 있어 소진하지 않음).
+  function printCustomLabels(fields, qty, useAutoMatch, manualCode) {
+    if (qty < 1) return;
+    var autoCodes = useAutoMatch ? getAvailableGtCodes().slice().reverse().slice(0, qty) : [];
+    var labelsHtml = "";
+    for (var i = 0; i < qty; i++) {
+      var gtCode = useAutoMatch ? (autoCodes[i] || "") : (manualCode || "");
+      var line1 = bracketPart(formatPurchaseTypeLabel(fields.purchaseType)) + bracketPart(fields.transportType) + bracketPart(fields.groupNo);
+      var line3 = bracketPart(formatMonthDay(fields.deadline));
+      labelsHtml += buildLabelHtml(line1, fields.company, line3, buildBarcodeHtml(gtCode));
+    }
+    els.printArea.innerHTML = labelsHtml;
+    renderLabelBarcodes(els.printArea, LABEL_BARCODE_OPTS);
+
+    if (useAutoMatch && autoCodes.length) {
+      autoCodes.forEach(function (c) { state.gtPrinted.push(c); });
+      saveGtState();
+      renderGtAvailableList();
+    }
+
+    triggerPrint();
+  }
+
+  // 업로드된 전체 데이터(날짜탭과 무관)에서 업체명 목록을 뽑아 검색어로 필터링 —
+  // 홈 화면 필터 드롭다운의 getSearchedValues와 같은 부분일치(대소문자 무시) 방식
+  function getCustomLabelCompanyMatches(term) {
+    var companies = uniqueValuesFrom(state.rows, function (r) { return r.company; });
+    if (!term) return companies;
+    var lower = term.toLowerCase();
+    return companies.filter(function (c) { return c.toLowerCase().indexOf(lower) !== -1; });
+  }
+
+  function fillCustomLabelFieldsFromCompany(name) {
+    var rep = state.rows.find(function (r) { return r.company === name; });
+    if (!rep) return;
+    els.customLabelGroupNo.value = rep.groupNo || "";
+    els.customLabelDeadline.value = formatDateOnly(rep.deadline);
+    els.customLabelPurchaseType.value = rep.purchaseType || "";
+    els.customLabelCompany.value = rep.company || "";
+    els.customLabelTransportType.value = rep.transportType || "";
+  }
+
+  function renderCustomLabelCompanyDropdown(term) {
+    var matches = getCustomLabelCompanyMatches(term);
+    els.customLabelCompanyDropdown.innerHTML = matches.length
+      ? matches.map(function (c) {
+          return '<button type="button" class="custom-label-company-item text-left text-xs text-slate-700 hover:bg-indigo-50 rounded-lg px-2 py-1.5 transition-colors" data-company="' + escapeHtml(c) + '">' + escapeHtml(c) + "</button>";
+        }).join("")
+      : '<div class="text-xs text-slate-400 px-2 py-1.5">일치하는 업체 없음</div>';
+  }
+
+  function openCustomLabelCompanyDropdown() {
+    renderCustomLabelCompanyDropdown(els.customLabelCompanySearch.value);
+    els.customLabelCompanyDropdown.classList.remove("hidden");
+  }
+
+  function closeCustomLabelCompanyDropdown() {
+    els.customLabelCompanyDropdown.classList.add("hidden");
+  }
+
+  // 기본값이 있는 칸은 기본값으로, 없는 칸은 빈 값으로 되돌려 모달을 닫을 때마다
+  // 이전 입력이 남아있지 않게 함
+  function resetCustomLabelModal() {
+    els.customLabelCompanySearch.value = "";
+    closeCustomLabelCompanyDropdown();
+    els.customLabelCompanyDropdown.innerHTML = "";
+    els.customLabelGroupNo.value = "";
+    els.customLabelDeadline.value = "";
+    els.customLabelPurchaseType.value = "";
+    els.customLabelCompany.value = "";
+    els.customLabelTransportType.value = "";
+    els.customLabelAutoMatch.checked = false;
+    els.customLabelGtCode.value = "";
+    els.customLabelQty.value = "1";
+  }
+
+  // 작업자에게 배정된 행을 (그룹번호+업체명) 기준 합산해, 임계값 이상인 조합마다
+  // 분할 단위로 나눈 만큼 "여분" 라벨을 인쇄 — 대표 행(rows[0])의 전체 데이터로 채움
+  function computeSpareGroups(detailRows) {
+    var totals = {};
+    var order = [];
+    detailRows.forEach(function (r) {
+      var key = r.groupNo + "|" + r.company;
+      if (!totals[key]) {
+        totals[key] = { groupNo: r.groupNo, company: r.company, qty: 0, rows: [] };
+        order.push(key);
+      }
+      totals[key].qty += (r.quantity || 0);
+      totals[key].rows.push(r);
+    });
+    return order.map(function (key) { return totals[key]; });
+  }
+
+  function spareGroupKey(g) {
+    return g.groupNo + "|" + g.company;
+  }
+
+  function spareGroupCount(g, splitSize, overrides) {
+    var override = overrides && overrides[spareGroupKey(g)];
+    return override || Math.ceil(g.qty / splitSize);
+  }
+
+  // 겉 테두리·구분선이 전혀 없는 완전한 백지 한 장(맨 앞 빈 라벨 옵션용)
+  function buildBlankLabelHtml() {
+    return '<div class="gt-label break-after-page w-[5cm] h-[4cm] box-border"></div>';
+  }
+
+  function printSpareLabels(detailRows, threshold, splitSize, leadingBlank, overrides) {
+    var groups = computeSpareGroups(detailRows);
+    var qualifying = groups.filter(function (g) { return g.qty >= threshold; });
+    var totalNeeded = qualifying.reduce(function (sum, g) { return sum + spareGroupCount(g, splitSize, overrides); }, 0);
+    if (!totalNeeded && !leadingBlank) return;
+
+    var availableCodes = getAvailableGtCodes().slice().reverse();
+    var codeIdx = 0;
+    var usedCodes = [];
+    var labelsHtml = leadingBlank ? buildBlankLabelHtml() : "";
+
+    qualifying.forEach(function (g) {
+      var n = spareGroupCount(g, splitSize, overrides);
+      var rep = g.rows[0];
+      var line1 = bracketPart(formatPurchaseTypeLabel(rep.purchaseType)) + bracketPart(rep.transportType) + bracketPart(rep.groupNo);
+      var line3 = bracketPart(formatMonthDay(rep.deadline));
+      for (var i = 0; i < n; i++) {
+        var code = availableCodes[codeIdx] || "";
+        if (code) { usedCodes.push(code); codeIdx++; }
+        labelsHtml += buildLabelHtml(line1, g.company, line3, buildBarcodeHtml(code));
+      }
+    });
+
+    els.printArea.innerHTML = labelsHtml;
+    renderLabelBarcodes(els.printArea, LABEL_BARCODE_OPTS);
+
+    if (usedCodes.length) {
+      usedCodes.forEach(function (c) { state.gtPrinted.push(c); });
+      saveGtState();
+      renderGtAvailableList();
+    }
+
+    triggerPrint();
+  }
+
+  var pendingSparePrintRows = null;
+  var sparePrintOverrides = {};
+
+  function getQualifyingSpareGroups(threshold) {
+    if (!pendingSparePrintRows) return [];
+    return computeSpareGroups(pendingSparePrintRows).filter(function (g) { return g.qty >= threshold; });
+  }
+
+  function computeSparePreviewTotal(threshold, splitSize) {
+    return getQualifyingSpareGroups(threshold).reduce(function (sum, g) {
+      return sum + spareGroupCount(g, splitSize, sparePrintOverrides);
+    }, 0);
+  }
+
+  function renderSparePrintGroupList() {
+    var threshold = parseInt(els.sparePrintThreshold.value, 10);
+    var splitSize = parseInt(els.sparePrintSplitSize.value, 10);
+    if (!threshold || threshold < 1 || !splitSize || splitSize < 1) {
+      els.sparePrintGroupList.innerHTML = '<span class="text-xs text-slate-400">임계값·분할단위를 입력해주세요.</span>';
+      return;
+    }
+    var groups = getQualifyingSpareGroups(threshold);
+    if (!groups.length) {
+      els.sparePrintGroupList.innerHTML = '<span class="text-xs text-slate-400">임계값 이상인 조합이 없습니다.</span>';
+      return;
+    }
+    els.sparePrintGroupList.innerHTML = groups.map(function (g) {
+      var key = spareGroupKey(g);
+      var defaultCount = Math.ceil(g.qty / splitSize);
+      var overrideVal = sparePrintOverrides[key] !== undefined ? sparePrintOverrides[key] : "";
+      return (
+        '<div class="flex items-center justify-between gap-2 text-xs py-1 border-b border-slate-100 last:border-b-0">' +
+        '<span class="text-slate-700">' + escapeHtml(g.groupNo) + " · " + escapeHtml(g.company) +
+        ' <span class="text-slate-400">(' + g.qty.toLocaleString("ko-KR") + "개, 기본 " + defaultCount + "장)</span></span>" +
+        '<input type="number" min="1" step="1" class="spare-group-override w-16 bg-white border border-slate-200 rounded-md px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" data-key="' + escapeHtml(key) + '" placeholder="' + defaultCount + '" value="' + overrideVal + '">' +
+        "</div>"
+      );
+    }).join("");
+
+    Array.prototype.forEach.call(els.sparePrintGroupList.querySelectorAll(".spare-group-override"), function (input) {
+      input.addEventListener("input", function () {
+        var key = input.dataset.key;
+        var v = parseInt(input.value, 10);
+        if (v && v >= 1) sparePrintOverrides[key] = v; else delete sparePrintOverrides[key];
+        updateSparePrintPreview();
+      });
+    });
+  }
+
+  function updateSparePrintPreview() {
+    if (!pendingSparePrintRows) return;
+    var threshold = parseInt(els.sparePrintThreshold.value, 10);
+    var splitSize = parseInt(els.sparePrintSplitSize.value, 10);
+    if (!threshold || threshold < 1 || !splitSize || splitSize < 1) {
+      els.sparePrintPreview.textContent = "0";
+      return;
+    }
+    var total = computeSparePreviewTotal(threshold, splitSize) + (els.sparePrintLeadingBlank.checked ? 1 : 0);
+    els.sparePrintPreview.textContent = total;
+  }
+
+  function handleSparePrintClick(detailRows) {
+    pendingSparePrintRows = detailRows;
+    sparePrintOverrides = {};
+    els.sparePrintModalMsg.textContent = "";
+    renderSparePrintGroupList();
+    updateSparePrintPreview();
+    els.sparePrintModal.classList.remove("hidden");
+  }
+
+  // 임계값/분할단위 기본값(40/15)으로 되돌리고 나머지 입력도 초기화 —
+  // 취소든 출력이든 모달을 닫을 때마다 호출해 다음에 열었을 때 항상 기본값으로 보이게 함
+  function resetSparePrintModal() {
+    els.sparePrintThreshold.value = "40";
+    els.sparePrintSplitSize.value = "15";
+    els.sparePrintLeadingBlank.checked = false;
+    sparePrintOverrides = {};
+    els.sparePrintModalMsg.textContent = "";
+    els.sparePrintGroupList.innerHTML = '<span class="text-xs text-slate-400">임계값·분할단위를 입력해주세요.</span>';
+    els.sparePrintPreview.textContent = "0";
+  }
+
+  // 정렬된 존 목록(수량)을 n명에게 연속 구간으로, 가장 많이 배정된 사람의 합계를
+  // 최소화하는 방식으로 나눔("Split Array Largest Sum"과 동일한 이진 탐색 분할).
+  function splitBalanced(items, n) {
+    if (!items.length) {
+      var emptyGroups = [];
+      for (var e = 0; e < n; e++) emptyGroups.push([]);
+      return emptyGroups;
+    }
+    if (items.length <= n) {
+      var groups = items.map(function (it) { return [it]; });
+      while (groups.length < n) groups.push([]);
+      return groups;
+    }
+
+    var qtys = items.map(function (it) { return it.qty; });
+    var lo = Math.max.apply(null, qtys);
+    var hi = qtys.reduce(function (a, b) { return a + b; }, 0);
+
+    function groupsNeeded(limit) {
+      var count = 1;
+      var sum = 0;
+      for (var i = 0; i < qtys.length; i++) {
+        if (sum + qtys[i] > limit) {
+          count++;
+          sum = qtys[i];
+        } else {
+          sum += qtys[i];
+        }
+      }
+      return count;
+    }
+
+    while (lo < hi) {
+      var mid = Math.floor((lo + hi) / 2);
+      if (groupsNeeded(mid) <= n) hi = mid; else lo = mid + 1;
+    }
+
+    var result = [];
+    var current = [];
+    var currentSum = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (currentSum + items[i].qty > lo && current.length) {
+        result.push(current);
+        current = [];
+        currentSum = 0;
+      }
+      current.push(items[i]);
+      currentSum += items[i].qty;
+    }
+    if (current.length) result.push(current);
+
+    // 균등 임계값(lo)을 만족하는 최소 그룹 수가 n보다 적을 수 있음(예: 수량이 동일한
+    // 존이 많은 경우) — 그런 경우 인원 전체가 일감을 나눠 갖도록 가장 존이 많이
+    // 몰린 그룹을 계속 반으로 쪼개 n개를 채운다(더 이상 쪼갤 그룹이 없으면 중단).
+    while (result.length < n) {
+      var splitIdx = -1;
+      var maxLen = 1;
+      for (var gi = 0; gi < result.length; gi++) {
+        if (result[gi].length > maxLen) {
+          maxLen = result[gi].length;
+          splitIdx = gi;
+        }
+      }
+      if (splitIdx === -1) break;
+      var group = result[splitIdx];
+      var half = Math.ceil(group.length / 2);
+      result.splice(splitIdx, 1, group.slice(0, half), group.slice(half));
+    }
+    while (result.length < n) result.push([]);
+    return result;
+  }
+
+  function getAssignZoneItems(floorInput, selectedDates) {
+    var rows = getAssignBaseRows();
+    var byZone = {};
+    rows.forEach(function (r) {
+      if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
+      var floorCode = getFloor(r.zone);
+      if (floorCode.indexOf(floorInput) !== 0) return;
+      var zone = r.zone || "(미지정)";
+      if (!byZone[zone]) byZone[zone] = { qty: 0, rows: [] };
+      byZone[zone].qty += (r.quantity || 0);
+      byZone[zone].rows.push(r);
+    });
+    return Object.keys(byZone)
+      .sort(function (a, b) { return a.localeCompare(b, "ko", { numeric: true }); })
+      .map(function (z) { return { zone: z, qty: byZone[z].qty, rows: byZone[z].rows }; });
+  }
+
+  // 존 개수가 인원수보다 적을 때, 행이 가장 많은 존을 절반씩 쪼개 아이템 수를
+  // 늘려서(같은 존이라도 별도 아이템으로) 인원수만큼 나눠 가질 여지를 만든다.
+  // 더 쪼갤 아이템(행 2개 이상)이 없으면 중단 — 데이터 자체가 인원수보다 적은
+  // 불가피한 경우.
+  function expandZoneItemsForCount(items, n) {
+    var result = items.map(function (it) {
+      return { zone: it.zone, qty: it.qty, rows: it.rows.slice() };
+    });
+    function sumQty(rows) {
+      return rows.reduce(function (s, r) { return s + (r.quantity || 0); }, 0);
+    }
+    while (result.length < n) {
+      var idx = -1;
+      var maxRows = 1;
+      for (var i = 0; i < result.length; i++) {
+        if (result[i].rows.length > maxRows) {
+          maxRows = result[i].rows.length;
+          idx = i;
+        }
+      }
+      if (idx === -1) break;
+      var item = result[idx];
+      var half = Math.ceil(item.rows.length / 2);
+      var rowsA = item.rows.slice(0, half);
+      var rowsB = item.rows.slice(half);
+      result.splice(idx, 1,
+        { zone: item.zone, qty: sumQty(rowsA), rows: rowsA },
+        { zone: item.zone, qty: sumQty(rowsB), rows: rowsB }
+      );
+    }
+    return result;
+  }
+
+  function renderAssignTabs() {
+    els.assignTabsContainer.innerHTML = "";
+    if (!state.assignConfigs.length) {
+      els.assignTabsContainer.innerHTML = '<span class="text-sm text-slate-400">위에서 층수와 인원을 입력하고 추가해주세요.</span>';
+      els.assignTableContainer.innerHTML = "";
+      return;
+    }
+    state.assignConfigs.forEach(function (cfg) {
+      var isActive = cfg.id === state.assignActiveId;
+      var tabBtn = document.createElement("button");
+      tabBtn.className = isActive ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
+      var dates = cfg.createdDates || [];
+      tabBtn.innerHTML =
+        "<span>" + escapeHtml(cfg.floorInput) + "층 · " + cfg.count + "명" +
+        (dates.length ? " · " + escapeHtml(dates.join(", ")) : "") + "</span>" +
+        '<span class="assign-tab-close text-xs opacity-70 hover:opacity-100 ml-1">✕</span>';
+      tabBtn.addEventListener("click", function (e) {
+        if (e.target.closest(".assign-tab-close")) {
+          removeAssignConfig(cfg.id);
+        } else {
+          state.assignActiveId = cfg.id;
+          state.assignActiveWorkerIdx = null;
+          saveAssignState();
+          renderAssignTabs();
+        }
+      });
+      els.assignTabsContainer.appendChild(tabBtn);
+    });
+    renderAssignPanel();
+  }
+
+  var ASSIGN_DETAIL_COLUMNS = [
+    { key: "groupNo", label: "그룹번호" },
+    { key: "deadline", label: "마감일시" },
+    { key: "createdAt", label: "생성일시" },
+    { key: "company", label: "업체명" },
+    { key: "transportType", label: "운송타입" },
+    { key: "zone", label: "존" },
+    { key: "quantity", label: "수량" }
+  ];
+
+  function renderAssignDetailTable(rows, keyPrefix) {
+    if (!rows.length) {
+      return '<div class="px-5 py-6 text-center text-sm text-slate-400">배정 없음</div>';
+    }
+    var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
+      return '<th class="px-4 py-2.5 text-left' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
+    }).join("") + '<th class="px-4 py-2.5 text-left">GT 바코드</th>';
+    var bodyHtml = rows.map(function (r, rowIdx) {
+      var gtKey = keyPrefix + ":" + rowIdx;
+      var gtValue = state.gtAssignments[gtKey] || "";
+      return (
+        '<tr class="hover:bg-slate-50/80 transition-colors">' +
+        ASSIGN_DETAIL_COLUMNS.map(function (col) {
+          if (col.key === "quantity") {
+            return '<td class="px-4 py-2 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
+          }
+          if (col.key === "groupNo") {
+            return '<td class="px-4 py-2 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + "</td>";
+          }
+          if (col.key === "deadline" || col.key === "createdAt") {
+            return '<td class="px-4 py-2 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r[col.key])) + "</td>";
+          }
+          return '<td class="px-4 py-2 text-slate-700 whitespace-nowrap">' + escapeHtml(r[col.key]) + "</td>";
+        }).join("") +
+        '<td class="px-4 py-2 whitespace-nowrap"><input type="text" class="assign-gt-input w-36 bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '" placeholder="예: GC-GT91-475-1"></td>' +
+        "</tr>"
+      );
+    }).join("");
+    return (
+      '<div class="overflow-x-auto">' +
+      '<table class="w-full border-collapse text-left text-xs min-w-max">' +
+      '<thead><tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">' + headHtml + "</tr></thead>" +
+      '<tbody class="divide-y divide-slate-100">' + bodyHtml + "</tbody>" +
+      "</table></div>"
+    );
+  }
+
+  function renderAssignPanel() {
+    var cfg = state.assignConfigs.find(function (c) { return c.id === state.assignActiveId; });
+    if (!cfg) {
+      els.assignTableContainer.innerHTML = "";
+      return;
+    }
+    var items = cfg.items || [];
+    if (!items.length) {
+      els.assignTableContainer.innerHTML = '<div class="bg-white border border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500 shadow-sm">해당 층에 데이터가 없습니다.</div>';
+      return;
+    }
+    var groups = splitBalanced(items, cfg.count);
+    var activeWorkerIdx = state.assignActiveWorkerIdx;
+
+    var tabsHtml = "";
+    if (groups.length > 1) {
+      tabsHtml = '<div class="flex flex-wrap gap-2 mb-4">' +
+        '<button type="button" class="assign-worker-tab-btn ' + (activeWorkerIdx === null ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE) + '" data-worker-idx="">전체</button>' +
+        groups.map(function (g, idx) {
+          return '<button type="button" class="assign-worker-tab-btn ' + (activeWorkerIdx === idx ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE) + '" data-worker-idx="' + idx + '">작업자 ' + (idx + 1) + "</button>";
+        }).join("") +
+        "</div>";
+    }
+
+    var cardsHtml = groups.map(function (group, idx) {
+      if (activeWorkerIdx !== null && activeWorkerIdx !== idx) return "";
+      var total = group.reduce(function (sum, it) { return sum + it.qty; }, 0);
+      var zoneList = group.length ? group.map(function (it) { return it.zone; }).join(", ") : "";
+      var detailRows = group.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
+      return (
+        '<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">' +
+        '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">' +
+        '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) +
+        (zoneList ? '<span class="ml-2 text-xs font-normal text-slate-500">담당 존: ' + escapeHtml(zoneList) + "</span>" : "") + "</div>" +
+        '<div class="flex items-center gap-3">' +
+        '<div class="text-sm font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + detailRows.length + "장</div>" +
+        '<button type="button" class="assign-automatch-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
+        '<button type="button" class="assign-gt-reset-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
+        '<button type="button" class="assign-spare-print-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">여분 출력</button>' +
+        '<button type="button" class="assign-print-btn bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all duration-150" data-worker-idx="' + idx + '">출력</button>' +
+        (groups.length > 1 ? '<button type="button" class="assign-delete-worker-btn bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">삭제</button>' : "") +
+        "</div>" +
+        "</div>" +
+        renderAssignDetailTable(detailRows, cfg.id + ":" + idx) +
+        "</div>"
+      );
+    }).join("");
+
+    els.assignTableContainer.innerHTML = tabsHtml + '<div class="space-y-4">' + cardsHtml + "</div>";
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-tab-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var v = btn.dataset.workerIdx;
+        state.assignActiveWorkerIdx = v === "" ? null : parseInt(v, 10);
+        renderAssignPanel();
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-gt-input"), function (input) {
+      input.addEventListener("change", function () {
+        setAssignGt(input.dataset.gtKey, trim(input.value));
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-automatch-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var workerIdx = parseInt(btn.dataset.workerIdx, 10);
+        var detailRows = groups[workerIdx].reduce(function (acc, it) { return acc.concat(it.rows); }, []);
+        autoMatchGtForWorker(cfg, workerIdx, detailRows);
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-gt-reset-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var workerIdx = parseInt(btn.dataset.workerIdx, 10);
+        resetGtForWorker(cfg, workerIdx);
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-print-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var workerIdx = parseInt(btn.dataset.workerIdx, 10);
+        var detailRows = groups[workerIdx].reduce(function (acc, it) { return acc.concat(it.rows); }, []);
+        printWorkerLabels(cfg, workerIdx, detailRows);
+        resetGtForWorker(cfg, workerIdx);
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-spare-print-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var workerIdx = parseInt(btn.dataset.workerIdx, 10);
+        var detailRows = groups[workerIdx].reduce(function (acc, it) { return acc.concat(it.rows); }, []);
+        handleSparePrintClick(detailRows);
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-delete-worker-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        removeAssignWorker(cfg);
+      });
+    });
+  }
+
+  function removeAssignWorker(cfg) {
+    if (cfg.count <= 1) return;
+    // 마지막 작업자 인덱스에 매칭된 GT가 있다면 재분배 전에 정리해 가용 목록으로 반환
+    resetGtForWorker(cfg, cfg.count - 1);
+    cfg.count -= 1;
+    saveAssignState();
+    renderAssignTabs();
+  }
+
+  function setAssignMsg(msg, kind) {
+    var color = kind === "error" ? "text-rose-600" : "text-slate-500";
+    els.assignMsg.textContent = msg || "";
+    els.assignMsg.className = "text-xs " + color;
+  }
+
+  function getSelectedAssignDates() {
+    return Array.prototype.map.call(
+      els.assignDateCheckboxes.querySelectorAll(".assign-date-cb:checked"),
+      function (cb) { return cb.value; }
+    );
+  }
+
+  function renderAssignDateCheckboxes() {
+    var dates = getAllCreatedDates();
+    if (!dates.length) {
+      els.assignDateCheckboxes.innerHTML = '<span class="text-xs text-slate-400">업로드된 데이터가 없습니다.</span>';
+      return;
+    }
+    var checkedBefore = {};
+    Array.prototype.forEach.call(els.assignDateCheckboxes.querySelectorAll(".assign-date-cb"), function (cb) {
+      checkedBefore[cb.value] = cb.checked;
+    });
+    els.assignDateCheckboxes.innerHTML = dates.map(function (date) {
+      var checked = checkedBefore[date] ? " checked" : "";
+      return (
+        '<label class="flex items-center gap-1.5 cursor-pointer text-slate-700"><input type="checkbox" class="assign-date-cb accent-indigo-600" value="' + escapeHtml(date) + '"' + checked + "> " + escapeHtml(date) + "</label>"
+      );
+    }).join("");
+  }
+
+  function addAssignConfig() {
+    var floorInput = trim(els.assignFloorInput.value);
+    var count = parseInt(els.assignCountInput.value, 10);
+    var selectedDates = getSelectedAssignDates();
+    if (!floorInput) {
+      setAssignMsg("층수를 입력해주세요.", "error");
+      return;
+    }
+    if (!count || count < 1) {
+      setAssignMsg("투입 인원을 1명 이상 입력해주세요.", "error");
+      return;
+    }
+    if (!selectedDates.length) {
+      setAssignMsg("생성일자를 1개 이상 선택해주세요.", "error");
+      return;
+    }
+    var id = Date.now();
+    // 추가 시점의 존/행 데이터를 스냅샷으로 고정 — 이후 홈 화면 필터가 바뀌어도
+    // 이미 만들어진 배정은 유지됨(재조회하지 않음)
+    var items = expandZoneItemsForCount(getAssignZoneItems(floorInput, selectedDates), count);
+    state.assignConfigs.push({ id: id, floorInput: floorInput, count: count, items: items, createdDates: selectedDates });
+    state.assignActiveId = id;
+    state.assignActiveWorkerIdx = null;
+    saveAssignState();
+    els.assignFloorInput.value = "";
+    els.assignCountInput.value = "";
+    setAssignMsg("", null);
+    renderAssignTabs();
+  }
+
+  function removeAssignConfig(id) {
+    state.assignConfigs = state.assignConfigs.filter(function (c) { return c.id !== id; });
+    if (state.assignActiveId === id) {
+      state.assignActiveId = state.assignConfigs.length ? state.assignConfigs[0].id : null;
+    }
+    saveAssignState();
+    renderAssignTabs();
+  }
+
+  function renderTable(rows) {
+    if (!rows.length) {
+      els.table.classList.add("hidden");
+      els.emptyState.classList.remove("hidden");
+      els.tableBody.innerHTML = "";
+      return;
+    }
+    els.table.classList.remove("hidden");
+    els.emptyState.classList.add("hidden");
+
+    var tdBase = "px-4 py-2.5 whitespace-nowrap";
+
+    els.tableBody.innerHTML = rows.map(function (r) {
+      return (
+        '<tr class="hover:bg-slate-50/80 transition-colors">' +
+        COLUMNS.map(function (col) {
+          if (col.key === "status") {
+            var cls = state.statusBadgeMap[r.status] || "";
+            return '<td class="' + tdBase + '"><span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ' + cls + '">' + escapeHtml(r.status) + "</span></td>";
+          }
+          if (col.key === "groupNo") {
+            return '<td class="' + tdBase + ' font-semibold text-slate-900">' + escapeHtml(r.groupNo) + "</td>";
+          }
+          if (col.key === "company") {
+            return '<td class="' + tdBase + ' font-medium text-slate-700">' + escapeHtml(r.company) + "</td>";
+          }
+          if (col.key === "quantity") {
+            return '<td class="' + tdBase + ' text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
+          }
+          if (col.key === "deadline" || col.key === "createdAt") {
+            return '<td class="' + tdBase + ' text-slate-700">' + escapeHtml(formatDateDisplay(r[col.key])) + "</td>";
+          }
+          return '<td class="' + tdBase + ' text-slate-700">' + escapeHtml(r[col.key]) + "</td>";
+        }).join("") +
+        '<td class="' + tdBase + ' text-right tabular-nums font-bold text-indigo-600 bg-indigo-50/30">' + Number(r.groupCompanyTotal || 0).toLocaleString("ko-KR") + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+  }
+
+  function refreshAll() {
+    // 보이지 않는 화면까지 매번 통째로 다시 그리는 낭비를 막기 위해, 현재
+    // 화면(hidden 클래스 여부)에 맞는 렌더링만 실행 — switchView()가 두
+    // 화면의 hidden 클래스만 토글하므로 그 상태를 그대로 기준으로 삼는다.
+    if (!els.homeView.classList.contains("hidden")) {
+      var filtered = getFilteredRows();
+      var sorted = getSortedRows(filtered);
+      updateStatusBadgeMap();
+      renderDateTabs();
+      renderFloorPanel(filtered);
+      renderTable(sorted);
+      updateSortHeaderClasses();
+      updateFilterButtonStates();
+    }
+    if (!els.assignView.classList.contains("hidden")) {
+      renderAssignDateCheckboxes();
+      renderAssignPanel();
+    }
+  }
+
+  // --- Event wiring ---
+
+  els.fileSelectBtn.addEventListener("click", function () { els.fileInput.click(); });
+  els.fileInput.addEventListener("change", function (e) {
+    handleFile(e.target.files[0]);
+  });
+
+  ["dragenter", "dragover"].forEach(function (evt) {
+    els.dropZone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      els.dropZone.classList.remove("border-slate-300");
+      els.dropZone.classList.add("border-indigo-500", "bg-indigo-50/30");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (evt) {
+    els.dropZone.addEventListener(evt, function (e) {
+      e.preventDefault();
+      els.dropZone.classList.remove("border-indigo-500", "bg-indigo-50/30");
+      els.dropZone.classList.add("border-slate-300");
+    });
+  });
+  els.dropZone.addEventListener("drop", function (e) {
+    var file = e.dataTransfer.files && e.dataTransfer.files[0];
+    handleFile(file);
+  });
+
+  els.pasteApplyBtn.addEventListener("click", function () {
+    var text = els.pasteArea.value;
+    if (!text.trim()) {
+      setStatusMsg("붙여넣을 데이터를 입력해주세요.", "error");
+      return;
+    }
+    var matrix = textToMatrix(text);
+    handleParsedMatrix(matrix, "붙여넣기");
+  });
+
+  els.resetBtn.addEventListener("click", function () {
+    if (!confirm("저장된 집품 데이터를 모두 삭제할까요?")) return;
+    state.rows = [];
+    state.floorExcluded = new Set();
+    localStorage.removeItem(STORAGE_KEY);
+    els.pasteArea.value = "";
+    els.fileName.textContent = "";
+    setStatusMsg("데이터를 초기화했습니다.", "ok");
+    refreshAll();
+  });
+
+  var debouncedRenderFloorPanel = debounce(function () {
+    renderFloorPanel(getFilteredRows());
+  }, 200);
+
+  els.laborInput.addEventListener("input", function () {
+    localStorage.setItem(LABOR_STORAGE_KEY, els.laborInput.value);
+    debouncedRenderFloorPanel();
+  });
+
+  els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
+  els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
+  els.assignAddBtn.addEventListener("click", addAssignConfig);
+
+  els.gtSaveBtn.addEventListener("click", function () {
+    var tokens = parseGtTokens(els.gtPasteArea.value);
+    if (!tokens.length) return;
+    var seen = {};
+    state.gtCodes.forEach(function (c) { seen[c] = true; });
+    tokens.forEach(function (t) {
+      if (!seen[t]) {
+        seen[t] = true;
+        state.gtCodes.push(t);
+      }
+    });
+    saveGtState();
+    els.gtPasteArea.value = "";
+    renderGtAvailableList();
+    renderAssignPanel();
+  });
+
+  els.gtClearBtn.addEventListener("click", function () {
+    if (!confirm("저장된 GT 바코드 데이터를 모두 삭제할까요?")) return;
+    state.gtCodes = [];
+    state.gtAssignments = {};
+    state.gtPrinted = [];
+    saveGtState();
+    renderGtAvailableList();
+    renderAssignPanel();
+  });
+
+  els.gtPrintBtn.addEventListener("click", function () {
+    var available = getAvailableGtCodes();
+    if (!available.length) {
+      alert("인쇄할 수 있는 사용 가능 GT 데이터가 없습니다.");
+      return;
+    }
+    els.gtPrintAvailableCount.textContent = available.length;
+    els.gtPrintQty.value = "";
+    els.gtPrintModalMsg.textContent = "";
+    els.gtPrintModal.classList.remove("hidden");
+  });
+
+  els.gtPrintModalCancelBtn.addEventListener("click", function () {
+    els.gtPrintModal.classList.add("hidden");
+    els.gtPrintQty.value = "";
+    els.gtPrintModalMsg.textContent = "";
+  });
+
+  els.gtPrintModalPrintBtn.addEventListener("click", function () {
+    var available = getAvailableGtCodes();
+    var qty = parseInt(els.gtPrintQty.value, 10);
+    if (!qty || qty < 1) {
+      els.gtPrintModalMsg.textContent = "1 이상의 숫자를 입력해주세요.";
+      return;
+    }
+    qty = Math.min(qty, available.length);
+    var codes = available.slice().reverse().slice(0, qty);
+    codes.forEach(function (c) { state.gtPrinted.push(c); });
+    saveGtState();
+    renderGtAvailableList();
+    els.gtPrintModal.classList.add("hidden");
+    els.gtPrintQty.value = "";
+    els.gtPrintModalMsg.textContent = "";
+    printGtLabels(codes);
+  });
+
+  els.sparePrintThreshold.addEventListener("input", function () {
+    renderSparePrintGroupList();
+    updateSparePrintPreview();
+  });
+  els.sparePrintSplitSize.addEventListener("input", function () {
+    renderSparePrintGroupList();
+    updateSparePrintPreview();
+  });
+  els.sparePrintLeadingBlank.addEventListener("change", updateSparePrintPreview);
+
+  els.sparePrintModalCancelBtn.addEventListener("click", function () {
+    els.sparePrintModal.classList.add("hidden");
+    pendingSparePrintRows = null;
+    resetSparePrintModal();
+  });
+
+  els.sparePrintModalPrintBtn.addEventListener("click", function () {
+    var threshold = parseInt(els.sparePrintThreshold.value, 10);
+    var splitSize = parseInt(els.sparePrintSplitSize.value, 10);
+    if (!threshold || threshold < 1 || !splitSize || splitSize < 1) {
+      els.sparePrintModalMsg.textContent = "1 이상의 숫자를 입력해주세요.";
+      return;
+    }
+    var expected = computeSparePreviewTotal(threshold, splitSize);
+    if (!expected) {
+      els.sparePrintModalMsg.textContent = "임계값 " + threshold + "개 이상인 조합이 없습니다.";
+      return;
+    }
+    var leadingBlank = els.sparePrintLeadingBlank.checked;
+    var rows = pendingSparePrintRows;
+    var overrides = sparePrintOverrides;
+    els.sparePrintModal.classList.add("hidden");
+    pendingSparePrintRows = null;
+    resetSparePrintModal();
+    printSpareLabels(rows, threshold, splitSize, leadingBlank, overrides);
+  });
+
+  els.customLabelBtn.addEventListener("click", function () {
+    els.customLabelModal.classList.remove("hidden");
+  });
+
+  els.customLabelCompanySearch.addEventListener("focus", openCustomLabelCompanyDropdown);
+  els.customLabelCompanySearch.addEventListener("input", function () {
+    renderCustomLabelCompanyDropdown(els.customLabelCompanySearch.value);
+    els.customLabelCompanyDropdown.classList.remove("hidden");
+  });
+
+  els.customLabelCompanyDropdown.addEventListener("click", function (e) {
+    var btn = e.target.closest(".custom-label-company-item");
+    if (!btn) return;
+    var name = btn.dataset.company;
+    els.customLabelCompanySearch.value = name;
+    fillCustomLabelFieldsFromCompany(name);
+    closeCustomLabelCompanyDropdown();
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!els.customLabelCompanyDropdown.classList.contains("hidden") &&
+        !els.customLabelCompanyDropdown.contains(e.target) &&
+        e.target !== els.customLabelCompanySearch) {
+      closeCustomLabelCompanyDropdown();
+    }
+  });
+
+  els.customLabelCancelBtn.addEventListener("click", function () {
+    els.customLabelModal.classList.add("hidden");
+    resetCustomLabelModal();
+  });
+
+  els.customLabelPrintBtn.addEventListener("click", function () {
+    var qty = parseInt(els.customLabelQty.value, 10);
+    if (!qty || qty < 1) qty = 1;
+    var fields = {
+      groupNo: trim(els.customLabelGroupNo.value),
+      deadline: trim(els.customLabelDeadline.value),
+      purchaseType: trim(els.customLabelPurchaseType.value),
+      company: trim(els.customLabelCompany.value),
+      transportType: trim(els.customLabelTransportType.value)
+    };
+    var useAutoMatch = els.customLabelAutoMatch.checked;
+    var manualCode = trim(els.customLabelGtCode.value);
+    els.customLabelModal.classList.add("hidden");
+    printCustomLabels(fields, qty, useAutoMatch, manualCode);
+    resetCustomLabelModal();
+  });
+
+  // --- Init ---
+  setupSortLabels();
+  setupFilterBar();
+  loadFromStorage();
+  loadDateTabState();
+  loadAssignState();
+  loadGtState();
+  els.laborInput.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
+  refreshAll();
+  renderAssignTabs();
+  renderGtAvailableList();
+})();
