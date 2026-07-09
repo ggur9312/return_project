@@ -1236,6 +1236,7 @@ function executeCyclePrint() {
                 displayValue: true,
                 fontSize: 44,
                 fontOptions: "bold",
+                font: "'Inter', 'Noto Sans KR', sans-serif",
                 margin: 0
             });
         } catch (e) {
