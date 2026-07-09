@@ -48,39 +48,13 @@ fileInput.addEventListener('change', (e) => {
 /* ================================================================
    SECTION 3: TOAST NOTIFICATION UTILITY
    ================================================================ */
-function showToast(message, type = 'success') {
-    const toastContainer = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = `p-4 rounded-xl shadow-lg border text-sm font-medium flex items-center space-x-2 bg-white transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto`;
-
-    if (type === 'success') {
-        toast.classList.add('border-emerald-200', 'text-emerald-800', 'bg-emerald-50/80');
-        toast.innerHTML = `<svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>${message}</span>`;
-    } else if (type === 'info') {
-        toast.classList.add('border-blue-200', 'text-blue-800', 'bg-blue-50/80');
-        toast.innerHTML = `<svg class="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>${message}</span>`;
-    } else {
-        toast.classList.add('border-rose-200', 'text-rose-800', 'bg-rose-50/80');
-        toast.innerHTML = `<svg class="w-5 h-5 text-rose-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg><span>${message}</span>`;
-    }
-
-    toastContainer.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.remove('translate-y-2', 'opacity-0');
-    }, 50);
-
-    setTimeout(() => {
-        toast.classList.add('opacity-0', 'translate-y-[-10px]');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
-}
-
+// showToast()는 js/shell.js로 이동(집품/트럭 두 앱 공용 전역 함수).
 
 /* ================================================================
    SECTION 4: DATA RESET
    ================================================================ */
-function clearData() {
-    if (!confirm('모든 데이터를 초기화하시겠습니까?')) return;
+async function clearData() {
+    if (!(await window.confirmModal('모든 데이터를 초기화하시겠습니까?'))) return;
     globalProcessedData = {};
     activeTabDate = null;
     document.getElementById('dashboardContainer').classList.add('hidden');
@@ -91,8 +65,8 @@ function clearData() {
     showToast('데이터가 초기화되었습니다.', 'info');
 }
 
-function deleteDateData(date) {
-    if (!confirm(`${date} 데이터를 삭제하시겠습니까?`)) return;
+async function deleteDateData(date) {
+    if (!(await window.confirmModal(`${date} 데이터를 삭제하시겠습니까?`))) return;
 
     delete globalProcessedData[date];
     const remainingDates = Object.keys(globalProcessedData);
@@ -221,6 +195,7 @@ function processData(data, fileName) {
             globalProcessedData[dateKey].push({
                 groupNo: groupNo,
                 company: companyName,
+                picking: false,
                 inputs: {
                     palette: 'KPP',
                     emptyGt: 0,
@@ -317,9 +292,13 @@ function renderDashboard(data) {
             const sAj = item.inputs.palette === 'AJ' ? 'selected' : '';
             const sPal = item.inputs.palette === '팔레트' ? 'selected' : '';
             const sSm = item.inputs.palette === '소량' ? 'selected' : '';
+            const pickingClass = item.picking ? 'bg-amber-50/70' : '';
 
             tableRowsHtml += `
-                <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
+                <tr id="row-${safeTabDate}-${itemIdx}" class="hover:bg-slate-50/80 transition-colors border-b border-slate-100 ${pickingClass}">
+                    <td class="px-3 py-2 text-center">
+                        <input type="checkbox" ${item.picking ? 'checked' : ''} onchange="toggleItemPicking('${date}', ${itemIdx}, this.checked)" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500" title="집품중">
+                    </td>
                     <td class="px-5 py-3 font-semibold text-slate-900 whitespace-nowrap">${item.groupNo}</td>
                     <td class="px-5 py-3 font-medium text-slate-700 whitespace-nowrap">${item.company}</td>
                     <td class="px-3 py-2 w-32">
@@ -350,6 +329,7 @@ function renderDashboard(data) {
                 <table class="w-full border-collapse text-left min-w-max">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
+                            <th class="px-3 py-3">집품중</th>
                             <th class="px-5 py-3 text-left">그룹번호</th>
                             <th class="px-5 py-3 text-left">업체명</th>
                             <th class="px-3 py-3 text-left">팔레트 종류</th>
@@ -365,6 +345,7 @@ function renderDashboard(data) {
                     </tbody>
                 </table>
             </div>
+            ${renderTruckPreviewSection(date)}
         `;
         tableContainer.appendChild(tablePanel);
     });
@@ -381,24 +362,38 @@ function updateInputValue(date, index, field, value) {
     if (globalProcessedData[date] && globalProcessedData[date][index]) {
         if (field === 'palette') {
             globalProcessedData[date][index].inputs[field] = value;
-        } else {
-            const numVal = parseInt(value) || 0;
-            globalProcessedData[date][index].inputs[field] = numVal;
-
-            if (field === 'emptyGt') {
-                // Recalculate 32/24 BOX expectations
-                const exp32 = (Math.round((numVal / 32) * 10) / 10).toFixed(1);
-                const exp24 = (Math.round((numVal / 24) * 10) / 10).toFixed(1);
-
-                const safeTabDate = getSafeId(date);
-                const el32 = document.getElementById(`calc32-${safeTabDate}-${index}`);
-                const el24 = document.getElementById(`calc24-${safeTabDate}-${index}`);
-
-                if (el32) el32.innerText = exp32;
-                if (el24) el24.innerText = exp24;
-            }
+            renderDashboard(globalProcessedData);
+            return;
         }
+
+        const numVal = parseInt(value) || 0;
+        globalProcessedData[date][index].inputs[field] = numVal;
+
+        const safeTabDate = getSafeId(date);
+
+        if (field === 'emptyGt') {
+            // Recalculate 32/24 BOX expectations
+            const exp32 = (Math.round((numVal / 32) * 10) / 10).toFixed(1);
+            const exp24 = (Math.round((numVal / 24) * 10) / 10).toFixed(1);
+
+            const el32 = document.getElementById(`calc32-${safeTabDate}-${index}`);
+            const el24 = document.getElementById(`calc24-${safeTabDate}-${index}`);
+
+            if (el32) el32.innerText = exp32;
+            if (el24) el24.innerText = exp24;
+        }
+
+        const previewEl = document.getElementById(`preview-${safeTabDate}`);
+        if (previewEl) previewEl.outerHTML = renderTruckPreviewSection(date);
+
         saveState();
+    }
+}
+
+function toggleItemPicking(date, index, checked) {
+    if (globalProcessedData[date] && globalProcessedData[date][index]) {
+        globalProcessedData[date][index].picking = checked;
+        renderDashboard(globalProcessedData);
     }
 }
 
@@ -478,6 +473,16 @@ function closePrintModal() {
     }, 200);
 }
 
+// GT 수량 표시 텍스트: 팔레트 집품이 있으면 (+N P) 표기, 집품중이면 뒤에 물결(~) 표기.
+// 인쇄 출력(buildTruckRows)과 화면 미리보기(buildPreviewRows) 양쪽에서 공용으로 사용.
+function gtDisplayText(d) {
+    let text = d.inputs.palettePick > 0
+        ? `${d.inputs.emptyGt} (+${d.inputs.palettePick}P)`
+        : `${d.inputs.emptyGt}`;
+    if (d.picking) text += ' ~';
+    return text;
+}
+
 // Build table rows for a list of truck entries. When showPalette is true,
 // palette type gets its own column instead of being appended to the company name.
 function buildTruckRows(list, showPalette) {
@@ -485,14 +490,11 @@ function buildTruckRows(list, showPalette) {
         return `<tr><td colspan="${showPalette ? 3 : 2}" style="padding:15px;color:#999;">데이터 없음</td></tr>`;
     }
     return list.map(d => {
-        const gtText = d.inputs.palettePick > 0
-            ? `${d.inputs.emptyGt} (+${d.inputs.palettePick}P)`
-            : `${d.inputs.emptyGt}`;
         const paletteCell = showPalette ? `<td>${d.inputs.palette}</td>` : '';
         return `<tr>
                 <td style="text-align:left;">${d.company}</td>
                 ${paletteCell}
-                <td style="font-weight:bold;">${gtText}</td>
+                <td style="font-weight:bold;">${gtDisplayText(d)}</td>
             </tr>`;
     }).join('');
 }
@@ -528,8 +530,9 @@ function sortTruckSection(list, byPaletteType) {
     });
 }
 
-// Build one date's left/right truck tables as a labeled, page-break-safe section
-function buildDateSectionHtml(date) {
+// 팔레트 종류에 따라 좌측(KPP/AJ/팔레트)/우측(소량) 트럭 구역으로 나눈다.
+// 인쇄 출력(buildDateSectionHtml)과 화면 미리보기(renderTruckPreviewSection)가 공용으로 사용.
+function splitTruckLeftRight(date) {
     const currentData = globalProcessedData[date] || [];
     const leftData = sortTruckSection(currentData.filter(d =>
         (d.inputs.palette === 'KPP' || d.inputs.palette === 'AJ' || d.inputs.palette === '팔레트') &&
@@ -539,6 +542,12 @@ function buildDateSectionHtml(date) {
         d.inputs.palette === '소량' &&
         (d.inputs.emptyGt > 0 || d.inputs.palettePick > 0)
     ), false);
+    return { leftData, rightData };
+}
+
+// Build one date's left/right truck tables as a labeled, page-break-safe section
+function buildDateSectionHtml(date) {
+    const { leftData, rightData } = splitTruckLeftRight(date);
 
     // 좌측엔 KPP/AJ/팔레트 트럭, 우측엔 소량 트럭. 소량 트럭이 없으면 buildTruckRows가 우측에
     // "데이터 없음"을 표시한다.
@@ -551,7 +560,7 @@ function buildDateSectionHtml(date) {
                 <div class="p-date-heading">${date}</div>
                 <div class="p-row" style="align-items:flex-start;">
                     <!-- Left Table -->
-                    <div style="flex:1;">
+                    <div style="flex:1; min-width:0;">
                         <table class="p-table">
                             <thead>${leftHeader}</thead>
                             <tbody>${leftRows}</tbody>
@@ -559,7 +568,7 @@ function buildDateSectionHtml(date) {
                     </div>
 
                     <!-- Right Table -->
-                    <div style="flex:1;">
+                    <div style="flex:1; min-width:0;">
                         <table class="p-table">
                             <thead>${rightHeader}</thead>
                             <tbody>${rightRows}</tbody>
@@ -567,6 +576,58 @@ function buildDateSectionHtml(date) {
                     </div>
                 </div>
             </div>`;
+}
+
+// 홈 화면용 출력 미리보기 행 (인쇄용 buildTruckRows와 동일한 필터/GT 표시 규칙을 화면 스타일로 렌더링)
+function buildPreviewRows(list, showPalette) {
+    if (list.length === 0) {
+        return `<tr><td colspan="${showPalette ? 3 : 2}" class="px-3 py-4 text-center text-xs text-slate-400">데이터 없음</td></tr>`;
+    }
+    return list.map(d => {
+        const paletteCell = showPalette ? `<td class="px-3 py-2 text-center text-slate-500">${d.inputs.palette}</td>` : '';
+        return `<tr class="border-b border-slate-100 last:border-b-0">
+                <td class="px-3 py-2 text-slate-700">${d.company}</td>
+                ${paletteCell}
+                <td class="px-3 py-2 text-right font-semibold text-slate-900">${gtDisplayText(d)}</td>
+            </tr>`;
+    }).join('');
+}
+
+// 출력물 양식과 동일하게 좌측(소량 제외)/우측(소량) 트럭 구역으로 나눠 보여주는 화면 미리보기 패널.
+// 팔레트 종류를 바꾸면 즉시 좌/우 구역 사이를 이동해 표시된다.
+function renderTruckPreviewSection(date) {
+    const safeTabDate = getSafeId(date);
+    const { leftData, rightData } = splitTruckLeftRight(date);
+
+    return `
+        <div id="preview-${safeTabDate}" class="bg-white border border-slate-200 rounded-xl shadow-sm p-4 mt-4">
+            <h3 class="text-sm font-semibold text-slate-900 mb-3">트럭 리스트</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs border-collapse min-w-max">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 font-bold">
+                                <th class="px-3 py-2 text-left">업체명</th>
+                                <th class="px-3 py-2 text-center">팔레트</th>
+                                <th class="px-3 py-2 text-right">GT</th>
+                            </tr>
+                        </thead>
+                        <tbody>${buildPreviewRows(leftData, true)}</tbody>
+                    </table>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs border-collapse min-w-max">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 font-bold">
+                                <th class="px-3 py-2 text-left">소량 트럭</th>
+                                <th class="px-3 py-2 text-right">GT</th>
+                            </tr>
+                        </thead>
+                        <tbody>${buildPreviewRows(rightData, false)}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
 }
 
 function executePrint() {
@@ -642,6 +703,7 @@ function executePrint() {
     setTimeout(() => {
         window.print();
         closePrintModal();
+        showToast('출력이 완료되었습니다.');
     }, 300);
 }
 
@@ -650,6 +712,7 @@ function executePrint() {
    SECTION 12: SIDEBAR VIEW SWITCHING (홈 / 트럭주기)
    ================================================================ */
 function truckSwitchView(view) {
+    if (window.flashPageLoading) window.flashPageLoading();
     const homeView = document.getElementById('truckHomeView');
     const cycleView = document.getElementById('cycleView');
     const navHomeBtn = document.getElementById('truckNavHomeBtn');
@@ -661,12 +724,14 @@ function truckSwitchView(view) {
     if (view === 'cycle') {
         homeView.classList.add('hidden');
         cycleView.classList.remove('hidden');
+        cycleView.classList.add('animate-fadeIn');
         navHomeBtn.className = inactiveClass;
         navCycleBtn.className = activeClass;
         renderCycleDateTabs();
     } else {
         cycleView.classList.add('hidden');
         homeView.classList.remove('hidden');
+        homeView.classList.add('animate-fadeIn');
         navCycleBtn.className = inactiveClass;
         navHomeBtn.className = activeClass;
     }
@@ -753,16 +818,16 @@ function renderCtAvailableList() {
 /* ================================================================
    SECTION 14-1: CT 데이터 / 트럭주기 데이터 초기화 (분리)
    ================================================================ */
-function clearCtPool() {
-    if (!confirm('저장된 CT 바코드 데이터를 모두 초기화하시겠습니까?')) return;
+async function clearCtPool() {
+    if (!(await window.confirmModal('저장된 CT 바코드 데이터를 모두 초기화하시겠습니까?'))) return;
     ctPool = [];
     renderCtAvailableList();
     saveState();
     showToast('CT 바코드 데이터가 초기화되었습니다.', 'info');
 }
 
-function clearCycleData() {
-    if (!confirm('생성된 트럭주기 데이터를 모두 초기화하시겠습니까?')) return;
+async function clearCycleData() {
+    if (!(await window.confirmModal('생성된 트럭주기 데이터를 모두 초기화하시겠습니까?'))) return;
     truckCycleData = {};
     activeCycleDate = null;
     renderCycleDateTabs();
@@ -819,6 +884,8 @@ function renderCycleTable() {
         return;
     }
 
+    const allChecked = flatRows.every(row => row.checked);
+
     let rowsHtml = '';
     flatRows.forEach(row => {
         rowsHtml += `
@@ -850,7 +917,9 @@ function renderCycleTable() {
             <table class="w-full border-collapse text-left min-w-max">
                 <thead>
                     <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
-                        <th class="px-4 py-3 w-10"></th>
+                        <th class="px-4 py-3 w-10">
+                            <input type="checkbox" ${allChecked ? 'checked' : ''} onchange="setAllCycleRowsChecked(this.checked)" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" title="전체 선택/해제">
+                        </th>
                         <th class="px-3 py-3">생성일시</th>
                         <th class="px-4 py-3 text-left">업체명</th>
                         <th class="px-3 py-3">순번</th>
@@ -893,11 +962,10 @@ function toggleCycleRowChecked(date, index, checked) {
     }
 }
 
-function toggleSelectAllCycleRows() {
+function setAllCycleRowsChecked(checked) {
     const allRows = Object.values(truckCycleData).flat();
     if (allRows.length === 0) return;
-    const allChecked = allRows.every(r => r.checked);
-    allRows.forEach(r => r.checked = !allChecked);
+    allRows.forEach(r => r.checked = checked);
     renderCycleTable();
 }
 
@@ -1145,7 +1213,9 @@ function executeCyclePrint() {
                 width: 2,
                 height: 70,
                 displayValue: true,
-                fontSize: 32,
+                fontSize: 44,
+                fontOptions: "bold",
+                font: "'Inter', 'Noto Sans KR', sans-serif",
                 margin: 0
             });
         } catch (e) {
@@ -1162,6 +1232,7 @@ function executeCyclePrint() {
 
     setTimeout(() => {
         window.print();
+        showToast('출력이 완료되었습니다.');
     }, 300);
 }
 
