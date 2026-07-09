@@ -834,7 +834,7 @@ function renderCycleTable() {
                     <input type="text" value="${row.seq}" oninput="updateCycleRow('${row.date}', ${row.idx}, 'seq', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm text-center font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </td>
                 <td class="px-3 py-2 w-48">
-                    <input type="text" value="${row.ct}" placeholder="CT 데이터 입력/매칭" oninput="updateCycleRow('${row.date}', ${row.idx}, 'ct', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" value="${row.ct}" oninput="updateCycleRow('${row.date}', ${row.idx}, 'ct', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 </td>
                 <td class="px-3 py-2 w-16 text-center">
                     <button onclick="deleteCycleRow('${row.date}', ${row.idx})" class="text-slate-300 hover:text-rose-500" title="삭제">
@@ -1153,6 +1153,12 @@ function executeCyclePrint() {
             document.getElementById(`cycleBarcode-${idx}`).outerHTML = `<span>[바코드 변환 오류: ${row.ct}]</span>`;
         }
     });
+
+    selectedRows.forEach(row => {
+        row.ct = '';
+    });
+    renderCycleTable();
+    saveState();
 
     setTimeout(() => {
         window.print();
