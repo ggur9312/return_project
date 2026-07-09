@@ -76,6 +76,7 @@
     .p-label-barcode { flex: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 3mm; }
   }
 </style>
+<style id="gtLabelPageStyleOverride"></style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 
@@ -200,6 +201,9 @@
     <div id="sortRulesContainer" class="flex flex-wrap gap-2"></div>
     <button id="sortAddBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
     <button id="sortResetBtn" type="button" class="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">정렬 초기화</button>
+    <label class="inline-flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer bg-white border border-slate-200 rounded-lg px-3 py-1.5">
+      <input type="checkbox" id="sortZoneOPriorityCheckbox" class="accent-indigo-600"> 72·73층 O존 우선(존 오름차순)
+    </label>
   </section>
 
   <section class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-auto mt-8">
@@ -238,6 +242,7 @@
           <button id="gtClearBtn" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">GT 데이터 초기화</button>
           <button id="gtPrintBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">GT 출력</button>
           <button id="customLabelBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">커스텀 라벨 출력</button>
+          <button id="labelMarginSettingsBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">라벨 여백 설정</button>
         </div>
         <span class="text-sm text-slate-500">사용 가능 GT: <span id="gtAvailableCount" class="font-bold text-indigo-600">0</span>건</span>
       </div>
@@ -362,6 +367,23 @@
     <div class="flex gap-2 pt-2">
       <button id="customLabelPrintBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">출력</button>
       <button id="customLabelCancelBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">취소</button>
+    </div>
+  </div>
+</div>
+
+<div id="labelMarginModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
+  <div id="labelMarginModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 transform scale-95 transition-transform duration-200">
+    <h3 class="text-sm font-semibold text-slate-900">라벨 여백 설정</h3>
+    <p class="text-xs text-slate-500">GT출력/할당출력/여분출력/커스텀출력 등 GT 라벨류 인쇄 시 라벨 오른쪽·아래쪽에 추가할 여백입니다. 실제 프린터로 인쇄해보고 여전히 잘리거나 밀리면 숫자만 조정하면 됩니다(라벨 자체 크기는 바뀌지 않습니다).</p>
+    <label class="flex flex-col gap-1 text-sm text-slate-600">오른쪽 여백(mm)
+      <input type="number" id="labelMarginRightInput" min="0" step="0.5" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <label class="flex flex-col gap-1 text-sm text-slate-600">아래쪽 여백(mm)
+      <input type="number" id="labelMarginBottomInput" min="0" step="0.5" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    </label>
+    <div class="flex gap-2 pt-2">
+      <button id="labelMarginSaveBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">저장</button>
+      <button id="labelMarginCancelBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">취소</button>
     </div>
   </div>
 </div>

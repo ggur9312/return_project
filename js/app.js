@@ -35,6 +35,9 @@
   var GT_CODES_KEY = "pickListGtCodes";
   var GT_ASSIGNMENTS_KEY = "pickListGtAssignments";
   var GT_PRINTED_KEY = "pickListGtPrinted";
+  var LABEL_MARGIN_RIGHT_KEY = "pickListLabelMarginRight";
+  var LABEL_MARGIN_BOTTOM_KEY = "pickListLabelMarginBottom";
+  var LABEL_MARGIN_DEFAULT = 3;
   var BADGE_CLASSES = [
     "bg-emerald-50 text-emerald-700 border border-emerald-100",
     "bg-blue-50 text-blue-700 border border-blue-100",
@@ -58,6 +61,8 @@
     // 정렬 기준 목록(우선순위 순서대로 적용). 기본값: 존 오름차순 -> 수량 내림차순,
     // 새로 업로드/붙여넣기한 데이터도 존별로 묶이고 수량이 많은 순으로 보이게 함.
     sortRules: [{ key: "zone", dir: 1 }, { key: "quantity", dir: -1 }],
+    // 72/73층 O존 우선 정렬 체크박스 상태 — 체크 시 zone 비교에서 O존을 72/73층보다 앞으로 보냄
+    zoneOPriority: false,
     filters: initialFilters,
     floorExcluded: new Set(),
     statusBadgeMap: {},
@@ -95,6 +100,7 @@
     sortRulesContainer: document.getElementById("sortRulesContainer"),
     sortAddBtn: document.getElementById("sortAddBtn"),
     sortResetBtn: document.getElementById("sortResetBtn"),
+    sortZoneOPriorityCheckbox: document.getElementById("sortZoneOPriorityCheckbox"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
     homeView: document.getElementById("homeView"),
@@ -146,6 +152,13 @@
     customLabelQty: document.getElementById("customLabelQty"),
     customLabelPrintBtn: document.getElementById("customLabelPrintBtn"),
     customLabelCancelBtn: document.getElementById("customLabelCancelBtn"),
+    labelMarginSettingsBtn: document.getElementById("labelMarginSettingsBtn"),
+    labelMarginModal: document.getElementById("labelMarginModal"),
+    labelMarginModalBox: document.getElementById("labelMarginModalBox"),
+    labelMarginRightInput: document.getElementById("labelMarginRightInput"),
+    labelMarginBottomInput: document.getElementById("labelMarginBottomInput"),
+    labelMarginSaveBtn: document.getElementById("labelMarginSaveBtn"),
+    labelMarginCancelBtn: document.getElementById("labelMarginCancelBtn"),
     gtPrintModal: document.getElementById("gtPrintModal"),
     gtPrintModalBox: document.getElementById("gtPrintModalBox"),
     gtPrintAvailableCount: document.getElementById("gtPrintAvailableCount"),
@@ -714,6 +727,19 @@
     state.statusBadgeMap = map;
   }
 
+  // 72/73층(알파벳 제거한 층코드가 "7"로 시작)에서는 실제 동선상 O존을 가장 먼저
+  // 지나가므로, zoneOPriority 체크박스가 켜져 있으면 O존을 해당 층 앞으로 보낸다.
+  // 그 외 비교(72/73층과 무관하거나 O존이 없는 경우)는 기존 로케일 비교 그대로 유지.
+  function compareZoneWithOPriority(za, zb) {
+    var sa = String(za || "").trim();
+    var sb = String(zb || "").trim();
+    var aIsO = sa.toUpperCase() === "O";
+    var bIsO = sb.toUpperCase() === "O";
+    if (aIsO && !bIsO && /^7/.test(getFloor(sb))) return -1;
+    if (bIsO && !aIsO && /^7/.test(getFloor(sa))) return 1;
+    return sa.localeCompare(sb, "ko");
+  }
+
   function compareValues(a, b, col) {
     if (col.type === "number") {
       return (a[col.key] || 0) - (b[col.key] || 0);
@@ -722,6 +748,9 @@
       var ta = Date.parse(a[col.key]);
       var tb = Date.parse(b[col.key]);
       if (!isNaN(ta) && !isNaN(tb)) return ta - tb;
+    }
+    if (col.key === "zone" && state.zoneOPriority) {
+      return compareZoneWithOPriority(a[col.key], b[col.key]);
     }
     return String(a[col.key]).localeCompare(String(b[col.key]), "ko");
   }
@@ -1139,6 +1168,28 @@
         svg.outerHTML = '<div class="text-lg font-bold font-mono text-black" style="font-weight:900">' + escapeHtml(svg.dataset.code) + "</div>";
       }
     });
+  }
+
+  // GT 라벨류(GT출력/할당출력/여분출력/커스텀출력) 인쇄 여백 — 프린터/라벨지에
+  // 따라 필요한 여백이 달라질 수 있어 코드에 값을 고정하지 않고, 사용자가 "라벨
+  // 여백 설정" 모달에서 mm 단위로 직접 조절해 localStorage에 저장하도록 함.
+  // 라벨 콘텐츠 자체(w-[5cm] h-[4cm])는 항상 고정, 오른쪽/아래쪽 여유 공간만 조절됨.
+  function loadLabelMargin() {
+    var right = parseFloat(localStorage.getItem(LABEL_MARGIN_RIGHT_KEY));
+    var bottom = parseFloat(localStorage.getItem(LABEL_MARGIN_BOTTOM_KEY));
+    return {
+      right: isNaN(right) ? LABEL_MARGIN_DEFAULT : right,
+      bottom: isNaN(bottom) ? LABEL_MARGIN_DEFAULT : bottom
+    };
+  }
+
+  function applyGtLabelPageStyle(rightMm, bottomMm) {
+    var styleEl = document.getElementById("gtLabelPageStyleOverride");
+    if (!styleEl) return;
+    var pageWidthCm = 5 + rightMm / 10;
+    var pageHeightCm = 4 + bottomMm / 10;
+    styleEl.textContent =
+      "@media print { @page pick-label { size: " + pageWidthCm + "cm " + pageHeightCm + "cm; margin: 0 " + rightMm + "mm " + bottomMm + "mm 0; } }";
   }
 
   // innerHTML 갱신 직후 곧바로 print()를 호출하면 브라우저가 레이아웃을 아직
@@ -2334,6 +2385,10 @@
     state.sortRules = [];
     refreshAll();
   });
+  els.sortZoneOPriorityCheckbox.addEventListener("change", function () {
+    state.zoneOPriority = els.sortZoneOPriorityCheckbox.checked;
+    refreshAll();
+  });
 
   els.gtSaveBtn.addEventListener("click", function () {
     var tokens = parseGtTokens(els.gtPasteArea.value);
@@ -2489,6 +2544,29 @@
     resetCustomLabelModal();
   });
 
+  els.labelMarginSettingsBtn.addEventListener("click", function () {
+    var margin = loadLabelMargin();
+    els.labelMarginRightInput.value = margin.right;
+    els.labelMarginBottomInput.value = margin.bottom;
+    openModalWithTransition(els.labelMarginModal, els.labelMarginModalBox);
+  });
+
+  els.labelMarginCancelBtn.addEventListener("click", function () {
+    closeModalWithTransition(els.labelMarginModal, els.labelMarginModalBox);
+  });
+
+  els.labelMarginSaveBtn.addEventListener("click", function () {
+    var right = parseFloat(els.labelMarginRightInput.value);
+    var bottom = parseFloat(els.labelMarginBottomInput.value);
+    if (isNaN(right) || right < 0) right = LABEL_MARGIN_DEFAULT;
+    if (isNaN(bottom) || bottom < 0) bottom = LABEL_MARGIN_DEFAULT;
+    localStorage.setItem(LABEL_MARGIN_RIGHT_KEY, String(right));
+    localStorage.setItem(LABEL_MARGIN_BOTTOM_KEY, String(bottom));
+    applyGtLabelPageStyle(right, bottom);
+    closeModalWithTransition(els.labelMarginModal, els.labelMarginModalBox);
+    if (window.showToast) window.showToast("라벨 여백이 저장되었습니다.");
+  });
+
   // --- Init ---
   setupSortLabels();
   setupFilterBar();
@@ -2496,6 +2574,7 @@
   loadDateTabState();
   loadAssignState();
   loadGtState();
+  (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom); })();
   els.laborInput.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
   refreshAll();
   renderAssignTabs();
