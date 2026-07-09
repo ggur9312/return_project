@@ -46,6 +46,164 @@ fileInput.addEventListener('change', (e) => {
 
 
 /* ================================================================
+   SECTION 2B: 업로드 섹션 접기/펼치기
+   ================================================================ */
+const TRUCK_UPLOAD_COLLAPSED_KEY = 'truckDashboardUploadCollapsed';
+
+function applyTruckUploadCollapsed(collapsed) {
+    document.getElementById('truckUploadToggleLabel').textContent = collapsed ? '펼치기' : '접기';
+    document.getElementById('truckUploadToggleIcon').classList.toggle('-rotate-90', collapsed);
+    document.getElementById('truckUploadCardBody').classList.toggle('hidden', collapsed);
+}
+
+document.getElementById('truckUploadToggleBtn').addEventListener('click', () => {
+    const collapsed = localStorage.getItem(TRUCK_UPLOAD_COLLAPSED_KEY) !== '1';
+    localStorage.setItem(TRUCK_UPLOAD_COLLAPSED_KEY, collapsed ? '1' : '0');
+    applyTruckUploadCollapsed(collapsed);
+});
+
+applyTruckUploadCollapsed(localStorage.getItem(TRUCK_UPLOAD_COLLAPSED_KEY) === '1');
+
+
+/* ================================================================
+   SECTION 2C: 계산기 위젯 (드래그 가능한 팝업, 배경을 막지 않음)
+   ================================================================ */
+let calcState = { display: '0', prevValue: null, operator: null, waitingForOperand: false };
+
+function calcUpdateDisplay() {
+    document.getElementById('calcDisplay').textContent = calcState.display;
+}
+
+function calcInputDigit(d) {
+    if (calcState.waitingForOperand) {
+        calcState.display = d;
+        calcState.waitingForOperand = false;
+    } else {
+        calcState.display = calcState.display === '0' ? d : calcState.display + d;
+    }
+    calcUpdateDisplay();
+}
+
+function calcInputDecimal() {
+    if (calcState.waitingForOperand) {
+        calcState.display = '0.';
+        calcState.waitingForOperand = false;
+    } else if (calcState.display.indexOf('.') === -1) {
+        calcState.display += '.';
+    }
+    calcUpdateDisplay();
+}
+
+function calcClear() {
+    calcState = { display: '0', prevValue: null, operator: null, waitingForOperand: false };
+    calcUpdateDisplay();
+}
+
+function calcBackspace() {
+    if (calcState.waitingForOperand) return;
+    calcState.display = calcState.display.length > 1 ? calcState.display.slice(0, -1) : '0';
+    calcUpdateDisplay();
+}
+
+function calcCompute(a, b, op) {
+    switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/': return b === 0 ? 0 : a / b;
+        default: return b;
+    }
+}
+
+function calcRound(n) {
+    return Math.round(n * 1e10) / 1e10;
+}
+
+function calcInputOperator(nextOp) {
+    const inputValue = parseFloat(calcState.display);
+    if (calcState.prevValue === null) {
+        calcState.prevValue = inputValue;
+    } else if (calcState.operator && !calcState.waitingForOperand) {
+        const result = calcRound(calcCompute(calcState.prevValue, inputValue, calcState.operator));
+        calcState.display = String(result);
+        calcState.prevValue = result;
+        calcUpdateDisplay();
+    }
+    calcState.waitingForOperand = true;
+    calcState.operator = nextOp;
+}
+
+function calcEquals() {
+    const inputValue = parseFloat(calcState.display);
+    if (calcState.operator !== null && calcState.prevValue !== null) {
+        const result = calcRound(calcCompute(calcState.prevValue, inputValue, calcState.operator));
+        calcState.display = String(result);
+        calcState.prevValue = null;
+        calcState.operator = null;
+        calcState.waitingForOperand = true;
+        calcUpdateDisplay();
+    }
+}
+
+const calcWidget = document.getElementById('calcWidget');
+const calcOpenBtn = document.getElementById('calcOpenBtn');
+const calcCloseBtn = document.getElementById('calcCloseBtn');
+const calcDragHandle = document.getElementById('calcDragHandle');
+
+calcOpenBtn.addEventListener('click', () => {
+    calcWidget.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        calcWidget.classList.remove('opacity-0', 'scale-95');
+    });
+});
+
+calcCloseBtn.addEventListener('click', () => {
+    calcWidget.classList.add('opacity-0', 'scale-95');
+    setTimeout(() => calcWidget.classList.add('hidden'), 150);
+});
+
+calcWidget.querySelectorAll('button[data-calc]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        const type = btn.dataset.calc;
+        if (type === 'digit') calcInputDigit(btn.dataset.digit);
+        else if (type === 'decimal') calcInputDecimal();
+        else if (type === 'clear') calcClear();
+        else if (type === 'backspace') calcBackspace();
+        else if (type === 'op') calcInputOperator(btn.dataset.op);
+        else if (type === 'equals') calcEquals();
+    });
+});
+
+// 제목 표시줄을 드래그하면 위젯을 원하는 위치로 옮길 수 있음 — 기본값(우하단 고정)에서
+// 한 번 옮기면 그 지점에 top/left로 고정되고, 새로고침하면 다시 기본 위치로 돌아옴.
+let calcDragOffsetX = 0;
+let calcDragOffsetY = 0;
+let calcDragging = false;
+
+calcDragHandle.addEventListener('mousedown', (e) => {
+    calcDragging = true;
+    const rect = calcWidget.getBoundingClientRect();
+    calcDragOffsetX = e.clientX - rect.left;
+    calcDragOffsetY = e.clientY - rect.top;
+    e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (!calcDragging) return;
+    const x = e.clientX - calcDragOffsetX;
+    const y = e.clientY - calcDragOffsetY;
+    calcWidget.style.left = Math.max(0, x) + 'px';
+    calcWidget.style.top = Math.max(0, y) + 'px';
+    calcWidget.style.right = 'auto';
+    calcWidget.style.bottom = 'auto';
+});
+
+document.addEventListener('mouseup', () => {
+    calcDragging = false;
+});
+
+
+/* ================================================================
    SECTION 3: TOAST NOTIFICATION UTILITY
    ================================================================ */
 // showToast()는 js/shell.js로 이동(집품/트럭 두 앱 공용 전역 함수).
