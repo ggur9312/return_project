@@ -315,6 +315,7 @@ function renderDashboard(data) {
 
             const sKpp = item.inputs.palette === 'KPP' ? 'selected' : '';
             const sAj = item.inputs.palette === 'AJ' ? 'selected' : '';
+            const sPal = item.inputs.palette === '팔레트' ? 'selected' : '';
             const sSm = item.inputs.palette === '소량' ? 'selected' : '';
 
             tableRowsHtml += `
@@ -325,17 +326,18 @@ function renderDashboard(data) {
                         <select onchange="updateInputValue('${date}', ${itemIdx}, 'palette', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <option value="KPP" ${sKpp}>KPP</option>
                             <option value="AJ" ${sAj}>AJ</option>
+                            <option value="팔레트" ${sPal}>팔레트</option>
                             <option value="소량" ${sSm}>소량</option>
                         </select>
                     </td>
                     <td class="px-3 py-2 w-28">
-                        <input type="number" min="0" value="${item.inputs.emptyGt}" oninput="updateInputValue('${date}', ${itemIdx}, 'emptyGt', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm text-right font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="number" min="0" value="${item.inputs.emptyGt}" onfocus="this.select()" oninput="updateInputValue('${date}', ${itemIdx}, 'emptyGt', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm text-right font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </td>
                     <td class="px-3 py-2 w-28">
-                        <input type="number" min="0" value="${item.inputs.palettePick}" oninput="updateInputValue('${date}', ${itemIdx}, 'palettePick', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm text-right font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="number" min="0" value="${item.inputs.palettePick}" onfocus="this.select()" oninput="updateInputValue('${date}', ${itemIdx}, 'palettePick', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm text-right font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </td>
                     <td class="px-3 py-2 w-28">
-                        <input type="number" min="0" value="${item.inputs.paletteGt}" oninput="updateInputValue('${date}', ${itemIdx}, 'paletteGt', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm text-right font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="number" min="0" value="${item.inputs.paletteGt}" onfocus="this.select()" oninput="updateInputValue('${date}', ${itemIdx}, 'paletteGt', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm text-right font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     </td>
                     <td class="px-4 py-3 w-32 text-right font-bold text-indigo-600 bg-indigo-50/30" id="calc32-${safeTabDate}-${itemIdx}">${exp32}</td>
                     <td class="px-4 py-3 w-32 text-right font-bold text-teal-600 bg-teal-50/30" id="calc24-${safeTabDate}-${itemIdx}">${exp24}</td>
@@ -483,7 +485,9 @@ function buildTruckRows(list, showPalette) {
         return `<tr><td colspan="${showPalette ? 3 : 2}" style="padding:15px;color:#999;">데이터 없음</td></tr>`;
     }
     return list.map(d => {
-        const gtText = `${d.inputs.emptyGt} (+${d.inputs.palettePick}P)`;
+        const gtText = d.inputs.palettePick > 0
+            ? `${d.inputs.emptyGt} (+${d.inputs.palettePick}P)`
+            : `${d.inputs.emptyGt}`;
         const paletteCell = showPalette ? `<td>${d.inputs.palette}</td>` : '';
         return `<tr>
                 <td style="text-align:left;">${d.company}</td>
@@ -508,19 +512,35 @@ function truckTableHeader(titleText, showPalette) {
             </tr>`;
 }
 
+// 출력물 정렬 순서: 좌측(KPP/AJ/팔레트)은 팔레트 종류 -> GT 수량(많은순) -> 업체명(가나다순),
+// 우측(소량)은 GT 수량(많은순) -> 업체명(가나다순)
+const PALETTE_SORT_ORDER = { 'KPP': 0, 'AJ': 1, '팔레트': 2 };
+
+function sortTruckSection(list, byPaletteType) {
+    return list.slice().sort((a, b) => {
+        if (byPaletteType) {
+            const rankDiff = PALETTE_SORT_ORDER[a.inputs.palette] - PALETTE_SORT_ORDER[b.inputs.palette];
+            if (rankDiff !== 0) return rankDiff;
+        }
+        const gtDiff = b.inputs.emptyGt - a.inputs.emptyGt;
+        if (gtDiff !== 0) return gtDiff;
+        return a.company.localeCompare(b.company, 'ko-KR');
+    });
+}
+
 // Build one date's left/right truck tables as a labeled, page-break-safe section
 function buildDateSectionHtml(date) {
     const currentData = globalProcessedData[date] || [];
-    const leftData = currentData.filter(d =>
-        (d.inputs.palette === 'KPP' || d.inputs.palette === 'AJ') &&
+    const leftData = sortTruckSection(currentData.filter(d =>
+        (d.inputs.palette === 'KPP' || d.inputs.palette === 'AJ' || d.inputs.palette === '팔레트') &&
         (d.inputs.emptyGt > 0 || d.inputs.palettePick > 0)
-    );
-    const rightData = currentData.filter(d =>
+    ), true);
+    const rightData = sortTruckSection(currentData.filter(d =>
         d.inputs.palette === '소량' &&
         (d.inputs.emptyGt > 0 || d.inputs.palettePick > 0)
-    );
+    ), false);
 
-    // 좌측엔 KPP/AJ 트럭, 우측엔 소량 트럭. 소량 트럭이 없으면 buildTruckRows가 우측에
+    // 좌측엔 KPP/AJ/팔레트 트럭, 우측엔 소량 트럭. 소량 트럭이 없으면 buildTruckRows가 우측에
     // "데이터 없음"을 표시한다.
     const leftRows = buildTruckRows(leftData, true);
     const rightRows = buildTruckRows(rightData, false);
@@ -970,7 +990,7 @@ function renderCycleGenCompanyList() {
             <span class="text-right tabular-nums text-slate-500">${d.inputs.palettePick}P</span>
             <span class="text-right tabular-nums text-slate-500">${exp32}P</span>
             <span class="text-right tabular-nums text-slate-500">${exp24}P</span>
-            <input type="number" min="1" value="1" class="cGenCompanyQty w-14 mx-auto bg-white border border-slate-200 rounded-md px-2 py-1 text-sm text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <input type="number" min="1" value="1" onfocus="this.select()" class="cGenCompanyQty w-14 mx-auto bg-white border border-slate-200 rounded-md px-2 py-1 text-sm text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
     `;
     }).join('');
