@@ -884,6 +884,8 @@ function renderCycleTable() {
         return;
     }
 
+    const allChecked = flatRows.every(row => row.checked);
+
     let rowsHtml = '';
     flatRows.forEach(row => {
         rowsHtml += `
@@ -915,7 +917,9 @@ function renderCycleTable() {
             <table class="w-full border-collapse text-left min-w-max">
                 <thead>
                     <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
-                        <th class="px-4 py-3 w-10"></th>
+                        <th class="px-4 py-3 w-10">
+                            <input type="checkbox" ${allChecked ? 'checked' : ''} onchange="setAllCycleRowsChecked(this.checked)" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" title="전체 선택/해제">
+                        </th>
                         <th class="px-3 py-3">생성일시</th>
                         <th class="px-4 py-3 text-left">업체명</th>
                         <th class="px-3 py-3">순번</th>
@@ -958,11 +962,10 @@ function toggleCycleRowChecked(date, index, checked) {
     }
 }
 
-function toggleSelectAllCycleRows() {
+function setAllCycleRowsChecked(checked) {
     const allRows = Object.values(truckCycleData).flat();
     if (allRows.length === 0) return;
-    const allChecked = allRows.every(r => r.checked);
-    allRows.forEach(r => r.checked = !allChecked);
+    allRows.forEach(r => r.checked = checked);
     renderCycleTable();
 }
 

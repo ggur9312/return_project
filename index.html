@@ -201,9 +201,7 @@
     <div id="sortRulesContainer" class="flex flex-wrap gap-2"></div>
     <button id="sortAddBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
     <button id="sortResetBtn" type="button" class="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">정렬 초기화</button>
-    <label class="inline-flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer bg-white border border-slate-200 rounded-lg px-3 py-1.5">
-      <input type="checkbox" id="sortZoneOPriorityCheckbox" class="accent-indigo-600"> 72·73층 O존 우선(존 오름차순)
-    </label>
+    <button id="sortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
   </section>
 
   <section class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-auto mt-8">
@@ -251,8 +249,9 @@
       </div>
     </section>
 
-    <div class="border-b border-slate-200 pb-1">
+    <div class="border-b border-slate-200 pb-1 flex justify-between items-center gap-2">
       <div id="assignTabsContainer" class="flex flex-wrap gap-2"></div>
+      <button id="assignDeleteAllBtn" type="button" class="shrink-0 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">전체삭제</button>
     </div>
 
     <div id="assignTableContainer"></div>
@@ -278,7 +277,7 @@
         <label class="text-sm text-slate-600 flex flex-col gap-1">투입 인원
           <input type="number" id="assignCountInput" min="1" step="1" placeholder="예: 3" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </label>
-        <button id="assignPreviewBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">미리보기</button>
+        <button id="assignPreviewBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">할당</button>
         <span id="assignMsg" class="text-xs"></span>
       </div>
       <div>
@@ -594,9 +593,6 @@
                         </button>
                         <button onclick="autoMatchCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                             <span>미사용 자동 매칭</span>
-                        </button>
-                        <button onclick="toggleSelectAllCycleRows()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
-                            <span>전체 선택/해제</span>
                         </button>
                         <button onclick="executeCyclePrint()" class="shrink-0 inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>

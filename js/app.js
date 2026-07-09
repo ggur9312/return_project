@@ -100,7 +100,7 @@
     sortRulesContainer: document.getElementById("sortRulesContainer"),
     sortAddBtn: document.getElementById("sortAddBtn"),
     sortResetBtn: document.getElementById("sortResetBtn"),
-    sortZoneOPriorityCheckbox: document.getElementById("sortZoneOPriorityCheckbox"),
+    sortZoneOPriorityBtn: document.getElementById("sortZoneOPriorityBtn"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
     homeView: document.getElementById("homeView"),
@@ -119,6 +119,7 @@
     assignCreateCloseBtn: document.getElementById("assignCreateCloseBtn"),
     assignTabsContainer: document.getElementById("assignTabsContainer"),
     assignTableContainer: document.getElementById("assignTableContainer"),
+    assignDeleteAllBtn: document.getElementById("assignDeleteAllBtn"),
     assignCustomBtn: document.getElementById("assignCustomBtn"),
     rowPickerModal: document.getElementById("rowPickerModal"),
     rowPickerModalBox: document.getElementById("rowPickerModalBox"),
@@ -2368,6 +2369,17 @@
   els.assignCancelBtn.addEventListener("click", closeAssignCreateModal);
   els.assignCreateCloseBtn.addEventListener("click", closeAssignCreateModal);
 
+  els.assignDeleteAllBtn.addEventListener("click", async function () {
+    if (!state.assignConfigs.length) return;
+    if (!(await window.confirmModal("생성된 집품 할당을 모두 삭제할까요?"))) return;
+    state.assignConfigs = [];
+    state.assignActiveId = null;
+    state.assignActiveWorkerIdx = null;
+    saveAssignState();
+    renderAssignTabs();
+    if (window.showToast) window.showToast("집품 할당이 모두 삭제되었습니다.");
+  });
+
   els.assignCustomBtn.addEventListener("click", function () { openRowPickerModal("create"); });
   els.rowPickerDateSelect.addEventListener("change", renderRowPickerAvailableList);
   els.rowPickerSearchInput.addEventListener("input", renderRowPickerAvailableList);
@@ -2385,9 +2397,12 @@
     state.sortRules = [];
     refreshAll();
   });
-  els.sortZoneOPriorityCheckbox.addEventListener("change", function () {
-    state.zoneOPriority = els.sortZoneOPriorityCheckbox.checked;
+  // 체크박스가 아니라 1회성 버튼 — 누른 순간에만 O존 우선 정렬을 적용하고,
+  // 이후 다른 조작으로 인한 재렌더링에는 영향을 주지 않도록 곧바로 플래그를 되돌린다.
+  els.sortZoneOPriorityBtn.addEventListener("click", function () {
+    state.zoneOPriority = true;
     refreshAll();
+    state.zoneOPriority = false;
   });
 
   els.gtSaveBtn.addEventListener("click", function () {
