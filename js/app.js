@@ -37,6 +37,8 @@
   var GT_PRINTED_KEY = "pickListGtPrinted";
   var LABEL_MARGIN_RIGHT_KEY = "pickListLabelMarginRight";
   var LABEL_MARGIN_BOTTOM_KEY = "pickListLabelMarginBottom";
+  var FLOOR_PANEL_COLLAPSED_KEY = "pickListFloorPanelCollapsed";
+  var UPLOAD_COLLAPSED_KEY = "pickListUploadCollapsed";
   var LABEL_MARGIN_DEFAULT = 3;
   var BADGE_CLASSES = [
     "bg-emerald-50 text-emerald-700 border border-emerald-100",
@@ -64,7 +66,6 @@
     // 72/73층 O존 우선 정렬 체크박스 상태 — 체크 시 zone 비교에서 O존을 72/73층보다 앞으로 보냄
     zoneOPriority: false,
     filters: initialFilters,
-    floorExcluded: new Set(),
     statusBadgeMap: {},
     assignConfigs: [],
     assignActiveId: null,
@@ -90,6 +91,16 @@
     floorPerPersonQty: document.getElementById("floorPerPersonQty"),
     filterQtySummary: document.getElementById("filterQtySummary"),
     floorBars: document.getElementById("floorBars"),
+    floorPanelToggleBtn: document.getElementById("floorPanelToggleBtn"),
+    floorPanelToggleLabel: document.getElementById("floorPanelToggleLabel"),
+    floorPanelToggleIcon: document.getElementById("floorPanelToggleIcon"),
+    floorPanelSummary: document.getElementById("floorPanelSummary"),
+    floorPanelBody: document.getElementById("floorPanelBody"),
+    uploadCard: document.getElementById("uploadCard"),
+    uploadToggleBtn: document.getElementById("uploadToggleBtn"),
+    uploadToggleLabel: document.getElementById("uploadToggleLabel"),
+    uploadToggleIcon: document.getElementById("uploadToggleIcon"),
+    uploadCardBody: document.getElementById("uploadCardBody"),
     dateTabsContainer: document.getElementById("dateTabsContainer"),
     filterBar: document.getElementById("filterBar"),
     filterResetAllBtn: document.getElementById("filterResetAllBtn"),
@@ -719,6 +730,15 @@
     });
   }
 
+  // 정식 집품 할당(층수 입력 방식)은 getAssignBaseRows()가 computeFilteredRows()를
+  // 거치므로, 홈 목록에 필터가 걸려 있으면 필터링된 일부 데이터만 할당 대상이 됨 —
+  // 이를 모르고 진행하는 실수를 막기 위해 필터 활성 여부를 확인하는 데 사용.
+  function hasActiveFilter() {
+    return ALL_COLUMNS.some(function (c) {
+      return state.filters[c.key] !== null && state.filters[c.key] !== undefined;
+    });
+  }
+
   function updateStatusBadgeMap() {
     var statuses = uniqueValues("status");
     var map = {};
@@ -814,26 +834,25 @@
     });
     var floors = Object.keys(byFloor).sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); });
 
-    var includedFloors = floors.filter(function (f) { return !state.floorExcluded.has(f); });
-    var totalQty = includedFloors.reduce(function (sum, f) { return sum + byFloor[f]; }, 0);
+    var totalQty = floors.reduce(function (sum, f) { return sum + byFloor[f]; }, 0);
     els.floorTotalQty.textContent = totalQty.toLocaleString("ko-KR") + "개";
     els.floorUnfilteredQty.textContent = sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
 
     var labor = parseFloat(els.laborInput.value);
     var hasLabor = !isNaN(labor) && labor > 0 && totalQty > 0;
-    els.floorPerPersonQty.textContent = hasLabor ? Math.round(totalQty / labor).toLocaleString("ko-KR") + "개" : "-";
+    var perPersonText = hasLabor ? Math.round(totalQty / labor).toLocaleString("ko-KR") + "개" : "-";
+    els.floorPerPersonQty.textContent = perPersonText;
     var maxQty = floors.reduce(function (m, f) { return Math.max(m, byFloor[f]); }, 0) || 1;
+
+    els.floorPanelSummary.textContent =
+      "총 수량 " + totalQty.toLocaleString("ko-KR") + "개 · 1인당 할당량 " + perPersonText;
 
     els.floorBars.innerHTML = floors.map(function (f) {
       var qty = byFloor[f];
       var widthPct = (qty / maxQty) * 100;
-      var excluded = state.floorExcluded.has(f);
       var laborHtml;
       var perPersonHtml;
-      if (excluded) {
-        laborHtml = '<span class="text-slate-400">제외됨</span>';
-        perPersonHtml = '<span class="text-slate-400">-</span>';
-      } else if (hasLabor) {
+      if (hasLabor) {
         var laborForFloorRaw = labor * (qty / totalQty);
         laborHtml = '<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 text-sm font-bold px-3 py-1 rounded-full">' + laborForFloorRaw.toFixed(1) + "명</span>";
         var roundedLabor = Math.round(laborForFloorRaw);
@@ -845,8 +864,7 @@
         perPersonHtml = '<span class="text-slate-400">-</span>';
       }
       return (
-        '<div class="grid grid-cols-[24px_60px_1fr_90px_110px_100px] items-center gap-2.5 text-xs' + (excluded ? " opacity-40" : "") + '">' +
-        '<input type="checkbox" class="floor-checkbox accent-indigo-600 cursor-pointer" data-floor="' + escapeHtml(f) + '"' + (excluded ? "" : " checked") + ">" +
+        '<div class="grid grid-cols-[60px_1fr_90px_110px_100px] items-center gap-2.5 text-xs">' +
         '<div class="text-slate-500 whitespace-nowrap">' + escapeHtml(f) + "층</div>" +
         '<div class="bg-slate-100 rounded-full overflow-hidden h-[10px]"><div class="bg-indigo-500 h-full rounded-full" style="width:' + widthPct + '%"></div></div>' +
         '<div class="text-right tabular-nums text-slate-700">' + qty.toLocaleString("ko-KR") + "개</div>" +
@@ -855,14 +873,23 @@
         "</div>"
       );
     }).join("");
+  }
 
-    Array.prototype.forEach.call(els.floorBars.querySelectorAll(".floor-checkbox"), function (cb) {
-      cb.addEventListener("change", function () {
-        var floor = cb.dataset.floor;
-        if (cb.checked) state.floorExcluded.delete(floor); else state.floorExcluded.add(floor);
-        renderFloorPanel(getFilteredRows());
-      });
-    });
+  // 접기/펼치기 카드 공용 헬퍼(층별 카드, 업로드 카드) — 라벨/아이콘/본문(+선택적 요약줄)을
+  // collapsed 상태에 맞게 갱신. summaryEl이 있으면 접혔을 때만 보이고, 없으면 본문만 토글.
+  function applyCardCollapsed(collapsed, toggleLabel, toggleIcon, body, summaryEl) {
+    toggleLabel.textContent = collapsed ? "펼치기" : "접기";
+    toggleIcon.classList.toggle("-rotate-90", collapsed);
+    body.classList.toggle("hidden", collapsed);
+    if (summaryEl) summaryEl.classList.toggle("hidden", !collapsed);
+  }
+
+  function loadFloorPanelCollapsed() {
+    return localStorage.getItem(FLOOR_PANEL_COLLAPSED_KEY) === "1";
+  }
+
+  function loadUploadCollapsed() {
+    return localStorage.getItem(UPLOAD_COLLAPSED_KEY) === "1";
   }
 
   // --- 생성일자별 탭 (홈) ---
@@ -2355,12 +2382,23 @@
   els.resetBtn.addEventListener("click", async function () {
     if (!(await window.confirmModal("저장된 집품 데이터를 모두 삭제할까요?"))) return;
     state.rows = [];
-    state.floorExcluded = new Set();
     localStorage.removeItem(STORAGE_KEY);
     els.pasteArea.value = "";
     els.fileName.textContent = "";
     setStatusMsg("데이터를 초기화했습니다.", "ok");
     refreshAll();
+  });
+
+  els.floorPanelToggleBtn.addEventListener("click", function () {
+    var collapsed = !loadFloorPanelCollapsed();
+    localStorage.setItem(FLOOR_PANEL_COLLAPSED_KEY, collapsed ? "1" : "0");
+    applyCardCollapsed(collapsed, els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
+  });
+
+  els.uploadToggleBtn.addEventListener("click", function () {
+    var collapsed = !loadUploadCollapsed();
+    localStorage.setItem(UPLOAD_COLLAPSED_KEY, collapsed ? "1" : "0");
+    applyCardCollapsed(collapsed, els.uploadToggleLabel, els.uploadToggleIcon, els.uploadCardBody, null);
   });
 
   var debouncedRenderFloorPanel = debounce(function () {
@@ -2375,7 +2413,12 @@
   els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
   els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
   els.assignOpenModalBtn.addEventListener("click", openAssignCreateModal);
-  els.assignPreviewBtn.addEventListener("click", generateAssignPreview);
+  els.assignPreviewBtn.addEventListener("click", async function () {
+    if (hasActiveFilter()) {
+      if (!(await window.confirmModal("현재 목록에 필터가 적용되어 있어 필터링된 데이터만 할당됩니다. 계속하시겠습니까?"))) return;
+    }
+    generateAssignPreview();
+  });
   els.assignConfirmBtn.addEventListener("click", confirmAssignConfig);
   els.assignCancelBtn.addEventListener("click", closeAssignCreateModal);
   els.assignCreateCloseBtn.addEventListener("click", closeAssignCreateModal);
@@ -2414,6 +2457,7 @@
     state.zoneOPriority = true;
     refreshAll();
     state.zoneOPriority = false;
+    if (window.showToast) window.showToast("72·73층 O존 우선 정렬이 적용되었습니다.");
   });
 
   els.gtSaveBtn.addEventListener("click", function () {
@@ -2601,6 +2645,8 @@
   loadAssignState();
   loadGtState();
   (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom); })();
+  applyCardCollapsed(loadFloorPanelCollapsed(), els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
+  applyCardCollapsed(loadUploadCollapsed(), els.uploadToggleLabel, els.uploadToggleIcon, els.uploadCardBody, null);
   els.laborInput.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
   refreshAll();
   renderAssignTabs();
