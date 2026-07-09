@@ -16,6 +16,11 @@
   var AGG_COLUMN = { key: "groupCompanyTotal", label: "업체 총수량", type: "number" };
   var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN]);
 
+  // 커스텀 할당 모달의 "사용 가능한 행" 테이블에 실제로 보이는 컬럼만 대상 —
+  // 생성일자는 이미 rowPickerDateSelect가 별도로 담당하므로 제외
+  var ROW_PICKER_COLUMNS = ["groupNo", "deadline", "company", "transportType", "zone", "quantity"]
+    .map(function (key) { return COLUMNS.find(function (c) { return c.key === key; }); });
+
   var LABEL_BARCODE_OPTS = { fontSize: 25, height: 42, width: 1.3 };
 
   // 행 고유 id 발급 — 배정(assignConfig)/GT 매칭 키가 배열 위치가 아니라 행 자체를
@@ -39,6 +44,7 @@
   var LABEL_MARGIN_BOTTOM_KEY = "pickListLabelMarginBottom";
   var FLOOR_PANEL_COLLAPSED_KEY = "pickListFloorPanelCollapsed";
   var UPLOAD_COLLAPSED_KEY = "pickListUploadCollapsed";
+  var FILTER_SORT_COLLAPSED_KEY = "pickListFilterSortCollapsed";
   var LABEL_MARGIN_DEFAULT = 3;
   var BADGE_CLASSES = [
     "bg-emerald-50 text-emerald-700 border border-emerald-100",
@@ -103,7 +109,13 @@
     uploadCardBody: document.getElementById("uploadCardBody"),
     dateTabsContainer: document.getElementById("dateTabsContainer"),
     filterBar: document.getElementById("filterBar"),
+    filterButtonsContainer: document.getElementById("filterButtonsContainer"),
     filterResetAllBtn: document.getElementById("filterResetAllBtn"),
+    filterSortToggleBtn: document.getElementById("filterSortToggleBtn"),
+    filterSortToggleLabel: document.getElementById("filterSortToggleLabel"),
+    filterSortToggleIcon: document.getElementById("filterSortToggleIcon"),
+    filterSortSummary: document.getElementById("filterSortSummary"),
+    filterSortBody: document.getElementById("filterSortBody"),
     table: document.getElementById("dataTable"),
     emptyState: document.getElementById("emptyState"),
     tableBody: document.getElementById("tableBody"),
@@ -137,10 +149,17 @@
     rowPickerTitle: document.getElementById("rowPickerTitle"),
     rowPickerDateSelect: document.getElementById("rowPickerDateSelect"),
     rowPickerSearchInput: document.getElementById("rowPickerSearchInput"),
+    rowPickerFilterButtonsContainer: document.getElementById("rowPickerFilterButtonsContainer"),
+    rowPickerFilterResetAllBtn: document.getElementById("rowPickerFilterResetAllBtn"),
+    rowPickerSortRulesContainer: document.getElementById("rowPickerSortRulesContainer"),
+    rowPickerSortAddBtn: document.getElementById("rowPickerSortAddBtn"),
+    rowPickerSortResetBtn: document.getElementById("rowPickerSortResetBtn"),
     rowPickerAvailableList: document.getElementById("rowPickerAvailableList"),
     rowPickerSelectedList: document.getElementById("rowPickerSelectedList"),
     rowPickerSelectedCount: document.getElementById("rowPickerSelectedCount"),
     rowPickerSelectedQty: document.getElementById("rowPickerSelectedQty"),
+    rowPickerDeleteAllBtn: document.getElementById("rowPickerDeleteAllBtn"),
+    rowPickerDragGhost: document.getElementById("rowPickerDragGhost"),
     rowPickerConfirmBtn: document.getElementById("rowPickerConfirmBtn"),
     rowPickerCancelBtn: document.getElementById("rowPickerCancelBtn"),
     rowPickerCloseBtn: document.getElementById("rowPickerCloseBtn"),
@@ -191,8 +210,6 @@
     sparePrintModalCancelBtn: document.getElementById("sparePrintModalCancelBtn"),
     printArea: document.getElementById("printArea")
   };
-
-  var filterEls = {}; // key -> { wrapper, btn, dropdown }
 
   function trim(v) {
     return (v === null || v === undefined ? "" : String(v)).trim();
@@ -507,237 +524,302 @@
     });
   }
 
-  // 필터바처럼 별도 영역에서 여러 정렬 기준을 명시적으로 추가/삭제/방향 전환.
-  // 테이블 헤더 클릭과 같은 state.sortRules를 공유해 항상 동기화된다.
-  function renderSortRules() {
-    if (!state.sortRules.length) {
-      els.sortRulesContainer.innerHTML = '<span class="text-xs text-slate-400">정렬 기준 없음</span>';
-      return;
-    }
-    els.sortRulesContainer.innerHTML = state.sortRules.map(function (rule, idx) {
-      var colOptions = ALL_COLUMNS.map(function (c) {
-        return '<option value="' + c.key + '"' + (c.key === rule.key ? " selected" : "") + '>' + c.label + "</option>";
-      }).join("");
-      var dirLabel = rule.dir === 1 ? "오름차순 ▲" : "내림차순 ▼";
-      return (
-        '<span class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 rounded-lg pl-2 pr-1 py-1">' +
-        '<span class="text-xs font-bold text-indigo-600">' + (idx + 1) + "</span>" +
-        '<select class="sort-rule-key bg-white border border-slate-200 rounded-md px-1.5 py-1 text-xs" data-idx="' + idx + '">' + colOptions + "</select>" +
-        '<button type="button" class="sort-rule-dir-btn text-xs font-medium text-indigo-700 px-1.5 py-1 hover:bg-indigo-100 rounded-md" data-idx="' + idx + '">' + dirLabel + "</button>" +
-        '<button type="button" class="sort-rule-remove-btn text-slate-400 hover:text-rose-500 px-1" data-idx="' + idx + '">✕</button>' +
-        "</span>"
-      );
-    }).join("");
-
-    Array.prototype.forEach.call(els.sortRulesContainer.querySelectorAll(".sort-rule-key"), function (sel) {
-      sel.addEventListener("change", function () {
-        state.sortRules[parseInt(sel.dataset.idx, 10)].key = sel.value;
-        refreshAll();
-      });
-    });
-    Array.prototype.forEach.call(els.sortRulesContainer.querySelectorAll(".sort-rule-dir-btn"), function (btn) {
-      btn.addEventListener("click", function () {
-        state.sortRules[parseInt(btn.dataset.idx, 10)].dir *= -1;
-        refreshAll();
-      });
-    });
-    Array.prototype.forEach.call(els.sortRulesContainer.querySelectorAll(".sort-rule-remove-btn"), function (btn) {
-      btn.addEventListener("click", function () {
-        state.sortRules.splice(parseInt(btn.dataset.idx, 10), 1);
-        refreshAll();
-      });
-    });
-  }
-
-  // --- 별도 필터 바 (검색 + 다중 선택, "적용" 버튼을 눌러야 실제 반영) ---
-
-  var pendingFilterDrafts = {}; // key -> Set, 드롭다운이 열려있는 동안의 임시 선택 상태(미적용)
-
-  function getEffectiveSet(key) {
-    if (pendingFilterDrafts[key]) return new Set(pendingFilterDrafts[key]);
-    var s = state.filters[key];
-    if (s === null || s === undefined) return new Set(getCandidateValues(key));
-    return new Set(s);
-  }
-
-  function getSearchedValues(key, term) {
-    var values = getCandidateValues(key);
-    if (!term) return values;
-    var lower = term.toLowerCase();
-    return values.filter(function (v) { return String(v).toLowerCase().indexOf(lower) !== -1; });
-  }
-
-  function commitFilterSet(key, set) {
-    var allValues = getCandidateValues(key);
-    state.filters[key] = set.size === allValues.length ? null : set;
-  }
-
-  function setupFilterBar() {
-    Array.prototype.forEach.call(els.filterBar.querySelectorAll(".filter-bar-btn"), function (btn) {
-      var key = btn.dataset.key;
-      var wrapper = btn.parentElement;
-      filterEls[key] = { wrapper: wrapper, btn: btn, dropdown: null };
-
-      btn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        toggleDropdown(key);
-      });
-    });
-
-    document.addEventListener("click", function (e) {
-      Object.keys(filterEls).forEach(function (key) {
-        var entry = filterEls[key];
-        if (entry.dropdown && !entry.dropdown.classList.contains("hidden") && !entry.dropdown.contains(e.target) && e.target !== entry.btn) {
-          closeDropdown(key);
-        }
-      });
-    });
-
-    els.filterResetAllBtn.addEventListener("click", function () {
-      Object.keys(filterEls).forEach(function (key) { closeDropdown(key); });
-      ALL_COLUMNS.forEach(function (c) { state.filters[c.key] = null; });
-      pendingFilterDrafts = {};
-      refreshAll();
-    });
-  }
-
-  function buildDropdown(key) {
-    var div = document.createElement("div");
-    div.className = "th-filter-dropdown hidden absolute top-full left-0 mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 font-normal whitespace-normal text-left";
-    div.innerHTML =
-      '<input type="text" class="th-filter-search w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs mb-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="검색...">' +
-      '<label class="flex items-center gap-1.5 text-xs pb-1.5 mb-1.5 border-b border-slate-200 text-slate-500"><input type="checkbox" class="th-filter-selectall-cb accent-indigo-600"> 전체 선택</label>' +
-      '<div class="th-filter-list max-h-44 overflow-y-auto flex flex-col gap-1"></div>' +
-      '<div class="flex gap-2 mt-2 pt-2 border-t border-slate-200">' +
-      '<button type="button" class="th-filter-apply flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg py-1.5 transition-colors">적용</button>' +
-      '<button type="button" class="th-filter-reset flex-1 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-lg py-1.5 transition-colors">초기화</button>' +
-      "</div>";
-    div.addEventListener("click", function (e) { e.stopPropagation(); });
-
-    var searchInput = div.querySelector(".th-filter-search");
-    var selectAllCb = div.querySelector(".th-filter-selectall-cb");
-
-    searchInput.addEventListener("input", debounce(function () {
-      var term = searchInput.value;
-      var visible = getSearchedValues(key, term);
-      pendingFilterDrafts[key] = new Set(visible);
-      renderDropdownItems(key);
-    }, 150));
-
-    selectAllCb.addEventListener("change", function () {
-      var term = searchInput.value;
-      var visible = getSearchedValues(key, term);
-      var set = getEffectiveSet(key);
-      visible.forEach(function (v) {
-        if (selectAllCb.checked) set.add(v); else set.delete(v);
-      });
-      pendingFilterDrafts[key] = set;
-      renderDropdownItems(key);
-    });
-
-    div.querySelector(".th-filter-apply").addEventListener("click", function () {
-      if (pendingFilterDrafts[key]) {
-        commitFilterSet(key, pendingFilterDrafts[key]);
-        delete pendingFilterDrafts[key];
-        refreshAll();
+  // 필터바처럼 별도 영역에서 여러 정렬 기준을 명시적으로 추가/삭제/방향 전환하는
+  // 컨트롤러 팩토리 — 홈과 커스텀 할당 모달이 각자의 정렬 규칙 배열/컨테이너로
+  // 독립적으로 인스턴스화한다. 홈은 테이블 헤더 클릭(setupSortLabels)과도 같은
+  // state.sortRules를 공유해 항상 동기화된다.
+  function createSortBarController(options) {
+    // options: { columns, containerEl, addBtn, resetBtn, getSortRules(), setSortRules(rules), onApply() }
+    function render() {
+      var rules = options.getSortRules();
+      if (!rules.length) {
+        options.containerEl.innerHTML = '<span class="text-xs text-slate-400">정렬 기준 없음</span>';
+        return;
       }
-      closeDropdown(key);
-    });
+      options.containerEl.innerHTML = rules.map(function (rule, idx) {
+        var colOptions = options.columns.map(function (c) {
+          return '<option value="' + c.key + '"' + (c.key === rule.key ? " selected" : "") + '>' + c.label + "</option>";
+        }).join("");
+        var dirLabel = rule.dir === 1 ? "오름차순 ▲" : "내림차순 ▼";
+        return (
+          '<span class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 rounded-lg pl-2 pr-1 py-1">' +
+          '<span class="text-xs font-bold text-indigo-600">' + (idx + 1) + "</span>" +
+          '<select class="sort-rule-key bg-white border border-slate-200 rounded-md px-1.5 py-1 text-xs" data-idx="' + idx + '">' + colOptions + "</select>" +
+          '<button type="button" class="sort-rule-dir-btn text-xs font-medium text-indigo-700 px-1.5 py-1 hover:bg-indigo-100 rounded-md" data-idx="' + idx + '">' + dirLabel + "</button>" +
+          '<button type="button" class="sort-rule-remove-btn text-slate-400 hover:text-rose-500 px-1" data-idx="' + idx + '">✕</button>' +
+          "</span>"
+        );
+      }).join("");
 
-    div.querySelector(".th-filter-reset").addEventListener("click", function () {
-      state.filters[key] = null;
-      delete pendingFilterDrafts[key];
-      renderDropdownItems(key);
-      refreshAll();
-    });
+      Array.prototype.forEach.call(options.containerEl.querySelectorAll(".sort-rule-key"), function (sel) {
+        sel.addEventListener("change", function () {
+          options.getSortRules()[parseInt(sel.dataset.idx, 10)].key = sel.value;
+          options.onApply();
+        });
+      });
+      Array.prototype.forEach.call(options.containerEl.querySelectorAll(".sort-rule-dir-btn"), function (btn) {
+        btn.addEventListener("click", function () {
+          options.getSortRules()[parseInt(btn.dataset.idx, 10)].dir *= -1;
+          options.onApply();
+        });
+      });
+      Array.prototype.forEach.call(options.containerEl.querySelectorAll(".sort-rule-remove-btn"), function (btn) {
+        btn.addEventListener("click", function () {
+          options.getSortRules().splice(parseInt(btn.dataset.idx, 10), 1);
+          options.onApply();
+        });
+      });
+    }
 
-    return div;
+    if (options.addBtn) {
+      options.addBtn.addEventListener("click", function () {
+        var rules = options.getSortRules();
+        var usedKeys = rules.map(function (r) { return r.key; });
+        var nextCol = options.columns.find(function (c) { return usedKeys.indexOf(c.key) === -1; }) || options.columns[0];
+        rules.push({ key: nextCol.key, dir: 1 });
+        options.onApply();
+      });
+    }
+    if (options.resetBtn) {
+      options.resetBtn.addEventListener("click", function () {
+        options.setSortRules([]);
+        options.onApply();
+      });
+    }
+
+    return { render: render };
   }
 
-  function renderDropdownItems(key) {
-    var entry = filterEls[key];
-    var dropdown = entry.dropdown;
-    var searchInput = dropdown.querySelector(".th-filter-search");
-    var selectAllCb = dropdown.querySelector(".th-filter-selectall-cb");
-    var listEl = dropdown.querySelector(".th-filter-list");
-    var term = searchInput.value;
-    var visible = getSearchedValues(key, term);
-    var effectiveSet = getEffectiveSet(key);
+  var homeSortBarController = createSortBarController({
+    columns: ALL_COLUMNS,
+    containerEl: els.sortRulesContainer,
+    addBtn: els.sortAddBtn,
+    resetBtn: els.sortResetBtn,
+    getSortRules: function () { return state.sortRules; },
+    setSortRules: function (rules) { state.sortRules = rules; },
+    onApply: function () { refreshAll(); }
+  });
 
-    listEl.innerHTML = visible.map(function (v) {
-      var checked = effectiveSet.has(v) ? " checked" : "";
-      var displayText = (key === "deadline" || key === "createdAt") ? formatDateOnly(v) : v;
-      return (
-        '<label class="th-filter-item flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" class="th-filter-item-cb accent-indigo-600" value="' + escapeHtml(v) + '"' + checked + "> " + escapeHtml(displayText) + "</label>"
-      );
-    }).join("");
+  // --- 필터 바 컨트롤러 팩토리 (검색 + 다중 선택, "적용" 버튼을 눌러야 실제 반영) ---
+  // 홈 화면과 커스텀 할당 모달이 서로 다른 컬럼/상태/컨테이너로 각각 인스턴스화해서
+  // 쓸 수 있도록 일반화됨 — 두 화면의 필터가 서로 독립적으로 동작한다.
+  function createFilterBarController(options) {
+    // options: { columns, containerEl, resetBtn, getFilters(), setFilter(key, valueOrNull), getCandidateValues(key), onApply() }
+    var filterEls = {};
+    var pendingDrafts = {}; // key -> Set, 드롭다운이 열려있는 동안의 임시 선택 상태(미적용)
 
-    var visibleCheckedCount = visible.filter(function (v) { return effectiveSet.has(v); }).length;
-    selectAllCb.checked = visible.length > 0 && visibleCheckedCount === visible.length;
-    selectAllCb.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visible.length;
+    function getEffectiveSet(key) {
+      if (pendingDrafts[key]) return new Set(pendingDrafts[key]);
+      var s = options.getFilters()[key];
+      if (s === null || s === undefined) return new Set(options.getCandidateValues(key));
+      return new Set(s);
+    }
 
-    Array.prototype.forEach.call(listEl.querySelectorAll(".th-filter-item-cb"), function (cb) {
-      cb.addEventListener("change", function () {
+    function getSearchedValues(key, term) {
+      var values = options.getCandidateValues(key);
+      if (!term) return values;
+      var lower = term.toLowerCase();
+      return values.filter(function (v) { return String(v).toLowerCase().indexOf(lower) !== -1; });
+    }
+
+    function commitFilterSet(key, set) {
+      var allValues = options.getCandidateValues(key);
+      options.setFilter(key, set.size === allValues.length ? null : set);
+    }
+
+    function buildDropdown(key) {
+      var div = document.createElement("div");
+      div.className = "th-filter-dropdown hidden absolute top-full left-0 mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 font-normal whitespace-normal text-left";
+      div.innerHTML =
+        '<input type="text" class="th-filter-search w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs mb-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="검색...">' +
+        '<label class="flex items-center gap-1.5 text-xs pb-1.5 mb-1.5 border-b border-slate-200 text-slate-500"><input type="checkbox" class="th-filter-selectall-cb accent-indigo-600"> 전체 선택</label>' +
+        '<div class="th-filter-list max-h-44 overflow-y-auto flex flex-col gap-1"></div>' +
+        '<div class="flex gap-2 mt-2 pt-2 border-t border-slate-200">' +
+        '<button type="button" class="th-filter-apply flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg py-1.5 transition-colors">적용</button>' +
+        '<button type="button" class="th-filter-reset flex-1 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-lg py-1.5 transition-colors">초기화</button>' +
+        "</div>";
+      div.addEventListener("click", function (e) { e.stopPropagation(); });
+
+      var searchInput = div.querySelector(".th-filter-search");
+      var selectAllCb = div.querySelector(".th-filter-selectall-cb");
+
+      searchInput.addEventListener("input", debounce(function () {
+        var term = searchInput.value;
+        var visible = getSearchedValues(key, term);
+        pendingDrafts[key] = new Set(visible);
+        renderDropdownItems(key);
+      }, 150));
+
+      selectAllCb.addEventListener("change", function () {
+        var term = searchInput.value;
+        var visible = getSearchedValues(key, term);
         var set = getEffectiveSet(key);
-        if (cb.checked) set.add(cb.value); else set.delete(cb.value);
-        pendingFilterDrafts[key] = set;
+        visible.forEach(function (v) {
+          if (selectAllCb.checked) set.add(v); else set.delete(v);
+        });
+        pendingDrafts[key] = set;
         renderDropdownItems(key);
       });
-    });
-  }
 
-  function openDropdown(key) {
-    Object.keys(filterEls).forEach(function (k) {
-      if (k !== key && filterEls[k].dropdown && !filterEls[k].dropdown.classList.contains("hidden")) {
-        closeDropdown(k);
+      div.querySelector(".th-filter-apply").addEventListener("click", function () {
+        if (pendingDrafts[key]) {
+          commitFilterSet(key, pendingDrafts[key]);
+          delete pendingDrafts[key];
+          options.onApply();
+        }
+        closeDropdown(key);
+      });
+
+      div.querySelector(".th-filter-reset").addEventListener("click", function () {
+        options.setFilter(key, null);
+        delete pendingDrafts[key];
+        renderDropdownItems(key);
+        options.onApply();
+      });
+
+      return div;
+    }
+
+    function renderDropdownItems(key) {
+      var entry = filterEls[key];
+      var dropdown = entry.dropdown;
+      var searchInput = dropdown.querySelector(".th-filter-search");
+      var selectAllCb = dropdown.querySelector(".th-filter-selectall-cb");
+      var listEl = dropdown.querySelector(".th-filter-list");
+      var term = searchInput.value;
+      var visible = getSearchedValues(key, term);
+      var effectiveSet = getEffectiveSet(key);
+      var col = options.columns.find(function (c) { return c.key === key; });
+
+      listEl.innerHTML = visible.map(function (v) {
+        var checked = effectiveSet.has(v) ? " checked" : "";
+        var displayText = (col && col.type === "date") ? formatDateOnly(v) : v;
+        return (
+          '<label class="th-filter-item flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" class="th-filter-item-cb accent-indigo-600" value="' + escapeHtml(v) + '"' + checked + "> " + escapeHtml(displayText) + "</label>"
+        );
+      }).join("");
+
+      var visibleCheckedCount = visible.filter(function (v) { return effectiveSet.has(v); }).length;
+      selectAllCb.checked = visible.length > 0 && visibleCheckedCount === visible.length;
+      selectAllCb.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visible.length;
+
+      Array.prototype.forEach.call(listEl.querySelectorAll(".th-filter-item-cb"), function (cb) {
+        cb.addEventListener("change", function () {
+          var set = getEffectiveSet(key);
+          if (cb.checked) set.add(cb.value); else set.delete(cb.value);
+          pendingDrafts[key] = set;
+          renderDropdownItems(key);
+        });
+      });
+    }
+
+    function openDropdown(key) {
+      Object.keys(filterEls).forEach(function (k) {
+        if (k !== key && filterEls[k].dropdown && !filterEls[k].dropdown.classList.contains("hidden")) {
+          closeDropdown(k);
+        }
+      });
+      var entry = filterEls[key];
+      if (!entry.dropdown) {
+        entry.dropdown = buildDropdown(key);
+        entry.wrapper.appendChild(entry.dropdown);
       }
-    });
-    var entry = filterEls[key];
-    if (!entry.dropdown) {
-      entry.dropdown = buildDropdown(key);
-      entry.wrapper.appendChild(entry.dropdown);
+      delete pendingDrafts[key]; // 매번 열 때 커밋된 상태에서 새로 시작
+      renderDropdownItems(key);
+      entry.dropdown.classList.remove("hidden");
     }
-    delete pendingFilterDrafts[key]; // 매번 열 때 커밋된 상태에서 새로 시작
-    renderDropdownItems(key);
-    entry.dropdown.classList.remove("hidden");
-  }
 
-  function closeDropdown(key) {
-    var entry = filterEls[key];
-    if (!entry.dropdown || entry.dropdown.classList.contains("hidden")) return;
-    entry.dropdown.classList.add("hidden");
-    delete pendingFilterDrafts[key]; // 적용 없이 닫으면 임시 선택은 버림
-    var searchInput = entry.dropdown.querySelector(".th-filter-search");
-    if (searchInput) searchInput.value = ""; // 검색창에 직접 입력한 검색어도 닫으면 초기화
-  }
-
-  function toggleDropdown(key) {
-    var entry = filterEls[key];
-    var isHidden = !entry.dropdown || entry.dropdown.classList.contains("hidden");
-    if (isHidden) {
-      openDropdown(key);
-    } else {
-      closeDropdown(key);
+    function closeDropdown(key) {
+      var entry = filterEls[key];
+      if (!entry.dropdown || entry.dropdown.classList.contains("hidden")) return;
+      entry.dropdown.classList.add("hidden");
+      delete pendingDrafts[key]; // 적용 없이 닫으면 임시 선택은 버림
+      var searchInput = entry.dropdown.querySelector(".th-filter-search");
+      if (searchInput) searchInput.value = ""; // 검색창에 직접 입력한 검색어도 닫으면 초기화
     }
+
+    function toggleDropdown(key) {
+      var entry = filterEls[key];
+      var isHidden = !entry.dropdown || entry.dropdown.classList.contains("hidden");
+      if (isHidden) {
+        openDropdown(key);
+      } else {
+        closeDropdown(key);
+      }
+    }
+
+    function updateButtonStates() {
+      Object.keys(filterEls).forEach(function (key) {
+        var btn = filterEls[key].btn;
+        var filters = options.getFilters();
+        var active = filters[key] !== null && filters[key] !== undefined;
+        var col = options.columns.find(function (c) { return c.key === key; });
+        btn.className = active ? FILTER_BTN_ACTIVE : FILTER_BTN_INACTIVE;
+        btn.innerHTML = escapeHtml(col.label) + ' <span class="text-[9px]">▾</span>';
+      });
+    }
+
+    function setup() {
+      options.columns.forEach(function (col) {
+        var wrapper = document.createElement("div");
+        wrapper.className = "relative inline-block";
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = FILTER_BTN_INACTIVE;
+        btn.dataset.key = col.key;
+        btn.innerHTML = escapeHtml(col.label) + ' <span class="text-[9px]">▾</span>';
+        wrapper.appendChild(btn);
+        options.containerEl.appendChild(wrapper);
+        filterEls[col.key] = { wrapper: wrapper, btn: btn, dropdown: null };
+
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          toggleDropdown(col.key);
+        });
+      });
+
+      document.addEventListener("click", function (e) {
+        Object.keys(filterEls).forEach(function (key) {
+          var entry = filterEls[key];
+          if (entry.dropdown && !entry.dropdown.classList.contains("hidden") && !entry.dropdown.contains(e.target) && e.target !== entry.btn) {
+            closeDropdown(key);
+          }
+        });
+      });
+
+      if (options.resetBtn) {
+        options.resetBtn.addEventListener("click", function () {
+          Object.keys(filterEls).forEach(function (key) { closeDropdown(key); });
+          options.columns.forEach(function (c) { options.setFilter(c.key, null); });
+          pendingDrafts = {};
+          options.onApply();
+        });
+      }
+    }
+
+    function hasActiveFilterFn() {
+      var filters = options.getFilters();
+      return options.columns.some(function (c) { return filters[c.key] !== null && filters[c.key] !== undefined; });
+    }
+
+    return { setup: setup, updateButtonStates: updateButtonStates, hasActiveFilter: hasActiveFilterFn };
   }
 
-  function updateFilterButtonStates() {
-    Object.keys(filterEls).forEach(function (key) {
-      var btn = filterEls[key].btn;
-      var active = state.filters[key] !== null && state.filters[key] !== undefined;
-      var label = ALL_COLUMNS.find(function (c) { return c.key === key; }).label;
-      btn.className = active ? FILTER_BTN_ACTIVE : FILTER_BTN_INACTIVE;
-      btn.innerHTML = escapeHtml(label) + ' <span class="text-[9px]">▾</span>';
-    });
-  }
+  var homeFilterBarController = createFilterBarController({
+    columns: ALL_COLUMNS,
+    containerEl: els.filterButtonsContainer,
+    resetBtn: els.filterResetAllBtn,
+    getFilters: function () { return state.filters; },
+    setFilter: function (key, value) { state.filters[key] = value; },
+    getCandidateValues: getCandidateValues,
+    onApply: function () { refreshAll(); }
+  });
 
   // 정식 집품 할당(층수 입력 방식)은 getAssignBaseRows()가 computeFilteredRows()를
   // 거치므로, 홈 목록에 필터가 걸려 있으면 필터링된 일부 데이터만 할당 대상이 됨 —
   // 이를 모르고 진행하는 실수를 막기 위해 필터 활성 여부를 확인하는 데 사용.
   function hasActiveFilter() {
-    return ALL_COLUMNS.some(function (c) {
-      return state.filters[c.key] !== null && state.filters[c.key] !== undefined;
-    });
+    return homeFilterBarController.hasActiveFilter();
   }
 
   function updateStatusBadgeMap() {
@@ -888,6 +970,22 @@
 
   function loadFloorPanelCollapsed() {
     return localStorage.getItem(FLOOR_PANEL_COLLAPSED_KEY) === "1";
+  }
+
+  function loadFilterSortCollapsed() {
+    var raw = localStorage.getItem(FILTER_SORT_COLLAPSED_KEY);
+    return raw === null ? true : raw === "1";
+  }
+
+  function updateFilterSortBadge() {
+    var filterCount = ALL_COLUMNS.filter(function (c) {
+      return state.filters[c.key] !== null && state.filters[c.key] !== undefined;
+    }).length;
+    var sortCount = state.sortRules.length;
+    var parts = [];
+    if (filterCount > 0) parts.push("필터 " + filterCount + "개");
+    if (sortCount > 0) parts.push("정렬 " + sortCount + "개");
+    els.filterSortSummary.textContent = parts.length ? parts.join(" · ") : "필터·정렬 없음";
   }
 
   function loadUploadCollapsed() {
@@ -1756,6 +1854,9 @@
   var rowPickerMarkedIds = new Set();
   var rowPickerDragAnchorId = null; // 드래그 셀렉트 시작 행 id(mousedown 시점)
   var rowPickerDragSelecting = false;
+  // 홈 화면의 state.filters/state.sortRules와는 독립적인, 모달 전용 필터/정렬 상태
+  var rowPickerFilters = {};
+  var rowPickerSortRules = [];
 
   // 이미 어떤 assignConfig에도 배정된 행의 id 집합 — 중복 배정 방지용
   function getAssignedRowIdSet() {
@@ -1771,7 +1872,9 @@
     return ids;
   }
 
-  function getRowPickerAvailableRows() {
+  // 생성일자 선택 + 검색어 + 이미 배정/선택된 행 제외까지만 적용한, 컬럼 필터 이전 범위 —
+  // 필터 드롭다운의 후보값(getRowPickerCandidateValues)도 이 범위를 기준으로 계산
+  function getRowPickerScopedRows() {
     var dateVal = els.rowPickerDateSelect.value;
     var term = trim(els.rowPickerSearchInput.value).toLowerCase();
     var assignedIds = getAssignedRowIdSet();
@@ -1786,6 +1889,67 @@
       return true;
     });
   }
+
+  function getRowPickerCandidateValues(key) {
+    var values = uniqueValuesFrom(getRowPickerScopedRows(), function (r) { return r[key]; });
+    var col = ROW_PICKER_COLUMNS.find(function (c) { return c.key === key; });
+    if (col && col.type === "number") {
+      values.sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
+    }
+    return values;
+  }
+
+  function computeRowPickerFilteredRows(baseRows) {
+    return baseRows.filter(function (r) {
+      for (var i = 0; i < ROW_PICKER_COLUMNS.length; i++) {
+        var col = ROW_PICKER_COLUMNS[i];
+        var filterSet = rowPickerFilters[col.key];
+        if (filterSet === null || filterSet === undefined) continue;
+        if (!filterSet.has(String(r[col.key]))) return false;
+      }
+      return true;
+    });
+  }
+
+  function getRowPickerSortedRows(rows) {
+    var activeRules = rowPickerSortRules
+      .map(function (rule) { return { col: ROW_PICKER_COLUMNS.find(function (c) { return c.key === rule.key; }), dir: rule.dir }; })
+      .filter(function (r) { return r.col; });
+    if (!activeRules.length) return rows;
+    var copy = rows.slice();
+    copy.sort(function (a, b) {
+      for (var i = 0; i < activeRules.length; i++) {
+        var diff = compareValues(a, b, activeRules[i].col) * activeRules[i].dir;
+        if (diff !== 0) return diff;
+      }
+      return 0;
+    });
+    return copy;
+  }
+
+  function getRowPickerAvailableRows() {
+    return getRowPickerSortedRows(computeRowPickerFilteredRows(getRowPickerScopedRows()));
+  }
+
+  var rowPickerFilterBarController = createFilterBarController({
+    columns: ROW_PICKER_COLUMNS,
+    containerEl: els.rowPickerFilterButtonsContainer,
+    resetBtn: els.rowPickerFilterResetAllBtn,
+    getFilters: function () { return rowPickerFilters; },
+    setFilter: function (key, value) { rowPickerFilters[key] = value; },
+    getCandidateValues: getRowPickerCandidateValues,
+    onApply: function () { renderRowPickerAvailableList(); }
+  });
+
+  var rowPickerSortBarController = createSortBarController({
+    columns: ROW_PICKER_COLUMNS,
+    containerEl: els.rowPickerSortRulesContainer,
+    addBtn: els.rowPickerSortAddBtn,
+    resetBtn: els.rowPickerSortResetBtn,
+    getSortRules: function () { return rowPickerSortRules; },
+    setSortRules: function (rules) { rowPickerSortRules = rules; },
+    onApply: function () { renderRowPickerAvailableList(); }
+  });
 
   function buildRowPickerTable(rows, btnClass, btnLabel, btnClickAttr, draggableSelect) {
     if (!rows.length) {
@@ -1824,6 +1988,8 @@
   }
 
   function renderRowPickerAvailableList() {
+    rowPickerFilterBarController.updateButtonStates();
+    rowPickerSortBarController.render();
     els.rowPickerAvailableList.innerHTML = buildRowPickerTable(getRowPickerAvailableRows(), "row-picker-add-btn bg-indigo-600 hover:bg-indigo-700 text-white", "추가", "", true);
     Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-add-btn"), function (btn) {
       btn.addEventListener("click", function () {
@@ -1872,7 +2038,32 @@
     rowPickerMarkedIds = new Set();
     for (var i = lo; i <= hi; i++) rowPickerMarkedIds.add(rows[i].id);
     Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (tr) {
-      tr.classList.toggle("bg-indigo-50", rowPickerMarkedIds.has(tr.dataset.rowId));
+      var marked = rowPickerMarkedIds.has(tr.dataset.rowId);
+      tr.classList.toggle("bg-indigo-50", marked);
+      tr.classList.toggle("opacity-70", marked && rowPickerDragSelecting);
+    });
+    updateRowPickerDragGhost();
+  }
+
+  // 드래그 중임을 알기 쉽게 커서를 따라다니며 이동 건수를 보여주는 배지
+  function updateRowPickerDragGhost() {
+    if (!rowPickerDragSelecting || !rowPickerMarkedIds.size) {
+      els.rowPickerDragGhost.classList.add("hidden");
+      return;
+    }
+    els.rowPickerDragGhost.textContent = rowPickerMarkedIds.size + "행 이동 중";
+    els.rowPickerDragGhost.classList.remove("hidden");
+  }
+
+  function positionRowPickerDragGhost(clientX, clientY) {
+    els.rowPickerDragGhost.style.left = (clientX + 14) + "px";
+    els.rowPickerDragGhost.style.top = (clientY + 14) + "px";
+  }
+
+  function clearRowPickerDragVisuals() {
+    els.rowPickerDragGhost.classList.add("hidden");
+    Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (tr) {
+      tr.classList.remove("opacity-70");
     });
   }
 
@@ -1893,14 +2084,20 @@
       // 유지한 채 이동 준비만 하고, 아니면 새로 이 행부터 범위를 시작한다.
       if (rowPickerMarkedIds.has(id) && rowPickerMarkedIds.size > 1) {
         rowPickerDragAnchorId = null;
+        Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (rowEl) {
+          rowEl.classList.toggle("opacity-70", rowPickerMarkedIds.has(rowEl.dataset.rowId));
+        });
       } else {
         rowPickerDragAnchorId = id;
         applyRowPickerMarkRange(id, id);
       }
+      updateRowPickerDragGhost();
+      positionRowPickerDragGhost(e.clientX, e.clientY);
     });
 
     document.addEventListener("mousemove", function (e) {
       if (!rowPickerDragSelecting) return;
+      positionRowPickerDragGhost(e.clientX, e.clientY);
       var el = document.elementFromPoint(e.clientX, e.clientY);
       var overSelectedList = !!(el && els.rowPickerSelectedList.contains(el));
       els.rowPickerSelectedList.classList.toggle("ring-2", overSelectedList);
@@ -1916,6 +2113,7 @@
       rowPickerDragSelecting = false;
       rowPickerDragAnchorId = null;
       els.rowPickerSelectedList.classList.remove("ring-2", "ring-indigo-400");
+      clearRowPickerDragVisuals();
       var el = document.elementFromPoint(e.clientX, e.clientY);
       if (el && els.rowPickerSelectedList.contains(el) && rowPickerMarkedIds.size) {
         var idsToMove = Array.from(rowPickerMarkedIds);
@@ -1934,6 +2132,8 @@
     rowPickerTargetWorkerIdx = (typeof workerIdx === "number") ? workerIdx : null;
     rowPickerSelectedRows = [];
     rowPickerMarkedIds = new Set();
+    rowPickerFilters = {};
+    rowPickerSortRules = [];
     els.rowPickerTitle.textContent = mode === "append" ? "작업자 " + (workerIdx + 1) + "에게 행 추가" : "커스텀 할당 만들기";
     els.rowPickerConfirmBtn.textContent = mode === "append" ? "추가" : "확정";
     els.rowPickerDateSelect.value = "";
@@ -2424,8 +2624,9 @@
       renderFilterQtySummary(filtered, unfiltered);
       renderTable(sorted);
       updateSortHeaderClasses();
-      updateFilterButtonStates();
-      renderSortRules();
+      homeFilterBarController.updateButtonStates();
+      homeSortBarController.render();
+      updateFilterSortBadge();
     }
     if (!els.assignView.classList.contains("hidden")) {
       renderAssignPanel();
@@ -2490,6 +2691,12 @@
     applyCardCollapsed(collapsed, els.uploadToggleLabel, els.uploadToggleIcon, els.uploadCardBody, null);
   });
 
+  els.filterSortToggleBtn.addEventListener("click", function () {
+    var collapsed = !loadFilterSortCollapsed();
+    localStorage.setItem(FILTER_SORT_COLLAPSED_KEY, collapsed ? "1" : "0");
+    applyCardCollapsed(collapsed, els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
+  });
+
   var debouncedRenderFloorPanel = debounce(function () {
     renderFloorPanel(getFilteredRows());
   }, 200);
@@ -2529,17 +2736,14 @@
   els.rowPickerConfirmBtn.addEventListener("click", confirmRowPicker);
   els.rowPickerCancelBtn.addEventListener("click", closeRowPickerModal);
   els.rowPickerCloseBtn.addEventListener("click", closeRowPickerModal);
+  els.rowPickerDeleteAllBtn.addEventListener("click", async function () {
+    if (!rowPickerSelectedRows.length) return;
+    if (!(await window.confirmModal("선택된 행을 모두 삭제할까요?"))) return;
+    rowPickerSelectedRows = [];
+    renderRowPickerAvailableList();
+    renderRowPickerSelectedList();
+  });
 
-  els.sortAddBtn.addEventListener("click", function () {
-    var usedKeys = state.sortRules.map(function (r) { return r.key; });
-    var nextCol = ALL_COLUMNS.find(function (c) { return usedKeys.indexOf(c.key) === -1; }) || ALL_COLUMNS[0];
-    state.sortRules.push({ key: nextCol.key, dir: 1 });
-    refreshAll();
-  });
-  els.sortResetBtn.addEventListener("click", function () {
-    state.sortRules = [];
-    refreshAll();
-  });
   // 체크박스가 아니라 1회성 버튼 — 누른 순간에만 O존 우선 정렬을 적용하고,
   // 이후 다른 조작으로 인한 재렌더링에는 영향을 주지 않도록 곧바로 플래그를 되돌린다.
   els.sortZoneOPriorityBtn.addEventListener("click", function () {
@@ -2728,7 +2932,8 @@
 
   // --- Init ---
   setupSortLabels();
-  setupFilterBar();
+  homeFilterBarController.setup();
+  rowPickerFilterBarController.setup();
   setupRowPickerDragAndDrop();
   loadFromStorage();
   loadDateTabState();
@@ -2737,6 +2942,7 @@
   (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom); })();
   applyCardCollapsed(loadFloorPanelCollapsed(), els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
   applyCardCollapsed(loadUploadCollapsed(), els.uploadToggleLabel, els.uploadToggleIcon, els.uploadCardBody, null);
+  applyCardCollapsed(loadFilterSortCollapsed(), els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
   els.laborInput.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
   refreshAll();
   renderAssignTabs();
