@@ -1234,7 +1234,8 @@ function executeCyclePrint() {
                 width: 2,
                 height: 70,
                 displayValue: true,
-                fontSize: 32,
+                fontSize: 44,
+                fontOptions: "bold",
                 margin: 0
             });
         } catch (e) {

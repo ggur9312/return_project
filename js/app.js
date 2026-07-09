@@ -55,8 +55,9 @@
 
   var state = {
     rows: [],
-    sortKey: null,
-    sortDir: 1,
+    // 정렬 기준 목록(우선순위 순서대로 적용). 기본값: 존 오름차순 -> 수량 내림차순,
+    // 새로 업로드/붙여넣기한 데이터도 존별로 묶이고 수량이 많은 순으로 보이게 함.
+    sortRules: [{ key: "zone", dir: 1 }, { key: "quantity", dir: -1 }],
     filters: initialFilters,
     floorExcluded: new Set(),
     statusBadgeMap: {},
@@ -80,7 +81,9 @@
     resetBtn: document.getElementById("resetBtn"),
     laborInput: document.getElementById("laborInput"),
     floorTotalQty: document.getElementById("floorTotalQty"),
+    floorUnfilteredQty: document.getElementById("floorUnfilteredQty"),
     floorPerPersonQty: document.getElementById("floorPerPersonQty"),
+    filterQtySummary: document.getElementById("filterQtySummary"),
     floorBars: document.getElementById("floorBars"),
     dateTabsContainer: document.getElementById("dateTabsContainer"),
     filterBar: document.getElementById("filterBar"),
@@ -89,6 +92,9 @@
     emptyState: document.getElementById("emptyState"),
     tableBody: document.getElementById("tableBody"),
     theadRow: document.querySelector("#dataTable thead tr"),
+    sortRulesContainer: document.getElementById("sortRulesContainer"),
+    sortAddBtn: document.getElementById("sortAddBtn"),
+    sortResetBtn: document.getElementById("sortResetBtn"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
     homeView: document.getElementById("homeView"),
@@ -434,17 +440,19 @@
     return computeFilteredRows(state.rows);
   }
 
-  // --- 정렬 (테이블 헤더 라벨 클릭) ---
+  // --- 정렬 (테이블 헤더 라벨 클릭 + 별도 다중 정렬 영역) ---
 
+  // 헤더를 클릭하면 그 열 하나만으로 정렬(이미 그 열 단독 정렬 중이면 방향 토글) —
+  // 정렬 영역(#sortRulesContainer)에서 여러 기준을 관리하는 것과 같은 state.sortRules를
+  // 공유하므로 항상 서로 동기화된다.
   function setupSortLabels() {
     Array.prototype.forEach.call(els.theadRow.querySelectorAll("th[data-key]"), function (th) {
       var key = th.dataset.key;
       th.addEventListener("click", function () {
-        if (state.sortKey === key) {
-          state.sortDir = state.sortDir * -1;
+        if (state.sortRules.length === 1 && state.sortRules[0].key === key) {
+          state.sortRules[0].dir *= -1;
         } else {
-          state.sortKey = key;
-          state.sortDir = 1;
+          state.sortRules = [{ key: key, dir: 1 }];
         }
         refreshAll();
       });
@@ -456,16 +464,60 @@
       var key = th.dataset.key;
       var label = th.querySelector(".th-label");
       var arrow = label.querySelector(".sort-arrow");
-      if (state.sortKey === key) {
+      var ruleIdx = state.sortRules.findIndex(function (r) { return r.key === key; });
+      if (ruleIdx !== -1) {
         if (!arrow) {
           arrow = document.createElement("span");
           arrow.className = "sort-arrow ml-1 text-indigo-600";
           label.appendChild(arrow);
         }
-        arrow.textContent = state.sortDir === 1 ? "▲" : "▼";
+        var dirArrow = state.sortRules[ruleIdx].dir === 1 ? "▲" : "▼";
+        arrow.textContent = state.sortRules.length > 1 ? (ruleIdx + 1) + dirArrow : dirArrow;
       } else if (arrow) {
         arrow.remove();
       }
+    });
+  }
+
+  // 필터바처럼 별도 영역에서 여러 정렬 기준을 명시적으로 추가/삭제/방향 전환.
+  // 테이블 헤더 클릭과 같은 state.sortRules를 공유해 항상 동기화된다.
+  function renderSortRules() {
+    if (!state.sortRules.length) {
+      els.sortRulesContainer.innerHTML = '<span class="text-xs text-slate-400">정렬 기준 없음</span>';
+      return;
+    }
+    els.sortRulesContainer.innerHTML = state.sortRules.map(function (rule, idx) {
+      var colOptions = ALL_COLUMNS.map(function (c) {
+        return '<option value="' + c.key + '"' + (c.key === rule.key ? " selected" : "") + '>' + c.label + "</option>";
+      }).join("");
+      var dirLabel = rule.dir === 1 ? "오름차순 ▲" : "내림차순 ▼";
+      return (
+        '<span class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 rounded-lg pl-2 pr-1 py-1">' +
+        '<span class="text-xs font-bold text-indigo-600">' + (idx + 1) + "</span>" +
+        '<select class="sort-rule-key bg-white border border-slate-200 rounded-md px-1.5 py-1 text-xs" data-idx="' + idx + '">' + colOptions + "</select>" +
+        '<button type="button" class="sort-rule-dir-btn text-xs font-medium text-indigo-700 px-1.5 py-1 hover:bg-indigo-100 rounded-md" data-idx="' + idx + '">' + dirLabel + "</button>" +
+        '<button type="button" class="sort-rule-remove-btn text-slate-400 hover:text-rose-500 px-1" data-idx="' + idx + '">✕</button>' +
+        "</span>"
+      );
+    }).join("");
+
+    Array.prototype.forEach.call(els.sortRulesContainer.querySelectorAll(".sort-rule-key"), function (sel) {
+      sel.addEventListener("change", function () {
+        state.sortRules[parseInt(sel.dataset.idx, 10)].key = sel.value;
+        refreshAll();
+      });
+    });
+    Array.prototype.forEach.call(els.sortRulesContainer.querySelectorAll(".sort-rule-dir-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        state.sortRules[parseInt(btn.dataset.idx, 10)].dir *= -1;
+        refreshAll();
+      });
+    });
+    Array.prototype.forEach.call(els.sortRulesContainer.querySelectorAll(".sort-rule-remove-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        state.sortRules.splice(parseInt(btn.dataset.idx, 10), 1);
+        refreshAll();
+      });
     });
   }
 
@@ -673,11 +725,18 @@
   }
 
   function getSortedRows(rows) {
-    if (!state.sortKey) return rows;
-    var col = ALL_COLUMNS.find(function (c) { return c.key === state.sortKey; });
-    if (!col) return rows;
+    var activeRules = state.sortRules
+      .map(function (rule) { return { col: ALL_COLUMNS.find(function (c) { return c.key === rule.key; }), dir: rule.dir }; })
+      .filter(function (r) { return r.col; });
+    if (!activeRules.length) return rows;
     var copy = rows.slice();
-    copy.sort(function (a, b) { return compareValues(a, b, col) * state.sortDir; });
+    copy.sort(function (a, b) {
+      for (var i = 0; i < activeRules.length; i++) {
+        var diff = compareValues(a, b, activeRules[i].col) * activeRules[i].dir;
+        if (diff !== 0) return diff;
+      }
+      return 0;
+    });
     return copy;
   }
 
@@ -694,7 +753,17 @@
     return isNaN(n) ? Infinity : n;
   }
 
-  function renderFloorPanel(rows) {
+  function sumQty(rows) {
+    return rows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
+  }
+
+  function renderFilterQtySummary(filteredRows, unfilteredRows) {
+    els.filterQtySummary.textContent =
+      "필터 적용 수량: " + sumQty(filteredRows).toLocaleString("ko-KR") + "개 · " +
+      "전체 수량: " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
+  }
+
+  function renderFloorPanel(rows, unfilteredRows) {
     var byFloor = {};
     rows.forEach(function (r) {
       var floor = getFloor(r.zone);
@@ -705,6 +774,7 @@
     var includedFloors = floors.filter(function (f) { return !state.floorExcluded.has(f); });
     var totalQty = includedFloors.reduce(function (sum, f) { return sum + byFloor[f]; }, 0);
     els.floorTotalQty.textContent = totalQty.toLocaleString("ko-KR") + "개";
+    els.floorUnfilteredQty.textContent = sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
 
     var labor = parseFloat(els.laborInput.value);
     var hasLabor = !isNaN(labor) && labor > 0 && totalQty > 0;
@@ -1019,11 +1089,18 @@
   // 집품 할당/커스텀/여분 라벨이 공유하는 4칸 라벨 마크업 — 값이 없는 필드는
   // bracketPart/빈 문자열을 그대로 넘기면 완전히 빈칸으로 표시됨
   function buildLabelHtml(line1, companyText, line3, barcodeHtml) {
+    // line1/line3이 빈 문자열이면 브라우저가 그 줄의 줄박스를 통째로 생략해버려
+    // 아래 구분선(divide-y)이 위로 밀려 붙는다. 일반 스페이스(" ")는 인라인
+    // 요소 경계에서 공백 축소(whitespace collapsing) 대상이라 여전히 줄이
+    // 찌그러지므로, 축소되지 않는 줄바꿈 없는 공백( )으로 채워 줄 높이를
+    // 항상 유지한다.
+    var safeLine1 = line1 || " ";
+    var safeLine3 = line3 || " ";
     return (
       '<div class="gt-label break-after-page w-[5cm] h-[4cm] flex flex-col divide-y divide-black text-center text-black box-border overflow-hidden">' +
-      '<div class="shrink-0 flex items-center justify-center py-0.5 overflow-hidden"><span class="text-xs font-bold leading-none text-black">' + line1 + "</span></div>" +
+      '<div class="shrink-0 flex items-center justify-center py-0.5 overflow-hidden"><span class="text-xs font-bold leading-none text-black">' + safeLine1 + "</span></div>" +
       '<div class="flex-1 flex items-center justify-center px-1 overflow-hidden"><span class="text-base font-bold leading-tight text-black break-words line-clamp-2">' + escapeHtml(companyText || "") + "</span></div>" +
-      '<div class="shrink-0 flex items-center justify-center py-0.5 overflow-hidden"><span class="text-sm font-bold leading-none text-black">' + line3 + "</span></div>" +
+      '<div class="shrink-0 flex items-center justify-center py-0.5 overflow-hidden"><span class="text-sm font-bold leading-none text-black">' + safeLine3 + "</span></div>" +
       buildBarcodeCellHtml(barcodeHtml, "flex-1") +
       "</div>"
     );
@@ -1953,8 +2030,8 @@
       return '<div class="px-5 py-4 text-center text-xs text-slate-400">배정 없음</div>';
     }
     var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
-      return '<th class="px-3 py-1.5 text-left' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
-    }).join("") + '<th class="px-3 py-1.5 text-right">작업자</th>';
+      return '<th class="px-2 py-1.5 text-left' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
+    }).join("") + '<th class="px-2 py-1.5 text-right">작업자</th>';
     var workerOptionsHtml = "";
     for (var wIdx = 0; wIdx < workerCount; wIdx++) {
       workerOptionsHtml += '<option value="' + wIdx + '"' + (wIdx === workerIdx ? " selected" : "") + '>작업자 ' + (wIdx + 1) + "</option>";
@@ -1968,17 +2045,17 @@
         '<tr class="border-b border-slate-100 last:border-b-0">' +
         ASSIGN_DETAIL_COLUMNS.map(function (col) {
           if (col.key === "quantity") {
-            return '<td class="px-3 py-1.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
+            return '<td class="px-2 py-1.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
           }
           if (col.key === "groupNo") {
-            return '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + "</td>";
+            return '<td class="px-2 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + "</td>";
           }
           if (col.key === "deadline" || col.key === "createdAt") {
-            return '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r[col.key])) + "</td>";
+            return '<td class="px-2 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r[col.key])) + "</td>";
           }
-          return '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r[col.key]) + "</td>";
+          return '<td class="px-2 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
-        '<td class="px-3 py-1.5 text-right">' + selectHtml + "</td>" +
+        '<td class="px-2 py-1.5 text-right">' + selectHtml + "</td>" +
         "</tr>"
       );
     }).join("");
@@ -2150,14 +2227,17 @@
     // 화면(hidden 클래스 여부)에 맞는 렌더링만 실행 — switchView()가 두
     // 화면의 hidden 클래스만 토글하므로 그 상태를 그대로 기준으로 삼는다.
     if (!els.homeView.classList.contains("hidden")) {
+      var unfiltered = getDateScopedRows();
       var filtered = getFilteredRows();
       var sorted = getSortedRows(filtered);
       updateStatusBadgeMap();
       renderDateTabs();
-      renderFloorPanel(filtered);
+      renderFloorPanel(filtered, unfiltered);
+      renderFilterQtySummary(filtered, unfiltered);
       renderTable(sorted);
       updateSortHeaderClasses();
       updateFilterButtonStates();
+      renderSortRules();
     }
     if (!els.assignView.classList.contains("hidden")) {
       renderAssignPanel();
@@ -2232,6 +2312,17 @@
   els.rowPickerSearchInput.addEventListener("input", renderRowPickerAvailableList);
   els.rowPickerConfirmBtn.addEventListener("click", confirmRowPicker);
   els.rowPickerCancelBtn.addEventListener("click", closeRowPickerModal);
+
+  els.sortAddBtn.addEventListener("click", function () {
+    var usedKeys = state.sortRules.map(function (r) { return r.key; });
+    var nextCol = ALL_COLUMNS.find(function (c) { return usedKeys.indexOf(c.key) === -1; }) || ALL_COLUMNS[0];
+    state.sortRules.push({ key: nextCol.key, dir: 1 });
+    refreshAll();
+  });
+  els.sortResetBtn.addEventListener("click", function () {
+    state.sortRules = [];
+    refreshAll();
+  });
 
   els.gtSaveBtn.addEventListener("click", function () {
     var tokens = parseGtTokens(els.gtPasteArea.value);
@@ -2339,6 +2430,11 @@
 
   els.customLabelCompanySearch.addEventListener("focus", openCustomLabelCompanyDropdown);
   els.customLabelCompanySearch.addEventListener("input", function () {
+    // 검색창은 기존 업체를 찾기 위한 용도지만, 목록에 없는 이름을 타이핑만 하고
+    // 드롭다운에서 아무것도 선택하지 않아도 실제 출력에 쓰이는 업체명 칸에
+    // 그대로 반영되게 한다. 이후 목록에서 클릭하면 fillCustomLabelFieldsFromCompany가
+    // 값을 덮어써 정상적으로 자동완성된다.
+    els.customLabelCompany.value = els.customLabelCompanySearch.value;
     renderCustomLabelCompanyDropdown(els.customLabelCompanySearch.value);
     els.customLabelCompanyDropdown.classList.remove("hidden");
   });
