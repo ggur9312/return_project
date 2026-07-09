@@ -844,8 +844,9 @@
     els.floorPerPersonQty.textContent = perPersonText;
     var maxQty = floors.reduce(function (m, f) { return Math.max(m, byFloor[f]); }, 0) || 1;
 
-    els.floorPanelSummary.textContent =
-      "총 수량 " + totalQty.toLocaleString("ko-KR") + "개 · 1인당 할당량 " + perPersonText;
+    els.floorPanelSummary.textContent = floors.length
+      ? floors.map(function (f) { return f + "층 " + byFloor[f].toLocaleString("ko-KR") + "개"; }).join(" · ")
+      : "데이터 없음";
 
     els.floorBars.innerHTML = floors.map(function (f) {
       var qty = byFloor[f];
