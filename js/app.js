@@ -1475,7 +1475,7 @@
           }
           return '<td class="px-4 py-2 text-slate-700 whitespace-nowrap">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
-        '<td class="px-4 py-2 whitespace-nowrap"><input type="text" class="assign-gt-input w-36 bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '" placeholder="예: GC-GT91-475-1"></td>' +
+        '<td class="px-4 py-2 whitespace-nowrap"><input type="text" class="assign-gt-input w-36 bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '"></td>' +
         "</tr>"
       );
     }).join("");
