@@ -140,6 +140,7 @@
     rowPickerAvailableList: document.getElementById("rowPickerAvailableList"),
     rowPickerSelectedList: document.getElementById("rowPickerSelectedList"),
     rowPickerSelectedCount: document.getElementById("rowPickerSelectedCount"),
+    rowPickerSelectedQty: document.getElementById("rowPickerSelectedQty"),
     rowPickerConfirmBtn: document.getElementById("rowPickerConfirmBtn"),
     rowPickerCancelBtn: document.getElementById("rowPickerCancelBtn"),
     rowPickerCloseBtn: document.getElementById("rowPickerCloseBtn"),
@@ -1751,6 +1752,10 @@
   var rowPickerTargetCfgId = null;
   var rowPickerTargetWorkerIdx = null;
   var rowPickerSelectedRows = []; // 확정 전까지 state에 반영되지 않는 임시 선택 목록
+  // "사용 가능한 행"에서 드래그로 범위 선택된(하지만 아직 옮기지 않은) 행 id 집합
+  var rowPickerMarkedIds = new Set();
+  var rowPickerDragAnchorId = null; // 드래그 셀렉트 시작 행 id(mousedown 시점)
+  var rowPickerDragSelecting = false;
 
   // 이미 어떤 assignConfig에도 배정된 행의 id 집합 — 중복 배정 방지용
   function getAssignedRowIdSet() {
@@ -1782,13 +1787,15 @@
     });
   }
 
-  function buildRowPickerTable(rows, btnClass, btnLabel, btnClickAttr) {
+  function buildRowPickerTable(rows, btnClass, btnLabel, btnClickAttr, draggableSelect) {
     if (!rows.length) {
       return '<div class="px-4 py-6 text-center text-xs text-slate-400">해당하는 행이 없습니다.</div>';
     }
     var bodyHtml = rows.map(function (r) {
+      var marked = draggableSelect && rowPickerMarkedIds.has(r.id);
       return (
-        '<tr class="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80 transition-colors">' +
+        '<tr class="row-picker-row border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80 transition-colors' + (draggableSelect ? " cursor-move select-none" : "") + (marked ? " bg-indigo-50" : "") + '"' +
+        ' data-row-id="' + escapeHtml(r.id) + '">' +
         '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r.deadline)) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(getCreatedDate(r)) + "</td>" +
@@ -1817,11 +1824,12 @@
   }
 
   function renderRowPickerAvailableList() {
-    els.rowPickerAvailableList.innerHTML = buildRowPickerTable(getRowPickerAvailableRows(), "row-picker-add-btn bg-indigo-600 hover:bg-indigo-700 text-white", "추가", "");
+    els.rowPickerAvailableList.innerHTML = buildRowPickerTable(getRowPickerAvailableRows(), "row-picker-add-btn bg-indigo-600 hover:bg-indigo-700 text-white", "추가", "", true);
     Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-add-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var row = state.rows.find(function (r) { return r.id === btn.dataset.rowId; });
         if (!row) return;
+        rowPickerMarkedIds.delete(row.id);
         rowPickerSelectedRows.push(row);
         renderRowPickerAvailableList();
         renderRowPickerSelectedList();
@@ -1831,6 +1839,8 @@
 
   function renderRowPickerSelectedList() {
     els.rowPickerSelectedCount.textContent = rowPickerSelectedRows.length;
+    var selectedQty = rowPickerSelectedRows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
+    els.rowPickerSelectedQty.textContent = selectedQty.toLocaleString("ko-KR");
     els.rowPickerSelectedList.innerHTML = buildRowPickerTable(rowPickerSelectedRows, "row-picker-remove-btn bg-rose-50 hover:bg-rose-100 text-rose-600", "삭제", "");
     Array.prototype.forEach.call(els.rowPickerSelectedList.querySelectorAll(".row-picker-remove-btn"), function (btn) {
       btn.addEventListener("click", function () {
@@ -1841,11 +1851,89 @@
     });
   }
 
+  // "사용 가능한 행" 목록에서 드래그로 여러 행을 한 번에 마킹(범위 선택)하고,
+  // 그중 하나를 "선택된 행" 영역으로 드래그앤드롭하면 마킹된 행 전부가 옮겨감.
+  // 컨테이너 자체(<div id="rowPickerAvailableList">)는 재렌더링 때마다 내용만
+  // 바뀌므로, 이벤트 위임(delegation)으로 한 번만 등록하면 매번 다시 걸 필요가 없다.
+  function getRowIndexInRows(rows, id) {
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].id === id) return i;
+    }
+    return -1;
+  }
+
+  function applyRowPickerMarkRange(anchorId, currentId) {
+    var rows = getRowPickerAvailableRows();
+    var anchorIdx = getRowIndexInRows(rows, anchorId);
+    var currentIdx = getRowIndexInRows(rows, currentId);
+    if (anchorIdx === -1 || currentIdx === -1) return;
+    var lo = Math.min(anchorIdx, currentIdx);
+    var hi = Math.max(anchorIdx, currentIdx);
+    rowPickerMarkedIds = new Set();
+    for (var i = lo; i <= hi; i++) rowPickerMarkedIds.add(rows[i].id);
+    Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (tr) {
+      tr.classList.toggle("bg-indigo-50", rowPickerMarkedIds.has(tr.dataset.rowId));
+    });
+  }
+
+  // 네이티브 HTML5 드래그(draggable/dragstart 등)는 커스텀 mousedown 범위선택과
+  // 이벤트가 충돌해(mousedown에서 preventDefault하면 브라우저가 드래그 자체를
+  // 시작하지 못함) 순수 mouse 이벤트만으로 "범위 선택 + 드롭까지" 한 번의
+  // 제스처로 처리한다: mousedown(시작) → mousemove(같은 목록 안이면 범위 갱신,
+  // "선택된 행" 위로 올라가면 드롭 표시) → mouseup("선택된 행" 위에서 떼면 이동).
+  function setupRowPickerDragAndDrop() {
+    els.rowPickerAvailableList.addEventListener("mousedown", function (e) {
+      if (e.target.closest("button")) return;
+      var tr = e.target.closest(".row-picker-row");
+      if (!tr) return;
+      e.preventDefault();
+      rowPickerDragSelecting = true;
+      var id = tr.dataset.rowId;
+      // 이미 여러 행이 마킹된 상태에서 그 중 하나를 다시 잡으면 기존 범위를
+      // 유지한 채 이동 준비만 하고, 아니면 새로 이 행부터 범위를 시작한다.
+      if (rowPickerMarkedIds.has(id) && rowPickerMarkedIds.size > 1) {
+        rowPickerDragAnchorId = null;
+      } else {
+        rowPickerDragAnchorId = id;
+        applyRowPickerMarkRange(id, id);
+      }
+    });
+
+    document.addEventListener("mousemove", function (e) {
+      if (!rowPickerDragSelecting) return;
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var overSelectedList = !!(el && els.rowPickerSelectedList.contains(el));
+      els.rowPickerSelectedList.classList.toggle("ring-2", overSelectedList);
+      els.rowPickerSelectedList.classList.toggle("ring-indigo-400", overSelectedList);
+      if (overSelectedList || rowPickerDragAnchorId === null) return;
+      var tr = el && el.closest(".row-picker-row");
+      if (!tr || !els.rowPickerAvailableList.contains(tr)) return;
+      applyRowPickerMarkRange(rowPickerDragAnchorId, tr.dataset.rowId);
+    });
+
+    document.addEventListener("mouseup", function (e) {
+      if (!rowPickerDragSelecting) return;
+      rowPickerDragSelecting = false;
+      rowPickerDragAnchorId = null;
+      els.rowPickerSelectedList.classList.remove("ring-2", "ring-indigo-400");
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      if (el && els.rowPickerSelectedList.contains(el) && rowPickerMarkedIds.size) {
+        var idsToMove = Array.from(rowPickerMarkedIds);
+        var movedRows = state.rows.filter(function (r) { return idsToMove.indexOf(r.id) !== -1; });
+        rowPickerSelectedRows = rowPickerSelectedRows.concat(movedRows);
+        rowPickerMarkedIds = new Set();
+        renderRowPickerAvailableList();
+        renderRowPickerSelectedList();
+      }
+    });
+  }
+
   function openRowPickerModal(mode, cfgId, workerIdx) {
     rowPickerMode = mode;
     rowPickerTargetCfgId = cfgId || null;
     rowPickerTargetWorkerIdx = (typeof workerIdx === "number") ? workerIdx : null;
     rowPickerSelectedRows = [];
+    rowPickerMarkedIds = new Set();
     els.rowPickerTitle.textContent = mode === "append" ? "작업자 " + (workerIdx + 1) + "에게 행 추가" : "커스텀 할당 만들기";
     els.rowPickerConfirmBtn.textContent = mode === "append" ? "추가" : "확정";
     els.rowPickerDateSelect.value = "";
@@ -2641,6 +2729,7 @@
   // --- Init ---
   setupSortLabels();
   setupFilterBar();
+  setupRowPickerDragAndDrop();
   loadFromStorage();
   loadDateTabState();
   loadAssignState();
