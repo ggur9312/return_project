@@ -728,16 +728,27 @@
     state.statusBadgeMap = map;
   }
 
+  // 존 코드에서 숫자(층코드)를 제거한 알파벳 부분이 정확히 "O"인지 판별 —
+  // 존은 "72K", "72A"처럼 층코드+알파벳 형태이고 O존도 "72O", "73O"처럼 층코드가 붙어 있음.
+  function isOZone(zone) {
+    return String(zone || "").replace(/[0-9]/g, "").trim().toUpperCase() === "O";
+  }
+
   // 72/73층(알파벳 제거한 층코드가 "7"로 시작)에서는 실제 동선상 O존을 가장 먼저
-  // 지나가므로, zoneOPriority 체크박스가 켜져 있으면 O존을 해당 층 앞으로 보낸다.
-  // 그 외 비교(72/73층과 무관하거나 O존이 없는 경우)는 기존 로케일 비교 그대로 유지.
+  // 지나가므로, zoneOPriority 버튼을 누르면 같은 층 안에서 O존(예: 72O, 73O)을
+  // 그 층의 다른 존(72K, 72A 등)보다 앞으로 보낸다. 층이 다르면(72층 vs 73층 등)
+  // 층끼리의 상대적 순서는 건드리지 않고 기존 로케일 비교 그대로 유지.
   function compareZoneWithOPriority(za, zb) {
     var sa = String(za || "").trim();
     var sb = String(zb || "").trim();
-    var aIsO = sa.toUpperCase() === "O";
-    var bIsO = sb.toUpperCase() === "O";
-    if (aIsO && !bIsO && /^7/.test(getFloor(sb))) return -1;
-    if (bIsO && !aIsO && /^7/.test(getFloor(sa))) return 1;
+    var floorA = getFloor(sa);
+    var floorB = getFloor(sb);
+    if (floorA === floorB && /^7/.test(floorA)) {
+      var aIsO = isOZone(sa);
+      var bIsO = isOZone(sb);
+      if (aIsO && !bIsO) return -1;
+      if (bIsO && !aIsO) return 1;
+    }
     return sa.localeCompare(sb, "ko");
   }
 
