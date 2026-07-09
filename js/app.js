@@ -1493,15 +1493,30 @@
     );
   }
 
+  // 구버전 저장 데이터 호환용: entries 안에 "존 아이템"(zone/qty/rows)이 섞여 있으면 rows로
+  // 펼치고, 이미 원본 데이터 행(zone/qty가 아니라 groupNo 등을 가짐)이면 그대로 둔다.
+  function flattenWorkerGroup(entries) {
+    var result = [];
+    (entries || []).forEach(function (e) {
+      if (e && e.rows) {
+        result = result.concat(e.rows);
+      } else {
+        result.push(e);
+      }
+    });
+    return result;
+  }
+
   function renderAssignPanel() {
     var cfg = state.assignConfigs.find(function (c) { return c.id === state.assignActiveId; });
     if (!cfg) {
       els.assignTableContainer.innerHTML = "";
       return;
     }
-    // workerGroups: 모달에서 확정된(수동 재배정 포함) 최종 분배. 구버전 config(items만 있고
-    // workerGroups 없음)는 기존처럼 splitBalanced로 매 렌더링 시 재계산해 호환성을 유지한다.
-    var groups = cfg.workerGroups || splitBalanced(cfg.items || [], cfg.count);
+    // workerGroups: 모달에서 확정된(수동 재배정 포함) 최종 분배(작업자별 원본 데이터 행 배열).
+    // 구버전 config(items만 있거나, workerGroups가 존 아이템 배열이던 이전 버전)는
+    // splitBalanced로 재계산 후 flattenWorkerGroup으로 정규화해 호환성을 유지한다.
+    var groups = (cfg.workerGroups || splitBalanced(cfg.items || [], cfg.count)).map(flattenWorkerGroup);
     var totalItems = groups.reduce(function (sum, g) { return sum + g.length; }, 0);
     if (!totalItems) {
       els.assignTableContainer.innerHTML = '<div class="bg-white border border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500 shadow-sm">해당 층에 데이터가 없습니다.</div>';
@@ -1519,11 +1534,10 @@
         "</div>";
     }
 
-    var cardsHtml = groups.map(function (group, idx) {
+    var cardsHtml = groups.map(function (detailRows, idx) {
       if (activeWorkerIdx !== null && activeWorkerIdx !== idx) return "";
-      var total = group.reduce(function (sum, it) { return sum + it.qty; }, 0);
-      var zoneList = group.length ? group.map(function (it) { return it.zone; }).join(", ") : "";
-      var detailRows = group.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
+      var total = detailRows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
+      var zoneList = Array.from(new Set(detailRows.map(function (r) { return r.zone; }).filter(Boolean))).join(", ");
       return (
         '<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">' +
         '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">' +
@@ -1562,8 +1576,7 @@
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-automatch-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        var detailRows = groups[workerIdx].reduce(function (acc, it) { return acc.concat(it.rows); }, []);
-        autoMatchGtForWorker(cfg, workerIdx, detailRows);
+        autoMatchGtForWorker(cfg, workerIdx, groups[workerIdx]);
       });
     });
 
@@ -1577,8 +1590,7 @@
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-print-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        var detailRows = groups[workerIdx].reduce(function (acc, it) { return acc.concat(it.rows); }, []);
-        printWorkerLabels(cfg, workerIdx, detailRows);
+        printWorkerLabels(cfg, workerIdx, groups[workerIdx]);
         resetGtForWorker(cfg, workerIdx);
       });
     });
@@ -1586,8 +1598,7 @@
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-spare-print-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        var detailRows = groups[workerIdx].reduce(function (acc, it) { return acc.concat(it.rows); }, []);
-        handleSparePrintClick(detailRows);
+        handleSparePrintClick(groups[workerIdx]);
       });
     });
 
@@ -1645,9 +1656,10 @@
     }).join("");
   }
 
-  // 모달에서 생성 중인 미리보기(작업자별 item[][]) — 확정 전까지는 state에 반영되지 않음
+  // 모달에서 생성 중인 미리보기(작업자별 원본 데이터 행 배열) — 확정 전까지는 state에 반영되지 않음
   var assignPreviewGroups = null;
   var assignPreviewMeta = null; // { floorInput, count, selectedDates } — 확정 시 config에 함께 저장
+  var assignPreviewActiveWorkerIdx = null; // 미리보기 탭(전체/작업자 N) 상태
 
   function generateAssignPreview() {
     var floorInput = trim(els.assignFloorInput.value);
@@ -1666,12 +1678,60 @@
       return;
     }
     // 미리보기 생성 시점의 존/행 데이터를 스냅샷으로 고정 — 이후 홈 화면 필터가 바뀌어도
-    // 확정된 배정은 유지됨(재조회하지 않음)
+    // 확정된 배정은 유지됨(재조회하지 않음). 존 단위 균형 분배(splitBalanced) 결과를
+    // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
     var items = expandZoneItemsForCount(getAssignZoneItems(floorInput, selectedDates), count);
-    assignPreviewGroups = splitBalanced(items, count);
+    var groups = splitBalanced(items, count);
+    assignPreviewGroups = groups.map(function (g) {
+      return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
+    });
     assignPreviewMeta = { floorInput: floorInput, count: count, selectedDates: selectedDates };
+    assignPreviewActiveWorkerIdx = null;
     setAssignMsg("", null);
     renderAssignPreview();
+  }
+
+  function renderAssignPreviewRows(rows, workerIdx, workerCount) {
+    if (!rows.length) {
+      return '<div class="px-5 py-4 text-center text-xs text-slate-400">배정 없음</div>';
+    }
+    var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
+      return '<th class="px-3 py-1.5 text-left' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
+    }).join("") + '<th class="px-3 py-1.5 text-right">작업자</th>';
+    var workerOptionsHtml = "";
+    for (var wIdx = 0; wIdx < workerCount; wIdx++) {
+      workerOptionsHtml += '<option value="' + wIdx + '"' + (wIdx === workerIdx ? " selected" : "") + '>작업자 ' + (wIdx + 1) + "</option>";
+    }
+    var bodyHtml = rows.map(function (r, rowIdx) {
+      var selectHtml =
+        '<select class="assign-preview-row-select bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-worker-idx="' + workerIdx + '" data-row-idx="' + rowIdx + '">' +
+        workerOptionsHtml +
+        "</select>";
+      return (
+        '<tr class="border-b border-slate-100 last:border-b-0">' +
+        ASSIGN_DETAIL_COLUMNS.map(function (col) {
+          if (col.key === "quantity") {
+            return '<td class="px-3 py-1.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
+          }
+          if (col.key === "groupNo") {
+            return '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + "</td>";
+          }
+          if (col.key === "deadline" || col.key === "createdAt") {
+            return '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r[col.key])) + "</td>";
+          }
+          return '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r[col.key]) + "</td>";
+        }).join("") +
+        '<td class="px-3 py-1.5 text-right">' + selectHtml + "</td>" +
+        "</tr>"
+      );
+    }).join("");
+    return (
+      '<div class="overflow-x-auto">' +
+      '<table class="w-full border-collapse text-left text-xs min-w-max">' +
+      '<thead><tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">' + headHtml + "</tr></thead>" +
+      '<tbody class="divide-y divide-slate-100">' + bodyHtml + "</tbody>" +
+      "</table></div>"
+    );
   }
 
   function renderAssignPreview() {
@@ -1680,52 +1740,52 @@
       return;
     }
     var groups = assignPreviewGroups;
-    var cardsHtml = groups.map(function (group, idx) {
-      var total = group.reduce(function (sum, it) { return sum + it.qty; }, 0);
-      var rowsHtml = group.length
-        ? group.map(function (it, itemIdx) {
-            var selectHtml =
-              '<select class="assign-preview-worker-select bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-worker-idx="' + idx + '" data-item-idx="' + itemIdx + '">' +
-              groups.map(function (g, wIdx) {
-                return '<option value="' + wIdx + '"' + (wIdx === idx ? " selected" : "") + '>작업자 ' + (wIdx + 1) + "</option>";
-              }).join("") +
-              "</select>";
-            return (
-              '<tr class="border-b border-slate-100 last:border-b-0">' +
-              '<td class="px-3 py-1.5 text-slate-700">' + escapeHtml(it.zone) + "</td>" +
-              '<td class="px-3 py-1.5 text-right tabular-nums text-slate-700">' + Number(it.qty || 0).toLocaleString("ko-KR") + "</td>" +
-              '<td class="px-3 py-1.5 text-right tabular-nums text-slate-500">' + it.rows.length + "장</td>" +
-              '<td class="px-3 py-1.5 text-right">' + selectHtml + "</td>" +
-              "</tr>"
-            );
-          }).join("")
-        : '<tr><td colspan="4" class="px-3 py-3 text-center text-xs text-slate-400">배정된 존 없음</td></tr>';
+    var workerCount = groups.length;
+    var activeIdx = assignPreviewActiveWorkerIdx;
+
+    var tabsHtml = "";
+    if (groups.length > 1) {
+      tabsHtml = '<div class="flex flex-wrap gap-2 mb-3">' +
+        '<button type="button" class="assign-preview-tab-btn ' + (activeIdx === null ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE) + '" data-worker-idx="">전체</button>' +
+        groups.map(function (g, idx) {
+          return '<button type="button" class="assign-preview-tab-btn ' + (activeIdx === idx ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE) + '" data-worker-idx="' + idx + '">작업자 ' + (idx + 1) + "</button>";
+        }).join("") +
+        "</div>";
+    }
+
+    var cardsHtml = groups.map(function (rows, idx) {
+      if (activeIdx !== null && activeIdx !== idx) return "";
+      var total = rows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
       return (
-        '<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">' +
+        '<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-3">' +
         '<div class="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200">' +
         '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) + "</div>" +
-        '<div class="text-xs font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개</div>" +
+        '<div class="text-xs font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + rows.length + "장</div>" +
         "</div>" +
-        '<table class="w-full text-xs border-collapse">' +
-        '<thead><tr class="bg-slate-50 text-slate-500 font-bold text-left">' +
-        '<th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5 text-right">행</th><th class="px-3 py-1.5 text-right">작업자</th>' +
-        "</tr></thead>" +
-        "<tbody>" + rowsHtml + "</tbody></table>" +
+        renderAssignPreviewRows(rows, idx, workerCount) +
         "</div>"
       );
     }).join("");
 
-    els.assignPreviewContainer.innerHTML = cardsHtml;
+    els.assignPreviewContainer.innerHTML = tabsHtml + cardsHtml;
 
-    Array.prototype.forEach.call(els.assignPreviewContainer.querySelectorAll(".assign-preview-worker-select"), function (sel) {
+    Array.prototype.forEach.call(els.assignPreviewContainer.querySelectorAll(".assign-preview-tab-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var v = btn.dataset.workerIdx;
+        assignPreviewActiveWorkerIdx = v === "" ? null : parseInt(v, 10);
+        renderAssignPreview();
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignPreviewContainer.querySelectorAll(".assign-preview-row-select"), function (sel) {
       sel.addEventListener("change", function () {
         var fromIdx = parseInt(sel.dataset.workerIdx, 10);
-        var itemIdx = parseInt(sel.dataset.itemIdx, 10);
+        var rowIdx = parseInt(sel.dataset.rowIdx, 10);
         var toIdx = parseInt(sel.value, 10);
         if (fromIdx === toIdx) return;
-        var item = assignPreviewGroups[fromIdx][itemIdx];
-        assignPreviewGroups[fromIdx].splice(itemIdx, 1);
-        assignPreviewGroups[toIdx].push(item);
+        var row = assignPreviewGroups[fromIdx][rowIdx];
+        assignPreviewGroups[fromIdx].splice(rowIdx, 1);
+        assignPreviewGroups[toIdx].push(row);
         renderAssignPreview();
       });
     });
@@ -1757,6 +1817,7 @@
     els.assignCountInput.value = "";
     assignPreviewGroups = null;
     assignPreviewMeta = null;
+    assignPreviewActiveWorkerIdx = null;
     setAssignMsg("", null);
     renderAssignPreview();
   }
