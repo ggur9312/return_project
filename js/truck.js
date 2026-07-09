@@ -221,6 +221,7 @@ function processData(data, fileName) {
             globalProcessedData[dateKey].push({
                 groupNo: groupNo,
                 company: companyName,
+                picking: false,
                 inputs: {
                     palette: 'KPP',
                     emptyGt: 0,
@@ -317,9 +318,13 @@ function renderDashboard(data) {
             const sAj = item.inputs.palette === 'AJ' ? 'selected' : '';
             const sPal = item.inputs.palette === '팔레트' ? 'selected' : '';
             const sSm = item.inputs.palette === '소량' ? 'selected' : '';
+            const pickingClass = item.picking ? 'bg-amber-50/70' : '';
 
             tableRowsHtml += `
-                <tr class="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
+                <tr id="row-${safeTabDate}-${itemIdx}" class="hover:bg-slate-50/80 transition-colors border-b border-slate-100 ${pickingClass}">
+                    <td class="px-3 py-2 text-center">
+                        <input type="checkbox" ${item.picking ? 'checked' : ''} onchange="toggleItemPicking('${date}', ${itemIdx}, this.checked)" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500" title="집품중">
+                    </td>
                     <td class="px-5 py-3 font-semibold text-slate-900 whitespace-nowrap">${item.groupNo}</td>
                     <td class="px-5 py-3 font-medium text-slate-700 whitespace-nowrap">${item.company}</td>
                     <td class="px-3 py-2 w-32">
@@ -350,6 +355,7 @@ function renderDashboard(data) {
                 <table class="w-full border-collapse text-left min-w-max">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
+                            <th class="px-3 py-3">집품중</th>
                             <th class="px-5 py-3 text-left">그룹번호</th>
                             <th class="px-5 py-3 text-left">업체명</th>
                             <th class="px-3 py-3 text-left">팔레트 종류</th>
@@ -365,6 +371,7 @@ function renderDashboard(data) {
                     </tbody>
                 </table>
             </div>
+            ${renderTruckPreviewSection(date)}
         `;
         tableContainer.appendChild(tablePanel);
     });
@@ -381,24 +388,38 @@ function updateInputValue(date, index, field, value) {
     if (globalProcessedData[date] && globalProcessedData[date][index]) {
         if (field === 'palette') {
             globalProcessedData[date][index].inputs[field] = value;
-        } else {
-            const numVal = parseInt(value) || 0;
-            globalProcessedData[date][index].inputs[field] = numVal;
-
-            if (field === 'emptyGt') {
-                // Recalculate 32/24 BOX expectations
-                const exp32 = (Math.round((numVal / 32) * 10) / 10).toFixed(1);
-                const exp24 = (Math.round((numVal / 24) * 10) / 10).toFixed(1);
-
-                const safeTabDate = getSafeId(date);
-                const el32 = document.getElementById(`calc32-${safeTabDate}-${index}`);
-                const el24 = document.getElementById(`calc24-${safeTabDate}-${index}`);
-
-                if (el32) el32.innerText = exp32;
-                if (el24) el24.innerText = exp24;
-            }
+            renderDashboard(globalProcessedData);
+            return;
         }
+
+        const numVal = parseInt(value) || 0;
+        globalProcessedData[date][index].inputs[field] = numVal;
+
+        const safeTabDate = getSafeId(date);
+
+        if (field === 'emptyGt') {
+            // Recalculate 32/24 BOX expectations
+            const exp32 = (Math.round((numVal / 32) * 10) / 10).toFixed(1);
+            const exp24 = (Math.round((numVal / 24) * 10) / 10).toFixed(1);
+
+            const el32 = document.getElementById(`calc32-${safeTabDate}-${index}`);
+            const el24 = document.getElementById(`calc24-${safeTabDate}-${index}`);
+
+            if (el32) el32.innerText = exp32;
+            if (el24) el24.innerText = exp24;
+        }
+
+        const previewEl = document.getElementById(`preview-${safeTabDate}`);
+        if (previewEl) previewEl.outerHTML = renderTruckPreviewSection(date);
+
         saveState();
+    }
+}
+
+function toggleItemPicking(date, index, checked) {
+    if (globalProcessedData[date] && globalProcessedData[date][index]) {
+        globalProcessedData[date][index].picking = checked;
+        renderDashboard(globalProcessedData);
     }
 }
 
@@ -478,6 +499,16 @@ function closePrintModal() {
     }, 200);
 }
 
+// GT 수량 표시 텍스트: 팔레트 집품이 있으면 (+N P) 표기, 집품중이면 뒤에 물결(~) 표기.
+// 인쇄 출력(buildTruckRows)과 화면 미리보기(buildPreviewRows) 양쪽에서 공용으로 사용.
+function gtDisplayText(d) {
+    let text = d.inputs.palettePick > 0
+        ? `${d.inputs.emptyGt} (+${d.inputs.palettePick}P)`
+        : `${d.inputs.emptyGt}`;
+    if (d.picking) text += ' ~';
+    return text;
+}
+
 // Build table rows for a list of truck entries. When showPalette is true,
 // palette type gets its own column instead of being appended to the company name.
 function buildTruckRows(list, showPalette) {
@@ -485,14 +516,11 @@ function buildTruckRows(list, showPalette) {
         return `<tr><td colspan="${showPalette ? 3 : 2}" style="padding:15px;color:#999;">데이터 없음</td></tr>`;
     }
     return list.map(d => {
-        const gtText = d.inputs.palettePick > 0
-            ? `${d.inputs.emptyGt} (+${d.inputs.palettePick}P)`
-            : `${d.inputs.emptyGt}`;
         const paletteCell = showPalette ? `<td>${d.inputs.palette}</td>` : '';
         return `<tr>
                 <td style="text-align:left;">${d.company}</td>
                 ${paletteCell}
-                <td style="font-weight:bold;">${gtText}</td>
+                <td style="font-weight:bold;">${gtDisplayText(d)}</td>
             </tr>`;
     }).join('');
 }
@@ -528,8 +556,9 @@ function sortTruckSection(list, byPaletteType) {
     });
 }
 
-// Build one date's left/right truck tables as a labeled, page-break-safe section
-function buildDateSectionHtml(date) {
+// 팔레트 종류에 따라 좌측(KPP/AJ/팔레트)/우측(소량) 트럭 구역으로 나눈다.
+// 인쇄 출력(buildDateSectionHtml)과 화면 미리보기(renderTruckPreviewSection)가 공용으로 사용.
+function splitTruckLeftRight(date) {
     const currentData = globalProcessedData[date] || [];
     const leftData = sortTruckSection(currentData.filter(d =>
         (d.inputs.palette === 'KPP' || d.inputs.palette === 'AJ' || d.inputs.palette === '팔레트') &&
@@ -539,6 +568,12 @@ function buildDateSectionHtml(date) {
         d.inputs.palette === '소량' &&
         (d.inputs.emptyGt > 0 || d.inputs.palettePick > 0)
     ), false);
+    return { leftData, rightData };
+}
+
+// Build one date's left/right truck tables as a labeled, page-break-safe section
+function buildDateSectionHtml(date) {
+    const { leftData, rightData } = splitTruckLeftRight(date);
 
     // 좌측엔 KPP/AJ/팔레트 트럭, 우측엔 소량 트럭. 소량 트럭이 없으면 buildTruckRows가 우측에
     // "데이터 없음"을 표시한다.
@@ -551,7 +586,7 @@ function buildDateSectionHtml(date) {
                 <div class="p-date-heading">${date}</div>
                 <div class="p-row" style="align-items:flex-start;">
                     <!-- Left Table -->
-                    <div style="flex:1;">
+                    <div style="flex:1; min-width:0;">
                         <table class="p-table">
                             <thead>${leftHeader}</thead>
                             <tbody>${leftRows}</tbody>
@@ -559,7 +594,7 @@ function buildDateSectionHtml(date) {
                     </div>
 
                     <!-- Right Table -->
-                    <div style="flex:1;">
+                    <div style="flex:1; min-width:0;">
                         <table class="p-table">
                             <thead>${rightHeader}</thead>
                             <tbody>${rightRows}</tbody>
@@ -567,6 +602,58 @@ function buildDateSectionHtml(date) {
                     </div>
                 </div>
             </div>`;
+}
+
+// 홈 화면용 출력 미리보기 행 (인쇄용 buildTruckRows와 동일한 필터/GT 표시 규칙을 화면 스타일로 렌더링)
+function buildPreviewRows(list, showPalette) {
+    if (list.length === 0) {
+        return `<tr><td colspan="${showPalette ? 3 : 2}" class="px-3 py-4 text-center text-xs text-slate-400">데이터 없음</td></tr>`;
+    }
+    return list.map(d => {
+        const paletteCell = showPalette ? `<td class="px-3 py-2 text-center text-slate-500">${d.inputs.palette}</td>` : '';
+        return `<tr class="border-b border-slate-100 last:border-b-0">
+                <td class="px-3 py-2 text-slate-700">${d.company}</td>
+                ${paletteCell}
+                <td class="px-3 py-2 text-right font-semibold text-slate-900">${gtDisplayText(d)}</td>
+            </tr>`;
+    }).join('');
+}
+
+// 출력물 양식과 동일하게 좌측(소량 제외)/우측(소량) 트럭 구역으로 나눠 보여주는 화면 미리보기 패널.
+// 팔레트 종류를 바꾸면 즉시 좌/우 구역 사이를 이동해 표시된다.
+function renderTruckPreviewSection(date) {
+    const safeTabDate = getSafeId(date);
+    const { leftData, rightData } = splitTruckLeftRight(date);
+
+    return `
+        <div id="preview-${safeTabDate}" class="bg-white border border-slate-200 rounded-xl shadow-sm p-4 mt-4">
+            <h3 class="text-sm font-semibold text-slate-900 mb-3">출력 미리보기</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs border-collapse min-w-max">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 font-bold">
+                                <th class="px-3 py-2 text-left">업체명</th>
+                                <th class="px-3 py-2 text-center">팔레트</th>
+                                <th class="px-3 py-2 text-right">GT</th>
+                            </tr>
+                        </thead>
+                        <tbody>${buildPreviewRows(leftData, true)}</tbody>
+                    </table>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs border-collapse min-w-max">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 font-bold">
+                                <th class="px-3 py-2 text-left">소량 트럭</th>
+                                <th class="px-3 py-2 text-right">GT</th>
+                            </tr>
+                        </thead>
+                        <tbody>${buildPreviewRows(rightData, false)}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
 }
 
 function executePrint() {
