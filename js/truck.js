@@ -48,33 +48,7 @@ fileInput.addEventListener('change', (e) => {
 /* ================================================================
    SECTION 3: TOAST NOTIFICATION UTILITY
    ================================================================ */
-function showToast(message, type = 'success') {
-    const toastContainer = document.getElementById('toastContainer');
-    const toast = document.createElement('div');
-    toast.className = `p-4 rounded-xl shadow-lg border text-sm font-medium flex items-center space-x-2 bg-white transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto`;
-
-    if (type === 'success') {
-        toast.classList.add('border-emerald-200', 'text-emerald-800', 'bg-emerald-50/80');
-        toast.innerHTML = `<svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>${message}</span>`;
-    } else if (type === 'info') {
-        toast.classList.add('border-blue-200', 'text-blue-800', 'bg-blue-50/80');
-        toast.innerHTML = `<svg class="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>${message}</span>`;
-    } else {
-        toast.classList.add('border-rose-200', 'text-rose-800', 'bg-rose-50/80');
-        toast.innerHTML = `<svg class="w-5 h-5 text-rose-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg><span>${message}</span>`;
-    }
-
-    toastContainer.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.remove('translate-y-2', 'opacity-0');
-    }, 50);
-
-    setTimeout(() => {
-        toast.classList.add('opacity-0', 'translate-y-[-10px]');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
-}
-
+// showToast()는 js/shell.js로 이동(집품/트럭 두 앱 공용 전역 함수).
 
 /* ================================================================
    SECTION 4: DATA RESET
@@ -729,6 +703,7 @@ function executePrint() {
     setTimeout(() => {
         window.print();
         closePrintModal();
+        showToast('출력이 완료되었습니다.');
     }, 300);
 }
 
@@ -737,6 +712,7 @@ function executePrint() {
    SECTION 12: SIDEBAR VIEW SWITCHING (홈 / 트럭주기)
    ================================================================ */
 function truckSwitchView(view) {
+    if (window.flashPageLoading) window.flashPageLoading();
     const homeView = document.getElementById('truckHomeView');
     const cycleView = document.getElementById('cycleView');
     const navHomeBtn = document.getElementById('truckNavHomeBtn');
@@ -1253,6 +1229,7 @@ function executeCyclePrint() {
 
     setTimeout(() => {
         window.print();
+        showToast('출력이 완료되었습니다.');
     }, 300);
 }
 

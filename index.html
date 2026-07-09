@@ -12,7 +12,11 @@
 <script src="js/vendor/JsBarcode.all.min.js"></script>
 <style>
   body { font-family: 'Inter', 'Noto Sans KR', sans-serif; }
-  button:not(:disabled), [role="button"] { cursor: pointer; }
+  button:not(:disabled), [role="button"] {
+    cursor: pointer;
+    transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1), transform 100ms cubic-bezier(0.4,0,0.2,1);
+  }
+  button:not(:disabled):active, [role="button"]:active { transform: scale(0.96); }
   .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(4px); }
@@ -81,6 +85,15 @@
     <button id="switchToTruckBtn" type="button" class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors bg-indigo-500/40 text-white hover:bg-indigo-500/60">트럭 현황</button>
   </div>
 </header>
+
+<div id="toastContainer" class="print:hidden fixed top-20 right-4 z-[110] space-y-2 pointer-events-none max-w-sm w-full"></div>
+
+<div id="pageLoadingOverlay" class="print:hidden hidden fixed inset-0 z-[200] flex items-center justify-center bg-white/60 backdrop-blur-sm opacity-0 transition-opacity duration-200 pointer-events-none">
+  <svg class="w-8 h-8 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+  </svg>
+</div>
 
 <div id="pickApp">
 
@@ -244,27 +257,34 @@
 </div>
 
 <div id="assignCreateModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
-  <div id="assignCreateModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-6xl p-6 space-y-4 max-h-[90vh] overflow-y-auto transform scale-95 transition-transform duration-200">
-    <h3 class="text-sm font-semibold text-slate-900">집품 할당 생성</h3>
-    <p class="text-xs text-slate-500">층수를 입력하면 존에서 알파벳을 제외한 층 코드가 그 값으로 시작하는 존을 모두 모아 인원수만큼 균등하게 배분합니다. (예: "7" → 72, 73 등 7로 시작하는 존 전부 / "72" → 72만)</p>
-    <div class="flex items-end gap-3 flex-wrap">
-      <label class="text-sm text-slate-600 flex flex-col gap-1">층수
-        <input type="text" id="assignFloorInput" placeholder="예: 7 또는 72" class="w-32 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-      </label>
-      <label class="text-sm text-slate-600 flex flex-col gap-1">투입 인원
-        <input type="number" id="assignCountInput" min="1" step="1" placeholder="예: 3" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-      </label>
-      <button id="assignPreviewBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">미리보기</button>
-      <span id="assignMsg" class="text-xs"></span>
+  <div id="assignCreateModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-200">
+    <div class="shrink-0 px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
+      <h3 class="text-sm font-semibold text-slate-900">집품 할당 생성</h3>
+      <button id="assignCreateCloseBtn" type="button" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
     </div>
-    <div>
-      <div class="text-sm text-slate-600 mb-1.5">포함할 생성일자</div>
-      <div id="assignDateCheckboxes" class="flex flex-wrap gap-x-4 gap-y-1.5 max-h-24 overflow-y-auto bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs">
-        <span class="text-xs text-slate-400">업로드된 데이터가 없습니다.</span>
+    <div class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+      <p class="text-xs text-slate-500">층수를 입력하면 존에서 알파벳을 제외한 층 코드가 그 값으로 시작하는 존을 모두 모아 인원수만큼 균등하게 배분합니다. (예: "7" → 72, 73 등 7로 시작하는 존 전부 / "72" → 72만)</p>
+      <div class="flex items-end gap-3 flex-wrap">
+        <label class="text-sm text-slate-600 flex flex-col gap-1">층수
+          <input type="text" id="assignFloorInput" placeholder="예: 7 또는 72" class="w-32 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </label>
+        <label class="text-sm text-slate-600 flex flex-col gap-1">투입 인원
+          <input type="number" id="assignCountInput" min="1" step="1" placeholder="예: 3" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </label>
+        <button id="assignPreviewBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">미리보기</button>
+        <span id="assignMsg" class="text-xs"></span>
       </div>
+      <div>
+        <div class="text-sm text-slate-600 mb-1.5">포함할 생성일자</div>
+        <div id="assignDateCheckboxes" class="flex flex-wrap gap-x-4 gap-y-1.5 max-h-24 overflow-y-auto bg-slate-50 border border-slate-100 rounded-lg p-2 text-xs">
+          <span class="text-xs text-slate-400">업로드된 데이터가 없습니다.</span>
+        </div>
+      </div>
+      <div id="assignPreviewContainer" class="space-y-3"></div>
     </div>
-    <div id="assignPreviewContainer" class="space-y-3"></div>
-    <div class="flex gap-2 pt-2">
+    <div class="shrink-0 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex gap-2">
       <button id="assignConfirmBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">확정</button>
       <button id="assignCancelBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">취소</button>
     </div>
@@ -272,25 +292,32 @@
 </div>
 
 <div id="rowPickerModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-[60] items-center justify-center p-4 opacity-0 transition-opacity duration-200">
-  <div id="rowPickerModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-4xl p-6 space-y-4 max-h-[90vh] overflow-y-auto transform scale-95 transition-transform duration-200">
-    <h3 id="rowPickerTitle" class="text-sm font-semibold text-slate-900">커스텀 할당 만들기</h3>
-    <div class="flex items-end gap-3 flex-wrap">
-      <label class="text-sm text-slate-600 flex flex-col gap-1">생성일자
-        <select id="rowPickerDateSelect" class="w-40 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
-      </label>
-      <label class="text-sm text-slate-600 flex flex-col gap-1 flex-1 min-w-[160px]">검색(그룹번호/업체명/존)
-        <input type="text" id="rowPickerSearchInput" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="검색어 입력">
-      </label>
+  <div id="rowPickerModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-200">
+    <div class="shrink-0 px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
+      <h3 id="rowPickerTitle" class="text-sm font-semibold text-slate-900">커스텀 할당 만들기</h3>
+      <button id="rowPickerCloseBtn" type="button" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
     </div>
-    <div>
-      <div class="text-sm font-semibold text-slate-700 mb-1.5">사용 가능한 행</div>
-      <div id="rowPickerAvailableList" class="border border-slate-200 rounded-lg max-h-56 overflow-y-auto"></div>
+    <div class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+      <div class="flex items-end gap-3 flex-wrap">
+        <label class="text-sm text-slate-600 flex flex-col gap-1">생성일자
+          <select id="rowPickerDateSelect" class="w-40 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+        </label>
+        <label class="text-sm text-slate-600 flex flex-col gap-1 flex-1 min-w-[160px]">검색(그룹번호/업체명/존)
+          <input type="text" id="rowPickerSearchInput" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="검색어 입력">
+        </label>
+      </div>
+      <div>
+        <div class="text-sm font-semibold text-slate-700 mb-1.5">사용 가능한 행</div>
+        <div id="rowPickerAvailableList" class="border border-slate-200 rounded-lg max-h-56 overflow-y-auto overflow-x-auto"></div>
+      </div>
+      <div>
+        <div class="text-sm font-semibold text-slate-700 mb-1.5">선택된 행 (<span id="rowPickerSelectedCount">0</span>건)</div>
+        <div id="rowPickerSelectedList" class="border border-slate-200 rounded-lg max-h-56 overflow-y-auto overflow-x-auto"></div>
+      </div>
     </div>
-    <div>
-      <div class="text-sm font-semibold text-slate-700 mb-1.5">선택된 행 (<span id="rowPickerSelectedCount">0</span>건)</div>
-      <div id="rowPickerSelectedList" class="border border-slate-200 rounded-lg max-h-56 overflow-y-auto"></div>
-    </div>
-    <div class="flex gap-2 pt-2">
+    <div class="shrink-0 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex gap-2">
       <button id="rowPickerConfirmBtn" type="button" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">확정</button>
       <button id="rowPickerCancelBtn" type="button" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">취소</button>
     </div>
@@ -418,8 +445,6 @@
         </aside>
 
         <div class="flex-1 min-w-0 space-y-8">
-
-        <div id="toastContainer" class="fixed top-20 right-4 z-50 space-y-2 pointer-events-none max-w-sm w-full"></div>
 
         <div id="truckHomeView" class="space-y-8">
 

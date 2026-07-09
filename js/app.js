@@ -110,6 +110,7 @@
     assignPreviewContainer: document.getElementById("assignPreviewContainer"),
     assignConfirmBtn: document.getElementById("assignConfirmBtn"),
     assignCancelBtn: document.getElementById("assignCancelBtn"),
+    assignCreateCloseBtn: document.getElementById("assignCreateCloseBtn"),
     assignTabsContainer: document.getElementById("assignTabsContainer"),
     assignTableContainer: document.getElementById("assignTableContainer"),
     assignCustomBtn: document.getElementById("assignCustomBtn"),
@@ -123,6 +124,7 @@
     rowPickerSelectedCount: document.getElementById("rowPickerSelectedCount"),
     rowPickerConfirmBtn: document.getElementById("rowPickerConfirmBtn"),
     rowPickerCancelBtn: document.getElementById("rowPickerCancelBtn"),
+    rowPickerCloseBtn: document.getElementById("rowPickerCloseBtn"),
     gtPasteArea: document.getElementById("gtPasteArea"),
     gtSaveBtn: document.getElementById("gtSaveBtn"),
     gtClearBtn: document.getElementById("gtClearBtn"),
@@ -884,6 +886,7 @@
   // --- 뷰 전환 (홈 / 집품 할당) ---
 
   function switchView(view) {
+    if (window.flashPageLoading) window.flashPageLoading();
     if (view === "assign") {
       els.homeView.classList.add("hidden");
       els.assignView.classList.remove("hidden");
@@ -1144,6 +1147,7 @@
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         window.print();
+        if (window.showToast) window.showToast("출력이 완료되었습니다.");
       });
     });
   }
@@ -1695,8 +1699,10 @@
       return (
         '<tr class="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80 transition-colors">' +
         '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + "</td>" +
+        '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r.deadline)) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(getCreatedDate(r)) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.company) + "</td>" +
+        '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.transportType) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.zone) + "</td>" +
         '<td class="px-3 py-1.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>" +
         '<td class="px-3 py-1.5 text-right"><button type="button" class="' + btnClass + ' ' + btnClickAttr + ' text-xs font-medium px-2.5 py-1 rounded-md transition-colors" data-row-id="' + escapeHtml(r.id) + '">' + btnLabel + "</button></td>" +
@@ -1706,7 +1712,7 @@
     return (
       '<table class="w-full text-xs border-collapse">' +
       '<thead><tr class="bg-slate-50 text-slate-500 font-bold text-left sticky top-0">' +
-      '<th class="px-3 py-1.5">그룹번호</th><th class="px-3 py-1.5">생성일자</th><th class="px-3 py-1.5">업체명</th><th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5"></th>' +
+      '<th class="px-3 py-1.5">그룹번호</th><th class="px-3 py-1.5">마감일시</th><th class="px-3 py-1.5">생성일자</th><th class="px-3 py-1.5">업체명</th><th class="px-3 py-1.5">운송타입</th><th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5"></th>' +
       "</tr></thead><tbody>" + bodyHtml + "</tbody></table>"
     );
   }
@@ -1734,7 +1740,7 @@
 
   function renderRowPickerSelectedList() {
     els.rowPickerSelectedCount.textContent = rowPickerSelectedRows.length;
-    els.rowPickerSelectedList.innerHTML = buildRowPickerTable(rowPickerSelectedRows, "row-picker-remove-btn bg-rose-50 hover:bg-rose-100 text-rose-600", "빼기", "");
+    els.rowPickerSelectedList.innerHTML = buildRowPickerTable(rowPickerSelectedRows, "row-picker-remove-btn bg-rose-50 hover:bg-rose-100 text-rose-600", "삭제", "");
     Array.prototype.forEach.call(els.rowPickerSelectedList.querySelectorAll(".row-picker-remove-btn"), function (btn) {
       btn.addEventListener("click", function () {
         rowPickerSelectedRows = rowPickerSelectedRows.filter(function (r) { return r.id !== btn.dataset.rowId; });
@@ -1783,6 +1789,7 @@
       closeRowPickerModal();
       switchView("assign");
       renderAssignTabs();
+      if (window.showToast) window.showToast("커스텀 할당이 생성되었습니다.");
     } else if (rowPickerMode === "append") {
       var cfg = state.assignConfigs.find(function (c) { return c.id === rowPickerTargetCfgId; });
       if (cfg) {
@@ -1795,6 +1802,7 @@
       }
       closeRowPickerModal();
       renderAssignPanel();
+      if (window.showToast) window.showToast("선택한 행이 추가되었습니다.");
     }
   }
 
@@ -2144,6 +2152,7 @@
     closeAssignCreateModal();
     switchView("assign");
     renderAssignTabs();
+    if (window.showToast) window.showToast("집품 할당이 생성되었습니다.");
   }
 
   function resetAssignCreateModal() {
@@ -2306,12 +2315,14 @@
   els.assignPreviewBtn.addEventListener("click", generateAssignPreview);
   els.assignConfirmBtn.addEventListener("click", confirmAssignConfig);
   els.assignCancelBtn.addEventListener("click", closeAssignCreateModal);
+  els.assignCreateCloseBtn.addEventListener("click", closeAssignCreateModal);
 
   els.assignCustomBtn.addEventListener("click", function () { openRowPickerModal("create"); });
   els.rowPickerDateSelect.addEventListener("change", renderRowPickerAvailableList);
   els.rowPickerSearchInput.addEventListener("input", renderRowPickerAvailableList);
   els.rowPickerConfirmBtn.addEventListener("click", confirmRowPicker);
   els.rowPickerCancelBtn.addEventListener("click", closeRowPickerModal);
+  els.rowPickerCloseBtn.addEventListener("click", closeRowPickerModal);
 
   els.sortAddBtn.addEventListener("click", function () {
     var usedKeys = state.sortRules.map(function (r) { return r.key; });
