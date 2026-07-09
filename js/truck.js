@@ -627,7 +627,7 @@ function renderTruckPreviewSection(date) {
 
     return `
         <div id="preview-${safeTabDate}" class="bg-white border border-slate-200 rounded-xl shadow-sm p-4 mt-4">
-            <h3 class="text-sm font-semibold text-slate-900 mb-3">출력 미리보기</h3>
+            <h3 class="text-sm font-semibold text-slate-900 mb-3">트럭 리스트</h3>
             <div class="grid grid-cols-2 gap-4">
                 <div class="overflow-x-auto">
                     <table class="w-full text-xs border-collapse min-w-max">

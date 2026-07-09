@@ -84,11 +84,16 @@
     navAssignBtn: document.getElementById("navAssignBtn"),
     homeView: document.getElementById("homeView"),
     assignView: document.getElementById("assignView"),
+    assignOpenModalBtn: document.getElementById("assignOpenModalBtn"),
+    assignCreateModal: document.getElementById("assignCreateModal"),
     assignFloorInput: document.getElementById("assignFloorInput"),
     assignCountInput: document.getElementById("assignCountInput"),
-    assignAddBtn: document.getElementById("assignAddBtn"),
+    assignPreviewBtn: document.getElementById("assignPreviewBtn"),
     assignMsg: document.getElementById("assignMsg"),
     assignDateCheckboxes: document.getElementById("assignDateCheckboxes"),
+    assignPreviewContainer: document.getElementById("assignPreviewContainer"),
+    assignConfirmBtn: document.getElementById("assignConfirmBtn"),
+    assignCancelBtn: document.getElementById("assignCancelBtn"),
     assignTabsContainer: document.getElementById("assignTabsContainer"),
     assignTableContainer: document.getElementById("assignTableContainer"),
     gtPasteArea: document.getElementById("gtPasteArea"),
@@ -1413,7 +1418,7 @@
   function renderAssignTabs() {
     els.assignTabsContainer.innerHTML = "";
     if (!state.assignConfigs.length) {
-      els.assignTabsContainer.innerHTML = '<span class="text-sm text-slate-400">위에서 층수와 인원을 입력하고 추가해주세요.</span>';
+      els.assignTabsContainer.innerHTML = '<span class="text-sm text-slate-400">홈 화면의 "집품 할당" 버튼으로 배정을 생성해주세요.</span>';
       els.assignTableContainer.innerHTML = "";
       return;
     }
@@ -1494,12 +1499,14 @@
       els.assignTableContainer.innerHTML = "";
       return;
     }
-    var items = cfg.items || [];
-    if (!items.length) {
+    // workerGroups: 모달에서 확정된(수동 재배정 포함) 최종 분배. 구버전 config(items만 있고
+    // workerGroups 없음)는 기존처럼 splitBalanced로 매 렌더링 시 재계산해 호환성을 유지한다.
+    var groups = cfg.workerGroups || splitBalanced(cfg.items || [], cfg.count);
+    var totalItems = groups.reduce(function (sum, g) { return sum + g.length; }, 0);
+    if (!totalItems) {
       els.assignTableContainer.innerHTML = '<div class="bg-white border border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500 shadow-sm">해당 층에 데이터가 없습니다.</div>';
       return;
     }
-    var groups = splitBalanced(items, cfg.count);
     var activeWorkerIdx = state.assignActiveWorkerIdx;
 
     var tabsHtml = "";
@@ -1595,6 +1602,13 @@
     if (cfg.count <= 1) return;
     // 마지막 작업자 인덱스에 매칭된 GT가 있다면 재분배 전에 정리해 가용 목록으로 반환
     resetGtForWorker(cfg, cfg.count - 1);
+    if (cfg.workerGroups) {
+      // 삭제되는 마지막 작업자의 항목은 그 앞 작업자에게 합쳐, 이미 수동 배정한
+      // 다른 작업자들의 구성은 그대로 유지한다(splitBalanced로 전체 재계산하지 않음).
+      var removed = cfg.workerGroups.pop();
+      var target = cfg.workerGroups[cfg.workerGroups.length - 1];
+      if (target) target.push.apply(target, removed);
+    }
     cfg.count -= 1;
     saveAssignState();
     renderAssignTabs();
@@ -1631,7 +1645,11 @@
     }).join("");
   }
 
-  function addAssignConfig() {
+  // 모달에서 생성 중인 미리보기(작업자별 item[][]) — 확정 전까지는 state에 반영되지 않음
+  var assignPreviewGroups = null;
+  var assignPreviewMeta = null; // { floorInput, count, selectedDates } — 확정 시 config에 함께 저장
+
+  function generateAssignPreview() {
     var floorInput = trim(els.assignFloorInput.value);
     var count = parseInt(els.assignCountInput.value, 10);
     var selectedDates = getSelectedAssignDates();
@@ -1647,18 +1665,111 @@
       setAssignMsg("생성일자를 1개 이상 선택해주세요.", "error");
       return;
     }
-    var id = Date.now();
-    // 추가 시점의 존/행 데이터를 스냅샷으로 고정 — 이후 홈 화면 필터가 바뀌어도
-    // 이미 만들어진 배정은 유지됨(재조회하지 않음)
+    // 미리보기 생성 시점의 존/행 데이터를 스냅샷으로 고정 — 이후 홈 화면 필터가 바뀌어도
+    // 확정된 배정은 유지됨(재조회하지 않음)
     var items = expandZoneItemsForCount(getAssignZoneItems(floorInput, selectedDates), count);
-    state.assignConfigs.push({ id: id, floorInput: floorInput, count: count, items: items, createdDates: selectedDates });
+    assignPreviewGroups = splitBalanced(items, count);
+    assignPreviewMeta = { floorInput: floorInput, count: count, selectedDates: selectedDates };
+    setAssignMsg("", null);
+    renderAssignPreview();
+  }
+
+  function renderAssignPreview() {
+    if (!assignPreviewGroups) {
+      els.assignPreviewContainer.innerHTML = "";
+      return;
+    }
+    var groups = assignPreviewGroups;
+    var cardsHtml = groups.map(function (group, idx) {
+      var total = group.reduce(function (sum, it) { return sum + it.qty; }, 0);
+      var rowsHtml = group.length
+        ? group.map(function (it, itemIdx) {
+            var selectHtml =
+              '<select class="assign-preview-worker-select bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-worker-idx="' + idx + '" data-item-idx="' + itemIdx + '">' +
+              groups.map(function (g, wIdx) {
+                return '<option value="' + wIdx + '"' + (wIdx === idx ? " selected" : "") + '>작업자 ' + (wIdx + 1) + "</option>";
+              }).join("") +
+              "</select>";
+            return (
+              '<tr class="border-b border-slate-100 last:border-b-0">' +
+              '<td class="px-3 py-1.5 text-slate-700">' + escapeHtml(it.zone) + "</td>" +
+              '<td class="px-3 py-1.5 text-right tabular-nums text-slate-700">' + Number(it.qty || 0).toLocaleString("ko-KR") + "</td>" +
+              '<td class="px-3 py-1.5 text-right tabular-nums text-slate-500">' + it.rows.length + "장</td>" +
+              '<td class="px-3 py-1.5 text-right">' + selectHtml + "</td>" +
+              "</tr>"
+            );
+          }).join("")
+        : '<tr><td colspan="4" class="px-3 py-3 text-center text-xs text-slate-400">배정된 존 없음</td></tr>';
+      return (
+        '<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">' +
+        '<div class="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200">' +
+        '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) + "</div>" +
+        '<div class="text-xs font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개</div>" +
+        "</div>" +
+        '<table class="w-full text-xs border-collapse">' +
+        '<thead><tr class="bg-slate-50 text-slate-500 font-bold text-left">' +
+        '<th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5 text-right">행</th><th class="px-3 py-1.5 text-right">작업자</th>' +
+        "</tr></thead>" +
+        "<tbody>" + rowsHtml + "</tbody></table>" +
+        "</div>"
+      );
+    }).join("");
+
+    els.assignPreviewContainer.innerHTML = cardsHtml;
+
+    Array.prototype.forEach.call(els.assignPreviewContainer.querySelectorAll(".assign-preview-worker-select"), function (sel) {
+      sel.addEventListener("change", function () {
+        var fromIdx = parseInt(sel.dataset.workerIdx, 10);
+        var itemIdx = parseInt(sel.dataset.itemIdx, 10);
+        var toIdx = parseInt(sel.value, 10);
+        if (fromIdx === toIdx) return;
+        var item = assignPreviewGroups[fromIdx][itemIdx];
+        assignPreviewGroups[fromIdx].splice(itemIdx, 1);
+        assignPreviewGroups[toIdx].push(item);
+        renderAssignPreview();
+      });
+    });
+  }
+
+  function confirmAssignConfig() {
+    if (!assignPreviewGroups || !assignPreviewMeta) {
+      setAssignMsg("먼저 미리보기를 생성해주세요.", "error");
+      return;
+    }
+    var id = Date.now();
+    state.assignConfigs.push({
+      id: id,
+      floorInput: assignPreviewMeta.floorInput,
+      count: assignPreviewMeta.count,
+      workerGroups: assignPreviewGroups,
+      createdDates: assignPreviewMeta.selectedDates
+    });
     state.assignActiveId = id;
     state.assignActiveWorkerIdx = null;
     saveAssignState();
+    closeAssignCreateModal();
+    switchView("assign");
+    renderAssignTabs();
+  }
+
+  function resetAssignCreateModal() {
     els.assignFloorInput.value = "";
     els.assignCountInput.value = "";
+    assignPreviewGroups = null;
+    assignPreviewMeta = null;
     setAssignMsg("", null);
-    renderAssignTabs();
+    renderAssignPreview();
+  }
+
+  function openAssignCreateModal() {
+    resetAssignCreateModal();
+    renderAssignDateCheckboxes();
+    els.assignCreateModal.classList.remove("hidden");
+  }
+
+  function closeAssignCreateModal() {
+    els.assignCreateModal.classList.add("hidden");
+    resetAssignCreateModal();
   }
 
   function removeAssignConfig(id) {
@@ -1725,7 +1836,6 @@
       updateFilterButtonStates();
     }
     if (!els.assignView.classList.contains("hidden")) {
-      renderAssignDateCheckboxes();
       renderAssignPanel();
     }
   }
@@ -1788,7 +1898,10 @@
 
   els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
   els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
-  els.assignAddBtn.addEventListener("click", addAssignConfig);
+  els.assignOpenModalBtn.addEventListener("click", openAssignCreateModal);
+  els.assignPreviewBtn.addEventListener("click", generateAssignPreview);
+  els.assignConfirmBtn.addEventListener("click", confirmAssignConfig);
+  els.assignCancelBtn.addEventListener("click", closeAssignCreateModal);
 
   els.gtSaveBtn.addEventListener("click", function () {
     var tokens = parseGtTokens(els.gtPasteArea.value);
