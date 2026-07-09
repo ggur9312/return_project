@@ -79,8 +79,8 @@ function showToast(message, type = 'success') {
 /* ================================================================
    SECTION 4: DATA RESET
    ================================================================ */
-function clearData() {
-    if (!confirm('모든 데이터를 초기화하시겠습니까?')) return;
+async function clearData() {
+    if (!(await window.confirmModal('모든 데이터를 초기화하시겠습니까?'))) return;
     globalProcessedData = {};
     activeTabDate = null;
     document.getElementById('dashboardContainer').classList.add('hidden');
@@ -91,8 +91,8 @@ function clearData() {
     showToast('데이터가 초기화되었습니다.', 'info');
 }
 
-function deleteDateData(date) {
-    if (!confirm(`${date} 데이터를 삭제하시겠습니까?`)) return;
+async function deleteDateData(date) {
+    if (!(await window.confirmModal(`${date} 데이터를 삭제하시겠습니까?`))) return;
 
     delete globalProcessedData[date];
     const remainingDates = Object.keys(globalProcessedData);
@@ -748,12 +748,14 @@ function truckSwitchView(view) {
     if (view === 'cycle') {
         homeView.classList.add('hidden');
         cycleView.classList.remove('hidden');
+        cycleView.classList.add('animate-fadeIn');
         navHomeBtn.className = inactiveClass;
         navCycleBtn.className = activeClass;
         renderCycleDateTabs();
     } else {
         cycleView.classList.add('hidden');
         homeView.classList.remove('hidden');
+        homeView.classList.add('animate-fadeIn');
         navCycleBtn.className = inactiveClass;
         navHomeBtn.className = activeClass;
     }
@@ -840,16 +842,16 @@ function renderCtAvailableList() {
 /* ================================================================
    SECTION 14-1: CT 데이터 / 트럭주기 데이터 초기화 (분리)
    ================================================================ */
-function clearCtPool() {
-    if (!confirm('저장된 CT 바코드 데이터를 모두 초기화하시겠습니까?')) return;
+async function clearCtPool() {
+    if (!(await window.confirmModal('저장된 CT 바코드 데이터를 모두 초기화하시겠습니까?'))) return;
     ctPool = [];
     renderCtAvailableList();
     saveState();
     showToast('CT 바코드 데이터가 초기화되었습니다.', 'info');
 }
 
-function clearCycleData() {
-    if (!confirm('생성된 트럭주기 데이터를 모두 초기화하시겠습니까?')) return;
+async function clearCycleData() {
+    if (!(await window.confirmModal('생성된 트럭주기 데이터를 모두 초기화하시겠습니까?'))) return;
     truckCycleData = {};
     activeCycleDate = null;
     renderCycleDateTabs();

@@ -18,6 +18,15 @@
 
   var LABEL_BARCODE_OPTS = { fontSize: 25, height: 42, width: 1.3 };
 
+  // 행 고유 id 발급 — 배정(assignConfig)/GT 매칭 키가 배열 위치가 아니라 행 자체를
+  // 안정적으로 가리킬 수 있도록 함. loadFromStorage()에서 구버전 데이터에 백필하며
+  // 기존 최대 id보다 큰 값에서 시작하도록 rowIdSeq를 보정한다.
+  var rowIdSeq = 0;
+  function nextRowId() {
+    rowIdSeq += 1;
+    return "r" + rowIdSeq;
+  }
+
   var STORAGE_KEY = "pickListData";
   var LABOR_STORAGE_KEY = "pickListLaborInput";
   var ASSIGN_CONFIGS_KEY = "pickListAssignConfigs";
@@ -86,6 +95,7 @@
     assignView: document.getElementById("assignView"),
     assignOpenModalBtn: document.getElementById("assignOpenModalBtn"),
     assignCreateModal: document.getElementById("assignCreateModal"),
+    assignCreateModalBox: document.getElementById("assignCreateModalBox"),
     assignFloorInput: document.getElementById("assignFloorInput"),
     assignCountInput: document.getElementById("assignCountInput"),
     assignPreviewBtn: document.getElementById("assignPreviewBtn"),
@@ -96,6 +106,17 @@
     assignCancelBtn: document.getElementById("assignCancelBtn"),
     assignTabsContainer: document.getElementById("assignTabsContainer"),
     assignTableContainer: document.getElementById("assignTableContainer"),
+    assignCustomBtn: document.getElementById("assignCustomBtn"),
+    rowPickerModal: document.getElementById("rowPickerModal"),
+    rowPickerModalBox: document.getElementById("rowPickerModalBox"),
+    rowPickerTitle: document.getElementById("rowPickerTitle"),
+    rowPickerDateSelect: document.getElementById("rowPickerDateSelect"),
+    rowPickerSearchInput: document.getElementById("rowPickerSearchInput"),
+    rowPickerAvailableList: document.getElementById("rowPickerAvailableList"),
+    rowPickerSelectedList: document.getElementById("rowPickerSelectedList"),
+    rowPickerSelectedCount: document.getElementById("rowPickerSelectedCount"),
+    rowPickerConfirmBtn: document.getElementById("rowPickerConfirmBtn"),
+    rowPickerCancelBtn: document.getElementById("rowPickerCancelBtn"),
     gtPasteArea: document.getElementById("gtPasteArea"),
     gtSaveBtn: document.getElementById("gtSaveBtn"),
     gtClearBtn: document.getElementById("gtClearBtn"),
@@ -104,6 +125,7 @@
     gtAvailableList: document.getElementById("gtAvailableList"),
     customLabelBtn: document.getElementById("customLabelBtn"),
     customLabelModal: document.getElementById("customLabelModal"),
+    customLabelModalBox: document.getElementById("customLabelModalBox"),
     customLabelCompanySearch: document.getElementById("customLabelCompanySearch"),
     customLabelCompanyDropdown: document.getElementById("customLabelCompanyDropdown"),
     customLabelGroupNo: document.getElementById("customLabelGroupNo"),
@@ -117,12 +139,14 @@
     customLabelPrintBtn: document.getElementById("customLabelPrintBtn"),
     customLabelCancelBtn: document.getElementById("customLabelCancelBtn"),
     gtPrintModal: document.getElementById("gtPrintModal"),
+    gtPrintModalBox: document.getElementById("gtPrintModalBox"),
     gtPrintAvailableCount: document.getElementById("gtPrintAvailableCount"),
     gtPrintQty: document.getElementById("gtPrintQty"),
     gtPrintModalMsg: document.getElementById("gtPrintModalMsg"),
     gtPrintModalPrintBtn: document.getElementById("gtPrintModalPrintBtn"),
     gtPrintModalCancelBtn: document.getElementById("gtPrintModalCancelBtn"),
     sparePrintModal: document.getElementById("sparePrintModal"),
+    sparePrintModalBox: document.getElementById("sparePrintModalBox"),
     sparePrintThreshold: document.getElementById("sparePrintThreshold"),
     sparePrintSplitSize: document.getElementById("sparePrintSplitSize"),
     sparePrintLeadingBlank: document.getElementById("sparePrintLeadingBlank"),
@@ -186,7 +210,7 @@
     for (var i = 1; i < matrix.length; i++) {
       var line = matrix[i];
       if (line.every(function (c) { return c === ""; })) continue;
-      var obj = {};
+      var obj = { id: nextRowId() };
       COLUMNS.forEach(function (col) {
         var raw = trim(line[colIndex[col.key]]);
         if (col.type === "number") {
@@ -210,6 +234,19 @@
     } catch (e) {
       state.rows = [];
     }
+    // 구버전 데이터(id 없음) 백필 + rowIdSeq를 기존 최대 id보다 크게 보정해
+    // 새로 추가되는 행의 id가 기존 것과 겹치지 않게 한다.
+    var maxSeq = 0;
+    state.rows.forEach(function (r) {
+      if (typeof r.id === "string") {
+        var n = parseInt(r.id.replace(/^r/, ""), 10);
+        if (!isNaN(n) && n > maxSeq) maxSeq = n;
+      }
+    });
+    rowIdSeq = maxSeq;
+    state.rows.forEach(function (r) {
+      if (!r.id) r.id = nextRowId();
+    });
   }
 
   function saveToStorage() {
@@ -764,9 +801,9 @@
     });
   }
 
-  function removeRowsByDate(date) {
+  async function removeRowsByDate(date) {
     var count = state.rows.filter(function (r) { return getCreatedDate(r) === date; }).length;
-    if (!confirm("생성일자 '" + date + "' 데이터 " + count + "건을 모두 삭제할까요?")) return;
+    if (!(await window.confirmModal("생성일자 '" + date + "' 데이터 " + count + "건을 모두 삭제할까요?"))) return;
     state.rows = state.rows.filter(function (r) { return getCreatedDate(r) !== date; });
     if (state.activeDateTab === date) state.activeDateTab = null;
     saveToStorage();
@@ -780,11 +817,13 @@
     if (view === "assign") {
       els.homeView.classList.add("hidden");
       els.assignView.classList.remove("hidden");
+      els.assignView.classList.add("animate-fadeIn");
       els.navHomeBtn.className = NAV_BTN_INACTIVE;
       els.navAssignBtn.className = NAV_BTN_ACTIVE;
     } else {
       els.assignView.classList.add("hidden");
       els.homeView.classList.remove("hidden");
+      els.homeView.classList.add("animate-fadeIn");
       els.navAssignBtn.className = NAV_BTN_INACTIVE;
       els.navHomeBtn.className = NAV_BTN_ACTIVE;
     }
@@ -906,12 +945,12 @@
     setTimeout(renderAssignPanel, 0);
   }
 
-  function autoMatchGtForWorker(cfg, workerIdx, detailRows) {
+  function autoMatchGtForWorker(cfg, detailRows) {
     // 입력된 순서 그대로 저장된 GT 목록을 뒤에서부터(역순으로) 소진
     var available = getAvailableGtCodes().slice().reverse();
     var ai = 0;
-    detailRows.forEach(function (r, rowIdx) {
-      var key = cfg.id + ":" + workerIdx + ":" + rowIdx;
+    detailRows.forEach(function (r) {
+      var key = cfg.id + ":" + r.id;
       if (state.gtAssignments[key]) return;
       if (ai >= available.length) return;
       state.gtAssignments[key] = available[ai];
@@ -922,10 +961,9 @@
     renderAssignPanel();
   }
 
-  function resetGtForWorker(cfg, workerIdx) {
-    var prefix = cfg.id + ":" + workerIdx + ":";
-    Object.keys(state.gtAssignments).forEach(function (key) {
-      if (key.indexOf(prefix) === 0) delete state.gtAssignments[key];
+  function resetGtForWorker(cfg, detailRows) {
+    detailRows.forEach(function (r) {
+      delete state.gtAssignments[cfg.id + ":" + r.id];
     });
     saveGtState();
     renderGtAvailableList();
@@ -1033,10 +1071,10 @@
     });
   }
 
-  function printWorkerLabels(cfg, workerIdx, detailRows) {
+  function printWorkerLabels(cfg, detailRows) {
     if (!detailRows.length) return;
-    var labelsHtml = detailRows.map(function (r, rowIdx) {
-      var gtKey = cfg.id + ":" + workerIdx + ":" + rowIdx;
+    var labelsHtml = detailRows.map(function (r) {
+      var gtKey = cfg.id + ":" + r.id;
       var gtCode = state.gtAssignments[gtKey] || "";
       var line1 = bracketPart(formatPurchaseTypeLabel(r.purchaseType)) + bracketPart(r.transportType) + bracketPart(r.groupNo);
       var line3 = bracketPart(formatMonthDay(r.deadline)) + (r.zone ? "[" + escapeHtml(r.zone) + "/" + Number(r.quantity || 0) + "EA]" : "");
@@ -1278,7 +1316,7 @@
     els.sparePrintModalMsg.textContent = "";
     renderSparePrintGroupList();
     updateSparePrintPreview();
-    els.sparePrintModal.classList.remove("hidden");
+    openModalWithTransition(els.sparePrintModal, els.sparePrintModalBox);
   }
 
   // 임계값/분할단위 기본값(40/15)으로 되돌리고 나머지 입력도 초기화 —
@@ -1427,8 +1465,9 @@
       var tabBtn = document.createElement("button");
       tabBtn.className = isActive ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
       var dates = cfg.createdDates || [];
+      var tabLabel = cfg.custom ? "커스텀" : (escapeHtml(cfg.floorInput) + "층 · " + cfg.count + "명");
       tabBtn.innerHTML =
-        "<span>" + escapeHtml(cfg.floorInput) + "층 · " + cfg.count + "명" +
+        "<span>" + tabLabel +
         (dates.length ? " · " + escapeHtml(dates.join(", ")) : "") + "</span>" +
         '<span class="assign-tab-close text-xs opacity-70 hover:opacity-100 ml-1">✕</span>';
       tabBtn.addEventListener("click", function (e) {
@@ -1456,16 +1495,23 @@
     { key: "quantity", label: "수량" }
   ];
 
-  function renderAssignDetailTable(rows, keyPrefix) {
+  function renderAssignDetailTable(rows, cfgId, workerIdx, workerCount) {
     if (!rows.length) {
       return '<div class="px-5 py-6 text-center text-sm text-slate-400">배정 없음</div>';
     }
     var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
       return '<th class="px-4 py-2.5 text-left' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
-    }).join("") + '<th class="px-4 py-2.5 text-left">GT 바코드</th>';
-    var bodyHtml = rows.map(function (r, rowIdx) {
-      var gtKey = keyPrefix + ":" + rowIdx;
+    }).join("") + '<th class="px-4 py-2.5 text-left">GT 바코드</th><th class="px-4 py-2.5 text-right">작업자</th><th class="px-4 py-2.5"></th>';
+    var workerOptionsHtml = "";
+    for (var w = 0; w < workerCount; w++) {
+      workerOptionsHtml += '<option value="' + w + '"' + (w === workerIdx ? " selected" : "") + '>작업자 ' + (w + 1) + "</option>";
+    }
+    var bodyHtml = rows.map(function (r) {
+      var gtKey = cfgId + ":" + r.id;
       var gtValue = state.gtAssignments[gtKey] || "";
+      var moveSelectHtml = workerCount > 1
+        ? '<select class="assign-result-row-select bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-row-id="' + escapeHtml(r.id) + '" data-from-worker="' + workerIdx + '">' + workerOptionsHtml + "</select>"
+        : "";
       return (
         '<tr class="hover:bg-slate-50/80 transition-colors">' +
         ASSIGN_DETAIL_COLUMNS.map(function (col) {
@@ -1481,6 +1527,8 @@
           return '<td class="px-4 py-2 text-slate-700 whitespace-nowrap">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
         '<td class="px-4 py-2 whitespace-nowrap"><input type="text" class="assign-gt-input w-36 bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '"></td>' +
+        '<td class="px-4 py-2 text-right whitespace-nowrap">' + moveSelectHtml + "</td>" +
+        '<td class="px-4 py-2 text-right whitespace-nowrap"><button type="button" class="assign-result-row-delete-btn text-slate-300 hover:text-rose-500 transition-colors" data-row-id="' + escapeHtml(r.id) + '" data-worker-idx="' + workerIdx + '" title="배정에서 빼기">✕</button></td>' +
         "</tr>"
       );
     }).join("");
@@ -1507,6 +1555,172 @@
     return result;
   }
 
+  // --- 공용 모달 트랜지션 헬퍼 (열기/닫기 시 페이드+스케일) ---
+  function openModalWithTransition(modalEl, boxEl) {
+    modalEl.classList.remove("hidden");
+    modalEl.classList.add("flex");
+    requestAnimationFrame(function () {
+      modalEl.classList.remove("opacity-0");
+      if (boxEl) boxEl.classList.remove("scale-95");
+    });
+  }
+
+  function closeModalWithTransition(modalEl, boxEl) {
+    modalEl.classList.add("opacity-0");
+    if (boxEl) boxEl.classList.add("scale-95");
+    setTimeout(function () {
+      modalEl.classList.add("hidden");
+      modalEl.classList.remove("flex");
+    }, 200);
+  }
+
+  // --- 공용 행 선택 모달: 커스텀 할당 생성 / 기존 작업자에 행 추가 ---
+  var rowPickerMode = null; // "create" | "append"
+  var rowPickerTargetCfgId = null;
+  var rowPickerTargetWorkerIdx = null;
+  var rowPickerSelectedRows = []; // 확정 전까지 state에 반영되지 않는 임시 선택 목록
+
+  // 이미 어떤 assignConfig에도 배정된 행의 id 집합 — 중복 배정 방지용
+  function getAssignedRowIdSet() {
+    var ids = new Set();
+    state.assignConfigs.forEach(function (cfg) {
+      // cfg.workerGroups가 아직 없는(한 번도 결과 화면을 렌더링하지 않은) config도
+      // 놓치지 않도록 renderAssignPanel과 동일한 폴백을 사용
+      var groups = cfg.workerGroups || splitBalanced(cfg.items || [], cfg.count);
+      groups.forEach(function (group) {
+        flattenWorkerGroup(group).forEach(function (r) { if (r && r.id) ids.add(r.id); });
+      });
+    });
+    return ids;
+  }
+
+  function getRowPickerAvailableRows() {
+    var dateVal = els.rowPickerDateSelect.value;
+    var term = trim(els.rowPickerSearchInput.value).toLowerCase();
+    var assignedIds = getAssignedRowIdSet();
+    var selectedIds = new Set(rowPickerSelectedRows.map(function (r) { return r.id; }));
+    return state.rows.filter(function (r) {
+      if (assignedIds.has(r.id) || selectedIds.has(r.id)) return false;
+      if (dateVal && getCreatedDate(r) !== dateVal) return false;
+      if (term) {
+        var hay = (String(r.groupNo) + " " + String(r.company) + " " + String(r.zone)).toLowerCase();
+        if (hay.indexOf(term) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  function buildRowPickerTable(rows, btnClass, btnLabel, btnClickAttr) {
+    if (!rows.length) {
+      return '<div class="px-4 py-6 text-center text-xs text-slate-400">해당하는 행이 없습니다.</div>';
+    }
+    var bodyHtml = rows.map(function (r) {
+      return (
+        '<tr class="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80 transition-colors">' +
+        '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + "</td>" +
+        '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(getCreatedDate(r)) + "</td>" +
+        '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.company) + "</td>" +
+        '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.zone) + "</td>" +
+        '<td class="px-3 py-1.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>" +
+        '<td class="px-3 py-1.5 text-right"><button type="button" class="' + btnClass + ' ' + btnClickAttr + ' text-xs font-medium px-2.5 py-1 rounded-md transition-colors" data-row-id="' + escapeHtml(r.id) + '">' + btnLabel + "</button></td>" +
+        "</tr>"
+      );
+    }).join("");
+    return (
+      '<table class="w-full text-xs border-collapse">' +
+      '<thead><tr class="bg-slate-50 text-slate-500 font-bold text-left sticky top-0">' +
+      '<th class="px-3 py-1.5">그룹번호</th><th class="px-3 py-1.5">생성일자</th><th class="px-3 py-1.5">업체명</th><th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5"></th>' +
+      "</tr></thead><tbody>" + bodyHtml + "</tbody></table>"
+    );
+  }
+
+  function renderRowPickerDateSelect() {
+    var dates = getAllCreatedDates();
+    var current = els.rowPickerDateSelect.value;
+    els.rowPickerDateSelect.innerHTML = '<option value="">전체</option>' + dates.map(function (d) {
+      return '<option value="' + escapeHtml(d) + '"' + (d === current ? " selected" : "") + '>' + escapeHtml(d) + "</option>";
+    }).join("");
+  }
+
+  function renderRowPickerAvailableList() {
+    els.rowPickerAvailableList.innerHTML = buildRowPickerTable(getRowPickerAvailableRows(), "row-picker-add-btn bg-indigo-600 hover:bg-indigo-700 text-white", "추가", "");
+    Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-add-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var row = state.rows.find(function (r) { return r.id === btn.dataset.rowId; });
+        if (!row) return;
+        rowPickerSelectedRows.push(row);
+        renderRowPickerAvailableList();
+        renderRowPickerSelectedList();
+      });
+    });
+  }
+
+  function renderRowPickerSelectedList() {
+    els.rowPickerSelectedCount.textContent = rowPickerSelectedRows.length;
+    els.rowPickerSelectedList.innerHTML = buildRowPickerTable(rowPickerSelectedRows, "row-picker-remove-btn bg-rose-50 hover:bg-rose-100 text-rose-600", "빼기", "");
+    Array.prototype.forEach.call(els.rowPickerSelectedList.querySelectorAll(".row-picker-remove-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        rowPickerSelectedRows = rowPickerSelectedRows.filter(function (r) { return r.id !== btn.dataset.rowId; });
+        renderRowPickerAvailableList();
+        renderRowPickerSelectedList();
+      });
+    });
+  }
+
+  function openRowPickerModal(mode, cfgId, workerIdx) {
+    rowPickerMode = mode;
+    rowPickerTargetCfgId = cfgId || null;
+    rowPickerTargetWorkerIdx = (typeof workerIdx === "number") ? workerIdx : null;
+    rowPickerSelectedRows = [];
+    els.rowPickerTitle.textContent = mode === "append" ? "작업자 " + (workerIdx + 1) + "에게 행 추가" : "커스텀 할당 만들기";
+    els.rowPickerConfirmBtn.textContent = mode === "append" ? "추가" : "확정";
+    els.rowPickerDateSelect.value = "";
+    els.rowPickerSearchInput.value = "";
+    renderRowPickerDateSelect();
+    renderRowPickerAvailableList();
+    renderRowPickerSelectedList();
+    openModalWithTransition(els.rowPickerModal, els.rowPickerModalBox);
+  }
+
+  function closeRowPickerModal() {
+    closeModalWithTransition(els.rowPickerModal, els.rowPickerModalBox);
+    rowPickerSelectedRows = [];
+  }
+
+  function confirmRowPicker() {
+    if (!rowPickerSelectedRows.length) return;
+    if (rowPickerMode === "create") {
+      var dates = Array.from(new Set(rowPickerSelectedRows.map(function (r) { return getCreatedDate(r); })));
+      var id = Date.now();
+      state.assignConfigs.push({
+        id: id,
+        floorInput: null,
+        custom: true,
+        count: 1,
+        workerGroups: [rowPickerSelectedRows.slice()],
+        createdDates: dates
+      });
+      state.assignActiveId = id;
+      state.assignActiveWorkerIdx = null;
+      saveAssignState();
+      closeRowPickerModal();
+      switchView("assign");
+      renderAssignTabs();
+    } else if (rowPickerMode === "append") {
+      var cfg = state.assignConfigs.find(function (c) { return c.id === rowPickerTargetCfgId; });
+      if (cfg) {
+        if (!cfg.workerGroups) {
+          cfg.workerGroups = splitBalanced(cfg.items || [], cfg.count).map(flattenWorkerGroup);
+        }
+        var targetGroup = cfg.workerGroups[rowPickerTargetWorkerIdx];
+        targetGroup.push.apply(targetGroup, rowPickerSelectedRows);
+        saveAssignState();
+      }
+      closeRowPickerModal();
+      renderAssignPanel();
+    }
+  }
+
   function renderAssignPanel() {
     var cfg = state.assignConfigs.find(function (c) { return c.id === state.assignActiveId; });
     if (!cfg) {
@@ -1514,9 +1728,14 @@
       return;
     }
     // workerGroups: 모달에서 확정된(수동 재배정 포함) 최종 분배(작업자별 원본 데이터 행 배열).
-    // 구버전 config(items만 있거나, workerGroups가 존 아이템 배열이던 이전 버전)는
-    // splitBalanced로 재계산 후 flattenWorkerGroup으로 정규화해 호환성을 유지한다.
-    var groups = (cfg.workerGroups || splitBalanced(cfg.items || [], cfg.count)).map(flattenWorkerGroup);
+    // 구버전 config(items만 있거나, workerGroups가 존 아이템 배열이던 이전 버전)는 최초 진입 시
+    // splitBalanced+flattenWorkerGroup으로 정규화해 cfg.workerGroups에 실제로 저장해둔다 —
+    // 이후 행 추가/삭제/이동 핸들러가 cfg.workerGroups를 직접 변경해야 하므로, 매 렌더링마다
+    // 새로 만들어지는 임시 배열이 아니라 실제 저장되는 배열이 있어야 한다.
+    if (!cfg.workerGroups) {
+      cfg.workerGroups = splitBalanced(cfg.items || [], cfg.count).map(flattenWorkerGroup);
+    }
+    var groups = cfg.workerGroups.map(flattenWorkerGroup);
     var totalItems = groups.reduce(function (sum, g) { return sum + g.length; }, 0);
     if (!totalItems) {
       els.assignTableContainer.innerHTML = '<div class="bg-white border border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500 shadow-sm">해당 층에 데이터가 없습니다.</div>';
@@ -1545,6 +1764,7 @@
         (zoneList ? '<span class="ml-2 text-xs font-normal text-slate-500">담당 존: ' + escapeHtml(zoneList) + "</span>" : "") + "</div>" +
         '<div class="flex items-center gap-3">' +
         '<div class="text-sm font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + detailRows.length + "장</div>" +
+        '<button type="button" class="assign-add-row-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">행 추가</button>' +
         '<button type="button" class="assign-automatch-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
         '<button type="button" class="assign-gt-reset-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
         '<button type="button" class="assign-spare-print-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">여분 출력</button>' +
@@ -1552,7 +1772,7 @@
         (groups.length > 1 ? '<button type="button" class="assign-delete-worker-btn bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">삭제</button>' : "") +
         "</div>" +
         "</div>" +
-        renderAssignDetailTable(detailRows, cfg.id + ":" + idx) +
+        renderAssignDetailTable(detailRows, cfg.id, idx, groups.length) +
         "</div>"
       );
     }).join("");
@@ -1576,22 +1796,22 @@
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-automatch-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        autoMatchGtForWorker(cfg, workerIdx, groups[workerIdx]);
+        autoMatchGtForWorker(cfg, groups[workerIdx]);
       });
     });
 
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-gt-reset-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        resetGtForWorker(cfg, workerIdx);
+        resetGtForWorker(cfg, groups[workerIdx]);
       });
     });
 
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-print-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        printWorkerLabels(cfg, workerIdx, groups[workerIdx]);
-        resetGtForWorker(cfg, workerIdx);
+        printWorkerLabels(cfg, groups[workerIdx]);
+        resetGtForWorker(cfg, groups[workerIdx]);
       });
     });
 
@@ -1607,12 +1827,49 @@
         removeAssignWorker(cfg);
       });
     });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-add-row-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var workerIdx = parseInt(btn.dataset.workerIdx, 10);
+        openRowPickerModal("append", cfg.id, workerIdx);
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-result-row-select"), function (sel) {
+      sel.addEventListener("change", function () {
+        var fromIdx = parseInt(sel.dataset.fromWorker, 10);
+        var toIdx = parseInt(sel.value, 10);
+        if (fromIdx === toIdx) return;
+        var rowId = sel.dataset.rowId;
+        var fromGroup = cfg.workerGroups[fromIdx];
+        var rowIdx = fromGroup.findIndex(function (r) { return r && r.id === rowId; });
+        if (rowIdx === -1) return;
+        var row = fromGroup.splice(rowIdx, 1)[0];
+        cfg.workerGroups[toIdx].push(row);
+        saveAssignState();
+        renderAssignPanel();
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-result-row-delete-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var workerIdx = parseInt(btn.dataset.workerIdx, 10);
+        var rowId = btn.dataset.rowId;
+        var group = cfg.workerGroups[workerIdx];
+        var rowIdx = group.findIndex(function (r) { return r && r.id === rowId; });
+        if (rowIdx !== -1) group.splice(rowIdx, 1);
+        delete state.gtAssignments[cfg.id + ":" + rowId];
+        saveGtState();
+        saveAssignState();
+        renderAssignPanel();
+      });
+    });
   }
 
   function removeAssignWorker(cfg) {
     if (cfg.count <= 1) return;
-    // 마지막 작업자 인덱스에 매칭된 GT가 있다면 재분배 전에 정리해 가용 목록으로 반환
-    resetGtForWorker(cfg, cfg.count - 1);
+    // GT 키가 이제 행 id 기준이라(작업자 인덱스 무관) 병합해도 기존 매칭이 그대로 유지됨 —
+    // 별도로 GT를 초기화할 필요 없음
     if (cfg.workerGroups) {
       // 삭제되는 마지막 작업자의 항목은 그 앞 작업자에게 합쳐, 이미 수동 배정한
       // 다른 작업자들의 구성은 그대로 유지한다(splitBalanced로 전체 재계산하지 않음).
@@ -1825,11 +2082,11 @@
   function openAssignCreateModal() {
     resetAssignCreateModal();
     renderAssignDateCheckboxes();
-    els.assignCreateModal.classList.remove("hidden");
+    openModalWithTransition(els.assignCreateModal, els.assignCreateModalBox);
   }
 
   function closeAssignCreateModal() {
-    els.assignCreateModal.classList.add("hidden");
+    closeModalWithTransition(els.assignCreateModal, els.assignCreateModalBox);
     resetAssignCreateModal();
   }
 
@@ -1838,6 +2095,12 @@
     if (state.assignActiveId === id) {
       state.assignActiveId = state.assignConfigs.length ? state.assignConfigs[0].id : null;
     }
+    // 이 config에 속했던 GT 매칭 키(고아 키)도 함께 정리
+    var prefix = id + ":";
+    Object.keys(state.gtAssignments).forEach(function (key) {
+      if (key.indexOf(prefix) === 0) delete state.gtAssignments[key];
+    });
+    saveGtState();
     saveAssignState();
     renderAssignTabs();
   }
@@ -1937,8 +2200,8 @@
     handleParsedMatrix(matrix, "붙여넣기");
   });
 
-  els.resetBtn.addEventListener("click", function () {
-    if (!confirm("저장된 집품 데이터를 모두 삭제할까요?")) return;
+  els.resetBtn.addEventListener("click", async function () {
+    if (!(await window.confirmModal("저장된 집품 데이터를 모두 삭제할까요?"))) return;
     state.rows = [];
     state.floorExcluded = new Set();
     localStorage.removeItem(STORAGE_KEY);
@@ -1964,6 +2227,12 @@
   els.assignConfirmBtn.addEventListener("click", confirmAssignConfig);
   els.assignCancelBtn.addEventListener("click", closeAssignCreateModal);
 
+  els.assignCustomBtn.addEventListener("click", function () { openRowPickerModal("create"); });
+  els.rowPickerDateSelect.addEventListener("change", renderRowPickerAvailableList);
+  els.rowPickerSearchInput.addEventListener("input", renderRowPickerAvailableList);
+  els.rowPickerConfirmBtn.addEventListener("click", confirmRowPicker);
+  els.rowPickerCancelBtn.addEventListener("click", closeRowPickerModal);
+
   els.gtSaveBtn.addEventListener("click", function () {
     var tokens = parseGtTokens(els.gtPasteArea.value);
     if (!tokens.length) return;
@@ -1981,8 +2250,8 @@
     renderAssignPanel();
   });
 
-  els.gtClearBtn.addEventListener("click", function () {
-    if (!confirm("저장된 GT 바코드 데이터를 모두 삭제할까요?")) return;
+  els.gtClearBtn.addEventListener("click", async function () {
+    if (!(await window.confirmModal("저장된 GT 바코드 데이터를 모두 삭제할까요?"))) return;
     state.gtCodes = [];
     state.gtAssignments = {};
     state.gtPrinted = [];
@@ -1991,20 +2260,20 @@
     renderAssignPanel();
   });
 
-  els.gtPrintBtn.addEventListener("click", function () {
+  els.gtPrintBtn.addEventListener("click", async function () {
     var available = getAvailableGtCodes();
     if (!available.length) {
-      alert("인쇄할 수 있는 사용 가능 GT 데이터가 없습니다.");
+      await window.alertModal("인쇄할 수 있는 사용 가능 GT 데이터가 없습니다.");
       return;
     }
     els.gtPrintAvailableCount.textContent = available.length;
     els.gtPrintQty.value = "";
     els.gtPrintModalMsg.textContent = "";
-    els.gtPrintModal.classList.remove("hidden");
+    openModalWithTransition(els.gtPrintModal, els.gtPrintModalBox);
   });
 
   els.gtPrintModalCancelBtn.addEventListener("click", function () {
-    els.gtPrintModal.classList.add("hidden");
+    closeModalWithTransition(els.gtPrintModal, els.gtPrintModalBox);
     els.gtPrintQty.value = "";
     els.gtPrintModalMsg.textContent = "";
   });
@@ -2021,7 +2290,7 @@
     codes.forEach(function (c) { state.gtPrinted.push(c); });
     saveGtState();
     renderGtAvailableList();
-    els.gtPrintModal.classList.add("hidden");
+    closeModalWithTransition(els.gtPrintModal, els.gtPrintModalBox);
     els.gtPrintQty.value = "";
     els.gtPrintModalMsg.textContent = "";
     printGtLabels(codes);
@@ -2038,7 +2307,7 @@
   els.sparePrintLeadingBlank.addEventListener("change", updateSparePrintPreview);
 
   els.sparePrintModalCancelBtn.addEventListener("click", function () {
-    els.sparePrintModal.classList.add("hidden");
+    closeModalWithTransition(els.sparePrintModal, els.sparePrintModalBox);
     pendingSparePrintRows = null;
     resetSparePrintModal();
   });
@@ -2058,14 +2327,14 @@
     var leadingBlank = els.sparePrintLeadingBlank.checked;
     var rows = pendingSparePrintRows;
     var overrides = sparePrintOverrides;
-    els.sparePrintModal.classList.add("hidden");
+    closeModalWithTransition(els.sparePrintModal, els.sparePrintModalBox);
     pendingSparePrintRows = null;
     resetSparePrintModal();
     printSpareLabels(rows, threshold, splitSize, leadingBlank, overrides);
   });
 
   els.customLabelBtn.addEventListener("click", function () {
-    els.customLabelModal.classList.remove("hidden");
+    openModalWithTransition(els.customLabelModal, els.customLabelModalBox);
   });
 
   els.customLabelCompanySearch.addEventListener("focus", openCustomLabelCompanyDropdown);
@@ -2092,7 +2361,7 @@
   });
 
   els.customLabelCancelBtn.addEventListener("click", function () {
-    els.customLabelModal.classList.add("hidden");
+    closeModalWithTransition(els.customLabelModal, els.customLabelModalBox);
     resetCustomLabelModal();
   });
 
@@ -2108,7 +2377,7 @@
     };
     var useAutoMatch = els.customLabelAutoMatch.checked;
     var manualCode = trim(els.customLabelGtCode.value);
-    els.customLabelModal.classList.add("hidden");
+    closeModalWithTransition(els.customLabelModal, els.customLabelModalBox);
     printCustomLabels(fields, qty, useAutoMatch, manualCode);
     resetCustomLabelModal();
   });
