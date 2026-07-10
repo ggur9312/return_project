@@ -33,6 +33,7 @@
   }
 
   var STORAGE_KEY = "pickListData";
+  var SORT_RULES_KEY = "pickListSortRules";
   var LABOR_STORAGE_KEY = "pickListLaborInput";
   var ASSIGN_CONFIGS_KEY = "pickListAssignConfigs";
   var ASSIGN_ACTIVE_KEY = "pickListAssignActiveId";
@@ -104,6 +105,10 @@
     homeSelectionSummary: document.getElementById("homeSelectionSummary"),
     homeSelectionAssignBtn: document.getElementById("homeSelectionAssignBtn"),
     homeSelectionClearBtn: document.getElementById("homeSelectionClearBtn"),
+    rowPickerSelectionBar: document.getElementById("rowPickerSelectionBar"),
+    rowPickerSelectionSummary: document.getElementById("rowPickerSelectionSummary"),
+    rowPickerSelectionAssignBtn: document.getElementById("rowPickerSelectionAssignBtn"),
+    rowPickerSelectionClearBtn: document.getElementById("rowPickerSelectionClearBtn"),
     floorBars: document.getElementById("floorBars"),
     floorPanelToggleBtn: document.getElementById("floorPanelToggleBtn"),
     floorPanelToggleLabel: document.getElementById("floorPanelToggleLabel"),
@@ -311,6 +316,24 @@
 
   function saveToStorage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.rows));
+  }
+
+  // 정렬 상태(state.sortRules)는 기존엔 저장되지 않아 브라우저가 새로고침되면
+  // (모바일에서 다른 앱 갔다 오는 사이 탭이 새로고침되는 경우 포함) 기본 정렬로
+  // 되돌아갔다 — 집품 데이터(state.rows)와 마찬가지로 localStorage에 저장/복원한다.
+  // 커스텀 할당 화면 전용 정렬(rowPickerSortRules)은 이 화면(홈)과 무관한 별도
+  // 상태라 대상이 아니다.
+  function saveSortRules() {
+    localStorage.setItem(SORT_RULES_KEY, JSON.stringify(state.sortRules));
+  }
+
+  function loadSortRules() {
+    try {
+      var raw = localStorage.getItem(SORT_RULES_KEY);
+      if (raw) state.sortRules = JSON.parse(raw);
+    } catch (e) {
+      // 저장된 값이 손상됐으면 state의 기본 정렬을 그대로 사용
+    }
   }
 
   function setStatusMsg(msg, kind) {
@@ -1075,6 +1098,7 @@
     saveToStorage();
     saveDateTabState();
     refreshAll();
+    if (window.showToast) window.showToast("생성일자 '" + date + "' 데이터 " + count + "건이 삭제되었습니다.", "info");
   }
 
   // --- 뷰 전환 (홈 / 집품 할당) ---
@@ -1305,6 +1329,9 @@
     saveGtState();
     renderGtAvailableList();
     renderAssignPanel();
+    if (window.showToast) {
+      window.showToast(ai > 0 ? "GT " + ai + "건이 자동매칭되었습니다." : "매칭할 수 있는 GT 코드가 없습니다.", ai > 0 ? "success" : "error");
+    }
   }
 
   function resetGtForWorker(cfg, detailRows) {
@@ -1314,6 +1341,7 @@
     saveGtState();
     renderGtAvailableList();
     renderAssignPanel();
+    if (window.showToast) window.showToast("GT 매칭이 초기화되었습니다.", "info");
   }
 
   function formatMonthDay(dateStr) {
@@ -2129,13 +2157,17 @@
     var bodyHtml = rows.map(function (r) {
       var marked = draggableSelect && rowPickerMarkedIds.has(r.id);
       var alreadyAssigned = !!(assignedIds && assignedIds.has(r.id));
+      // 이미 다른 곳에 할당된 행이라도 여기서 다시 선택/드래그할 수 있어야 하므로
+      // (확정 시 홈처럼 확인모달로 중복 여부를 다시 물어봄) 상호작용을 막지 않고
+      // "이미 할당됨" 배지 + 색상 표시로만 구분한다.
       var rowClasses = "row-picker-row border-b border-slate-100 last:border-b-0 transition-colors" +
-        (alreadyAssigned ? " bg-amber-50/70 opacity-60 pointer-events-none" : (draggableSelect ? " cursor-move select-none hover:bg-slate-50/80" : " hover:bg-slate-50/80")) +
+        (alreadyAssigned ? " bg-amber-50/70" : "") +
+        (draggableSelect ? " cursor-move select-none hover:bg-slate-50/80" : " hover:bg-slate-50/80") +
         (marked ? " bg-indigo-50" : "");
       var badge = alreadyAssigned ? ' <span class="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100 align-middle">이미 할당됨</span>' : "";
       return (
         '<tr class="' + rowClasses + '"' +
-        ' data-row-id="' + escapeHtml(r.id) + '"' + (alreadyAssigned ? ' data-assigned="1"' : "") + '>' +
+        ' data-row-id="' + escapeHtml(r.id) + '">' +
         '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + badge + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r.deadline)) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(getCreatedDate(r)) + "</td>" +
@@ -2143,7 +2175,7 @@
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.transportType) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.zone) + "</td>" +
         '<td class="px-3 py-1.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>" +
-        '<td class="px-3 py-1.5 text-right"><button type="button" class="' + btnClass + ' ' + btnClickAttr + ' text-xs font-medium px-2.5 py-1 rounded-md transition-colors" data-row-id="' + escapeHtml(r.id) + '"' + (alreadyAssigned ? " disabled" : "") + '>' + btnLabel + "</button></td>" +
+        '<td class="px-3 py-1.5 text-right"><button type="button" class="' + btnClass + ' ' + btnClickAttr + ' text-xs font-medium px-2.5 py-1 rounded-md transition-colors" data-row-id="' + escapeHtml(r.id) + '">' + btnLabel + "</button></td>" +
         "</tr>"
       );
     }).join("");
@@ -2222,6 +2254,32 @@
       tr.classList.toggle("opacity-70", marked && rowPickerDragSelecting);
     });
     updateRowPickerDragGhost();
+    updateRowPickerSelectionSummary();
+  }
+
+  // 홈 화면의 선택바(#homeSelectionBar)와 동일한 패턴 — 드래그가 끝난 뒤에도
+  // 마킹이 남아있는 동안(마우스를 뗀 뒤) 몇 행 · 몇 개를 선택했는지 계속 보여주고,
+  // 여기서 바로 "선택된 행" 목록으로 옮길 수 있게 한다.
+  function updateRowPickerSelectionSummary() {
+    if (!rowPickerMarkedIds.size) {
+      els.rowPickerSelectionBar.classList.add("hidden");
+      return;
+    }
+    var qty = 0;
+    rowPickerMarkedIds.forEach(function (id) {
+      var row = state.rows.find(function (r) { return r.id === id; });
+      if (row) qty += row.quantity || 0;
+    });
+    els.rowPickerSelectionSummary.textContent = "선택 " + rowPickerMarkedIds.size.toLocaleString("ko-KR") + "행 · " + qty.toLocaleString("ko-KR") + "개";
+    els.rowPickerSelectionBar.classList.remove("hidden");
+  }
+
+  function clearRowPickerMarks() {
+    rowPickerMarkedIds = new Set();
+    Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (tr) {
+      tr.classList.remove("bg-indigo-50", "opacity-70");
+    });
+    updateRowPickerSelectionSummary();
   }
 
   // 드래그 중임을 알기 쉽게 커서를 따라다니며 이동 건수 + 수량 합계를 보여주는 배지
@@ -2286,7 +2344,6 @@
       if (e.target.closest("button")) return;
       var tr = e.target.closest(".row-picker-row");
       if (!tr) return;
-      if (tr.dataset.assigned === "1") return;
       e.preventDefault();
       var id = tr.dataset.rowId;
 
@@ -2357,6 +2414,7 @@
         var movedRows = state.rows.filter(function (r) { return idsToMove.indexOf(r.id) !== -1; });
         rowPickerSelectedRows = rowPickerSelectedRows.concat(movedRows);
         rowPickerMarkedIds = new Set();
+        updateRowPickerSelectionSummary();
         renderRowPickerAvailableList();
         renderRowPickerSelectedList();
       }
@@ -2376,6 +2434,7 @@
     rowPickerSortRules = [{ key: "zone", dir: 1 }];
     els.rowPickerTitle.textContent = mode === "append" ? "작업자 " + (workerIdx + 1) + "에게 행 추가" : "커스텀 할당 만들기";
     els.rowPickerConfirmBtn.textContent = mode === "append" ? "추가" : "확정";
+    updateRowPickerSelectionSummary();
     switchView("custom");
   }
 
@@ -2405,8 +2464,19 @@
     if (window.showToast) window.showToast("커스텀 할당이 생성되었습니다.");
   }
 
-  function confirmRowPicker() {
+  async function confirmRowPicker() {
     if (!rowPickerSelectedRows.length) return;
+    // 홈 선택바의 "할당"과 동일하게, 선택된 행 중 이미 할당된 게 있으면 확정 전에
+    // 재확인한다 — 여기서는 마킹 단계(추가/할당 버튼)에서 막지 않고 확정 시점에
+    // 한 번에 확인해서, 확인모달이 반복해서 뜨지 않게 한다.
+    var assignedIds = getAssignedRowIdSet();
+    var alreadyAssignedCount = rowPickerSelectedRows.filter(function (r) { return assignedIds.has(r.id); }).length;
+    if (alreadyAssignedCount > 0) {
+      var msg = alreadyAssignedCount === rowPickerSelectedRows.length
+        ? "선택한 행이 이미 할당되어 있습니다. 그래도 할당하시겠습니까?"
+        : "선택한 " + rowPickerSelectedRows.length + "행 중 " + alreadyAssignedCount + "건이 이미 할당되어 있습니다. 그래도 할당하시겠습니까?";
+      if (!(await window.confirmModal(msg))) return;
+    }
     if (rowPickerMode === "create") {
       createCustomAssignment(rowPickerSelectedRows);
       rowPickerSelectedRows = [];
@@ -3021,6 +3091,7 @@
       homeFilterBarController.updateButtonStates();
       homeSortBarController.render();
       updateFilterSortBadge();
+      saveSortRules();
     }
     if (!els.assignView.classList.contains("hidden")) {
       renderAssignPanel();
@@ -3071,10 +3142,17 @@
     if (!(await window.confirmModal("저장된 집품 데이터를 모두 삭제할까요?"))) return;
     state.rows = [];
     localStorage.removeItem(STORAGE_KEY);
+    // 활성 날짜 탭/필터가 남아있으면, 초기화 후 다른 날짜의 데이터를 다시
+    // 업로드했을 때 예전 날짜/필터 조건에 걸려 화면에 아무 것도 안 보이는
+    // 문제가 있었다 — 전체 데이터가 곧바로 보이도록 "전체" 탭+필터 없음으로 되돌린다.
+    state.activeDateTab = null;
+    Object.keys(state.filters).forEach(function (key) { state.filters[key] = null; });
+    saveDateTabState();
     els.pasteArea.value = "";
     els.fileName.textContent = "";
     setStatusMsg("데이터를 초기화했습니다.", "ok");
     refreshAll();
+    if (window.showToast) window.showToast("집품 데이터가 초기화되었습니다.", "info");
   });
 
   els.floorPanelToggleBtn.addEventListener("click", function () {
@@ -3138,6 +3216,7 @@
     rowPickerSelectedRows = [];
     renderRowPickerAvailableList();
     renderRowPickerSelectedList();
+    if (window.showToast) window.showToast("선택된 행이 모두 삭제되었습니다.", "info");
   });
 
   els.homeSelectionAssignBtn.addEventListener("click", async function () {
@@ -3156,6 +3235,22 @@
   });
 
   els.homeSelectionClearBtn.addEventListener("click", clearHomeSelection);
+
+  // 커스텀 할당 화면에서는 홈과 달리 "할당"을 눌러도 바로 할당이 생성되지 않고,
+  // 드래그로 선택 영역에 끌어놓은 것과 동일하게 "선택된 행" 목록으로만 옮긴다 —
+  // 중복 할당 여부는 실제로 확정할 때(rowPickerConfirmBtn) 한 번에 확인한다.
+  els.rowPickerSelectionAssignBtn.addEventListener("click", function () {
+    if (!rowPickerMarkedIds.size) return;
+    var idsToMove = Array.from(rowPickerMarkedIds);
+    var movedRows = state.rows.filter(function (r) { return idsToMove.indexOf(r.id) !== -1; });
+    rowPickerSelectedRows = rowPickerSelectedRows.concat(movedRows);
+    rowPickerMarkedIds = new Set();
+    updateRowPickerSelectionSummary();
+    renderRowPickerAvailableList();
+    renderRowPickerSelectedList();
+  });
+
+  els.rowPickerSelectionClearBtn.addEventListener("click", clearRowPickerMarks);
 
   // 체크박스가 아니라 1회성 버튼 — 누른 순간에만 O존 우선 정렬을 적용하고,
   // 이후 다른 조작으로 인한 재렌더링에는 영향을 주지 않도록 곧바로 플래그를 되돌린다.
@@ -3178,16 +3273,21 @@
     if (!tokens.length) return;
     var seen = {};
     state.gtCodes.forEach(function (c) { seen[c] = true; });
+    var addedCount = 0;
     tokens.forEach(function (t) {
       if (!seen[t]) {
         seen[t] = true;
         state.gtCodes.push(t);
+        addedCount++;
       }
     });
     saveGtState();
     els.gtPasteArea.value = "";
     renderGtAvailableList();
     renderAssignPanel();
+    if (window.showToast) {
+      window.showToast(addedCount > 0 ? "GT 코드 " + addedCount + "건이 저장되었습니다." : "새로 추가된 GT 코드가 없습니다(중복).", addedCount > 0 ? "success" : "info");
+    }
   });
 
   els.gtClearBtn.addEventListener("click", async function () {
@@ -3198,6 +3298,7 @@
     saveGtState();
     renderGtAvailableList();
     renderAssignPanel();
+    if (window.showToast) window.showToast("GT 데이터가 초기화되었습니다.", "info");
   });
 
   els.gtPrintBtn.addEventListener("click", async function () {
@@ -3367,6 +3468,7 @@
   setupRowPickerDragAndDrop();
   setupHomeRowSelection();
   loadFromStorage();
+  loadSortRules();
   loadDateTabState();
   loadAssignState();
   loadGtState();
