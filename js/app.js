@@ -3053,7 +3053,12 @@
 
       homeDragAdditive = false;
       homeDragBaseIds = null;
-      if (homeMarkedIds.size > 1) {
+      // 이미 여러 행이 선택된 상태에서 그중 한 행을 누르면(향후 이동 등 확장 대비)
+      // 기존 선택을 그대로 두지만, 선택돼 있지 않은 새 행을 누르면 그건 새로운
+      // 드래그 선택을 시작하려는 의도이므로 기존 선택을 지우고 새로 앵커를 잡는다 —
+      // 이전엔 homeMarkedIds.size > 1이기만 하면 무조건 앵커를 비워, O존 우선 정렬로
+      // 여러 행을 선택한 뒤 다른 존에서 새로 드래그해도 선택이 그대로 굳어버렸다.
+      if (homeMarkedIds.size > 1 && homeMarkedIds.has(id)) {
         homeDragAnchorId = null;
       } else {
         homeDragAnchorId = id;
