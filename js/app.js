@@ -132,8 +132,10 @@
     sortZoneOPriorityBtn: document.getElementById("sortZoneOPriorityBtn"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
+    mainNavAside: document.getElementById("mainNavAside"),
     homeView: document.getElementById("homeView"),
     assignView: document.getElementById("assignView"),
+    customAssignView: document.getElementById("customAssignView"),
     assignOpenModalBtn: document.getElementById("assignOpenModalBtn"),
     assignCreateModal: document.getElementById("assignCreateModal"),
     assignCreateModalBox: document.getElementById("assignCreateModalBox"),
@@ -150,8 +152,6 @@
     assignTableContainer: document.getElementById("assignTableContainer"),
     assignDeleteAllBtn: document.getElementById("assignDeleteAllBtn"),
     assignCustomBtn: document.getElementById("assignCustomBtn"),
-    rowPickerModal: document.getElementById("rowPickerModal"),
-    rowPickerModalBox: document.getElementById("rowPickerModalBox"),
     rowPickerTitle: document.getElementById("rowPickerTitle"),
     rowPickerDateSelect: document.getElementById("rowPickerDateSelect"),
     rowPickerSearchInput: document.getElementById("rowPickerSearchInput"),
@@ -161,7 +161,6 @@
     rowPickerSortAddBtn: document.getElementById("rowPickerSortAddBtn"),
     rowPickerSortResetBtn: document.getElementById("rowPickerSortResetBtn"),
     rowPickerSortZoneOPriorityBtn: document.getElementById("rowPickerSortZoneOPriorityBtn"),
-    rowPickerModalBody: document.getElementById("rowPickerModalBody"),
     rowPickerAvailableList: document.getElementById("rowPickerAvailableList"),
     rowPickerSelectedList: document.getElementById("rowPickerSelectedList"),
     rowPickerSelectedCount: document.getElementById("rowPickerSelectedCount"),
@@ -1082,18 +1081,20 @@
 
   function switchView(view) {
     if (window.flashPageLoading) window.flashPageLoading();
-    if (view === "assign") {
-      els.homeView.classList.add("hidden");
-      els.assignView.classList.remove("hidden");
-      els.assignView.classList.add("animate-fadeIn");
-      els.navHomeBtn.className = NAV_BTN_INACTIVE;
-      els.navAssignBtn.className = NAV_BTN_ACTIVE;
-    } else {
-      els.assignView.classList.add("hidden");
-      els.homeView.classList.remove("hidden");
-      els.homeView.classList.add("animate-fadeIn");
-      els.navAssignBtn.className = NAV_BTN_INACTIVE;
-      els.navHomeBtn.className = NAV_BTN_ACTIVE;
+    els.homeView.classList.toggle("hidden", view !== "home");
+    els.assignView.classList.toggle("hidden", view !== "assign");
+    els.customAssignView.classList.toggle("hidden", view !== "custom");
+    if (view === "home") els.homeView.classList.add("animate-fadeIn");
+    if (view === "assign") els.assignView.classList.add("animate-fadeIn");
+    if (view === "custom") els.customAssignView.classList.add("animate-fadeIn");
+    // 커스텀 할당 화면은 진행 중인 선택을 실수로 잃지 않도록(모달일 때 배경
+    // 클릭으로 못 닫던 것과 동일한 안전장치) 좌측 내비를 숨긴다. 홈/할당
+    // 내비 버튼 활성 스타일은 그 두 화면 사이를 오갈 때만 갱신하고, 커스텀
+    // 화면에서는 진입 직전 상태를 그대로 유지한다.
+    els.mainNavAside.classList.toggle("hidden", view === "custom");
+    if (view === "home" || view === "assign") {
+      els.navHomeBtn.className = view === "home" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
+      els.navAssignBtn.className = view === "assign" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     }
     // refreshAll()은 숨겨진 화면의 렌더링을 건너뛰므로, 방금 보이게 된 화면이
     // 숨겨져 있는 동안 놓쳤을 수 있는 갱신을 따라잡도록 전환 직후 한 번 그려준다.
@@ -1886,10 +1887,11 @@
     }, 200);
   }
 
-  // --- 공용 행 선택 모달: 커스텀 할당 생성 / 기존 작업자에 행 추가 ---
+  // --- 커스텀 할당 화면: 커스텀 할당 생성 / 기존 작업자에 행 추가 (전용 페이지) ---
   var rowPickerMode = null; // "create" | "append"
   var rowPickerTargetCfgId = null;
   var rowPickerTargetWorkerIdx = null;
+  var rowPickerReturnView = "home"; // 취소/닫기 시 돌아갈 화면 — "home" | "assign"
   var rowPickerSelectedRows = []; // 확정 전까지 state에 반영되지 않는 임시 선택 목록
   // "사용 가능한 행"에서 드래그로 범위 선택된(하지만 아직 옮기지 않은) 행 id 집합
   var rowPickerMarkedIds = new Set();
@@ -1897,7 +1899,7 @@
   var rowPickerDragSelecting = false;
   var rowPickerAutoScrollRAF = null;
   var rowPickerLastMouseY = 0;
-  // 홈 화면의 state.filters/state.sortRules와는 독립적인, 모달 전용 필터/정렬 상태
+  // 홈 화면의 state.filters/state.sortRules와는 독립적인, 이 화면 전용 필터/정렬 상태
   var rowPickerFilters = {};
   var rowPickerSortRules = [];
 
@@ -2126,9 +2128,9 @@
   // 시작하지 못함) 순수 mouse 이벤트만으로 "범위 선택 + 드롭까지" 한 번의
   // 제스처로 처리한다: mousedown(시작) → mousemove(같은 목록 안이면 범위 갱신,
   // "선택된 행" 위로 올라가면 드롭 표시) → mouseup("선택된 행" 위에서 떼면 이동).
-  // 드래그 중 마킹된 행이 화면 밖(스크롤 영역 아래/위)에 있어도 마우스를 가장자리
-  // 근처로 가져가면 자동으로 스크롤되도록 함 — 모달 목록 자체(rowPickerAvailableList)와
-  // 모달 본문(rowPickerModalBody) 두 스크롤 영역 모두에 적용.
+  // 드래그 중 마킹된 행이 화면 밖에 있어도 마우스를 뷰포트 위/아래 가장자리
+  // 근처로 가져가면 페이지 자체가 자동으로 스크롤되도록 함(전용 페이지로 바뀌면서
+  // 스크롤 영역이 하나뿐이라 윈도우 스크롤만 다루면 됨).
   var ROW_PICKER_AUTOSCROLL_EDGE = 30;
   var ROW_PICKER_AUTOSCROLL_SPEED = 12;
 
@@ -2137,16 +2139,11 @@
       rowPickerAutoScrollRAF = null;
       return;
     }
-    [els.rowPickerAvailableList, els.rowPickerModalBody].forEach(function (container) {
-      if (!container) return;
-      var rect = container.getBoundingClientRect();
-      if (rowPickerLastMouseY < rect.top || rowPickerLastMouseY > rect.bottom) return;
-      if (rowPickerLastMouseY < rect.top + ROW_PICKER_AUTOSCROLL_EDGE) {
-        container.scrollTop -= ROW_PICKER_AUTOSCROLL_SPEED;
-      } else if (rowPickerLastMouseY > rect.bottom - ROW_PICKER_AUTOSCROLL_EDGE) {
-        container.scrollTop += ROW_PICKER_AUTOSCROLL_SPEED;
-      }
-    });
+    if (rowPickerLastMouseY < ROW_PICKER_AUTOSCROLL_EDGE) {
+      window.scrollBy(0, -ROW_PICKER_AUTOSCROLL_SPEED);
+    } else if (rowPickerLastMouseY > window.innerHeight - ROW_PICKER_AUTOSCROLL_EDGE) {
+      window.scrollBy(0, ROW_PICKER_AUTOSCROLL_SPEED);
+    }
     rowPickerAutoScrollRAF = requestAnimationFrame(rowPickerAutoScrollTick);
   }
 
@@ -2230,10 +2227,13 @@
     });
   }
 
-  function openRowPickerModal(mode, cfgId, workerIdx) {
+  function openCustomAssignView(mode, cfgId, workerIdx) {
     rowPickerMode = mode;
     rowPickerTargetCfgId = cfgId || null;
     rowPickerTargetWorkerIdx = (typeof workerIdx === "number") ? workerIdx : null;
+    // 취소/닫기 시 어느 화면으로 돌아갈지 — 홈에서 진입("create")했으면 홈으로,
+    // 할당 결과 화면의 "행 추가"("append")로 진입했으면 할당 화면으로.
+    rowPickerReturnView = mode === "append" ? "assign" : "home";
     rowPickerSelectedRows = [];
     rowPickerMarkedIds = new Set();
     rowPickerFilters = {};
@@ -2242,15 +2242,12 @@
     els.rowPickerConfirmBtn.textContent = mode === "append" ? "추가" : "확정";
     els.rowPickerDateSelect.value = "";
     els.rowPickerSearchInput.value = "";
-    renderRowPickerDateSelect();
-    renderRowPickerAvailableList();
-    renderRowPickerSelectedList();
-    openModalWithTransition(els.rowPickerModal, els.rowPickerModalBox);
+    switchView("custom");
   }
 
-  function closeRowPickerModal() {
-    closeModalWithTransition(els.rowPickerModal, els.rowPickerModalBox);
+  function closeCustomAssignView() {
     rowPickerSelectedRows = [];
+    switchView(rowPickerReturnView);
   }
 
   function confirmRowPicker() {
@@ -2269,7 +2266,7 @@
       state.assignActiveId = id;
       state.assignActiveWorkerIdx = null;
       saveAssignState();
-      closeRowPickerModal();
+      rowPickerSelectedRows = [];
       switchView("assign");
       renderAssignTabs();
       if (window.showToast) window.showToast("커스텀 할당이 생성되었습니다.");
@@ -2283,8 +2280,8 @@
         targetGroup.push.apply(targetGroup, rowPickerSelectedRows);
         saveAssignState();
       }
-      closeRowPickerModal();
-      renderAssignPanel();
+      rowPickerSelectedRows = [];
+      switchView("assign");
       if (window.showToast) window.showToast("선택한 행이 추가되었습니다.");
     }
   }
@@ -2405,7 +2402,7 @@
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-add-row-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        openRowPickerModal("append", cfg.id, workerIdx);
+        openCustomAssignView("append", cfg.id, workerIdx);
       });
     });
 
@@ -2833,6 +2830,11 @@
     if (!els.assignView.classList.contains("hidden")) {
       renderAssignPanel();
     }
+    if (!els.customAssignView.classList.contains("hidden")) {
+      renderRowPickerDateSelect();
+      renderRowPickerAvailableList();
+      renderRowPickerSelectedList();
+    }
   }
 
   // --- Event wiring ---
@@ -2932,12 +2934,12 @@
     if (window.showToast) window.showToast("집품 할당이 모두 삭제되었습니다.");
   });
 
-  els.assignCustomBtn.addEventListener("click", function () { openRowPickerModal("create"); });
+  els.assignCustomBtn.addEventListener("click", function () { openCustomAssignView("create"); });
   els.rowPickerDateSelect.addEventListener("change", renderRowPickerAvailableList);
   els.rowPickerSearchInput.addEventListener("input", renderRowPickerAvailableList);
   els.rowPickerConfirmBtn.addEventListener("click", confirmRowPicker);
-  els.rowPickerCancelBtn.addEventListener("click", closeRowPickerModal);
-  els.rowPickerCloseBtn.addEventListener("click", closeRowPickerModal);
+  els.rowPickerCancelBtn.addEventListener("click", closeCustomAssignView);
+  els.rowPickerCloseBtn.addEventListener("click", closeCustomAssignView);
   els.rowPickerDeleteAllBtn.addEventListener("click", async function () {
     if (!rowPickerSelectedRows.length) return;
     if (!(await window.confirmModal("선택된 행을 모두 삭제할까요?"))) return;
