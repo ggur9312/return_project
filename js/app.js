@@ -154,6 +154,7 @@
     rowPickerSortRulesContainer: document.getElementById("rowPickerSortRulesContainer"),
     rowPickerSortAddBtn: document.getElementById("rowPickerSortAddBtn"),
     rowPickerSortResetBtn: document.getElementById("rowPickerSortResetBtn"),
+    rowPickerSortZoneOPriorityBtn: document.getElementById("rowPickerSortZoneOPriorityBtn"),
     rowPickerAvailableList: document.getElementById("rowPickerAvailableList"),
     rowPickerSelectedList: document.getElementById("rowPickerSelectedList"),
     rowPickerSelectedCount: document.getElementById("rowPickerSelectedCount"),
@@ -2045,13 +2046,18 @@
     updateRowPickerDragGhost();
   }
 
-  // 드래그 중임을 알기 쉽게 커서를 따라다니며 이동 건수를 보여주는 배지
+  // 드래그 중임을 알기 쉽게 커서를 따라다니며 이동 건수 + 수량 합계를 보여주는 배지
   function updateRowPickerDragGhost() {
     if (!rowPickerDragSelecting || !rowPickerMarkedIds.size) {
       els.rowPickerDragGhost.classList.add("hidden");
       return;
     }
-    els.rowPickerDragGhost.textContent = rowPickerMarkedIds.size + "행 이동 중";
+    var qty = 0;
+    rowPickerMarkedIds.forEach(function (id) {
+      var row = state.rows.find(function (r) { return r.id === id; });
+      if (row) qty += row.quantity || 0;
+    });
+    els.rowPickerDragGhost.textContent = rowPickerMarkedIds.size + "행 이동 중 · " + qty.toLocaleString("ko-KR") + "개";
     els.rowPickerDragGhost.classList.remove("hidden");
   }
 
@@ -2749,6 +2755,13 @@
   els.sortZoneOPriorityBtn.addEventListener("click", function () {
     state.zoneOPriority = true;
     refreshAll();
+    state.zoneOPriority = false;
+    if (window.showToast) window.showToast("72·73층 O존 우선 정렬이 적용되었습니다.");
+  });
+
+  els.rowPickerSortZoneOPriorityBtn.addEventListener("click", function () {
+    state.zoneOPriority = true;
+    renderRowPickerAvailableList();
     state.zoneOPriority = false;
     if (window.showToast) window.showToast("72·73층 O존 우선 정렬이 적용되었습니다.");
   });
