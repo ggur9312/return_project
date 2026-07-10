@@ -266,6 +266,7 @@
           <button id="gtPrintBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">GT 출력</button>
           <button id="customLabelBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">커스텀 라벨 출력</button>
           <button id="labelMarginSettingsBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">라벨 여백 설정</button>
+          <button id="assignCalcOpenBtn" type="button" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">계산기</button>
         </div>
         <span class="text-sm text-slate-500">사용 가능 GT: <span id="gtAvailableCount" class="font-bold text-indigo-600">0</span>건</span>
       </div>
@@ -328,7 +329,7 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>
     </div>
-    <div class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+    <div id="rowPickerModalBody" class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
       <div class="flex items-end gap-3 flex-wrap">
         <label class="text-sm text-slate-600 flex flex-col gap-1">생성일자
           <select id="rowPickerDateSelect" class="w-40 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
@@ -507,38 +508,6 @@
             </div>
         </div>
     </header>
-
-    <div id="calcWidget" class="hidden print:hidden fixed bottom-6 right-6 z-[150] w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden opacity-0 scale-95">
-        <div id="calcDragHandle" class="px-4 py-2.5 bg-slate-800 text-white flex items-center justify-between cursor-move select-none">
-            <span class="text-sm font-semibold">계산기</span>
-            <button id="calcCloseBtn" type="button" class="text-slate-300 hover:text-white">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-        </div>
-        <div class="p-3 space-y-2">
-            <div id="calcDisplay" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 text-right text-2xl font-mono tabular-nums overflow-x-auto whitespace-nowrap">0</div>
-            <div class="grid grid-cols-4 gap-1.5 text-sm font-semibold">
-                <button type="button" data-calc="clear" class="col-span-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg py-2.5">C</button>
-                <button type="button" data-calc="backspace" class="bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg py-2.5">←</button>
-                <button type="button" data-calc="op" data-op="/" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg py-2.5">÷</button>
-                <button type="button" data-calc="digit" data-digit="7" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">7</button>
-                <button type="button" data-calc="digit" data-digit="8" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">8</button>
-                <button type="button" data-calc="digit" data-digit="9" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">9</button>
-                <button type="button" data-calc="op" data-op="*" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg py-2.5">×</button>
-                <button type="button" data-calc="digit" data-digit="4" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">4</button>
-                <button type="button" data-calc="digit" data-digit="5" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">5</button>
-                <button type="button" data-calc="digit" data-digit="6" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">6</button>
-                <button type="button" data-calc="op" data-op="-" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg py-2.5">−</button>
-                <button type="button" data-calc="digit" data-digit="1" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">1</button>
-                <button type="button" data-calc="digit" data-digit="2" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">2</button>
-                <button type="button" data-calc="digit" data-digit="3" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">3</button>
-                <button type="button" data-calc="op" data-op="+" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg py-2.5">+</button>
-                <button type="button" data-calc="digit" data-digit="0" class="col-span-2 bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">0</button>
-                <button type="button" data-calc="decimal" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">.</button>
-                <button type="button" data-calc="equals" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2.5">=</button>
-            </div>
-        </div>
-    </div>
 
     <div class="print:hidden flex-1 max-w-[1600px] w-full mx-auto flex gap-6 px-4 sm:px-6 lg:px-8 py-8">
 
@@ -804,6 +773,44 @@
     <div id="truckPrintArea" class="hidden print:block">
     </div>
 
+</div>
+
+<div id="homeSelectionBar" class="hidden print:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-3 bg-indigo-600 text-white rounded-full shadow-2xl px-5 py-2.5">
+  <span id="homeSelectionSummary" class="text-sm font-semibold"></span>
+  <button id="homeSelectionClearBtn" type="button" class="text-xs font-medium bg-white/20 hover:bg-white/30 rounded-full px-3 py-1 transition-colors">선택 해제</button>
+</div>
+
+<div id="calcWidget" class="hidden print:hidden fixed bottom-6 right-6 z-[150] w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden opacity-0 scale-95">
+    <div id="calcDragHandle" class="px-4 py-2.5 bg-slate-800 text-white flex items-center justify-between cursor-move select-none">
+        <span class="text-sm font-semibold">계산기</span>
+        <button id="calcCloseBtn" type="button" class="text-slate-300 hover:text-white">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+    </div>
+    <div class="p-3 space-y-2">
+        <div id="calcPendingLabel" class="text-xs text-slate-400 text-right h-4"></div>
+        <div id="calcDisplay" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 text-right text-2xl font-mono tabular-nums overflow-x-auto whitespace-nowrap">0</div>
+        <div class="grid grid-cols-4 gap-1.5 text-sm font-semibold">
+            <button type="button" data-calc="clear" class="col-span-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg py-2.5">C</button>
+            <button type="button" data-calc="backspace" class="bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg py-2.5">←</button>
+            <button type="button" data-calc="op" data-op="/" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg py-2.5">÷</button>
+            <button type="button" data-calc="digit" data-digit="7" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">7</button>
+            <button type="button" data-calc="digit" data-digit="8" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">8</button>
+            <button type="button" data-calc="digit" data-digit="9" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">9</button>
+            <button type="button" data-calc="op" data-op="*" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg py-2.5">×</button>
+            <button type="button" data-calc="digit" data-digit="4" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">4</button>
+            <button type="button" data-calc="digit" data-digit="5" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">5</button>
+            <button type="button" data-calc="digit" data-digit="6" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">6</button>
+            <button type="button" data-calc="op" data-op="-" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg py-2.5">−</button>
+            <button type="button" data-calc="digit" data-digit="1" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">1</button>
+            <button type="button" data-calc="digit" data-digit="2" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">2</button>
+            <button type="button" data-calc="digit" data-digit="3" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">3</button>
+            <button type="button" data-calc="op" data-op="+" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg py-2.5">+</button>
+            <button type="button" data-calc="digit" data-digit="0" class="col-span-2 bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">0</button>
+            <button type="button" data-calc="decimal" class="bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-lg py-2.5">.</button>
+            <button type="button" data-calc="equals" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-2.5">=</button>
+        </div>
+    </div>
 </div>
 
 <div id="uiConfirmModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-[300] items-center justify-center p-4 opacity-0 transition-opacity duration-200">

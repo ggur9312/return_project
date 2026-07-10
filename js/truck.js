@@ -70,8 +70,16 @@ applyTruckUploadCollapsed(localStorage.getItem(TRUCK_UPLOAD_COLLAPSED_KEY) === '
    ================================================================ */
 let calcState = { display: '0', prevValue: null, operator: null, waitingForOperand: false };
 
+const CALC_OP_SYMBOLS = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+
 function calcUpdateDisplay() {
     document.getElementById('calcDisplay').textContent = calcState.display;
+    const pendingEl = document.getElementById('calcPendingLabel');
+    if (pendingEl) {
+        pendingEl.textContent = (calcState.operator && calcState.prevValue !== null)
+            ? (calcState.prevValue + ' ' + (CALC_OP_SYMBOLS[calcState.operator] || calcState.operator))
+            : '';
+    }
 }
 
 function calcInputDigit(d) {
@@ -127,10 +135,10 @@ function calcInputOperator(nextOp) {
         const result = calcRound(calcCompute(calcState.prevValue, inputValue, calcState.operator));
         calcState.display = String(result);
         calcState.prevValue = result;
-        calcUpdateDisplay();
     }
     calcState.waitingForOperand = true;
     calcState.operator = nextOp;
+    calcUpdateDisplay();
 }
 
 function calcEquals() {
@@ -147,15 +155,19 @@ function calcEquals() {
 
 const calcWidget = document.getElementById('calcWidget');
 const calcOpenBtn = document.getElementById('calcOpenBtn');
+const assignCalcOpenBtn = document.getElementById('assignCalcOpenBtn');
 const calcCloseBtn = document.getElementById('calcCloseBtn');
 const calcDragHandle = document.getElementById('calcDragHandle');
 
-calcOpenBtn.addEventListener('click', () => {
+function calcOpenWidget() {
     calcWidget.classList.remove('hidden');
     requestAnimationFrame(() => {
         calcWidget.classList.remove('opacity-0', 'scale-95');
     });
-});
+}
+
+calcOpenBtn.addEventListener('click', calcOpenWidget);
+if (assignCalcOpenBtn) assignCalcOpenBtn.addEventListener('click', calcOpenWidget);
 
 calcCloseBtn.addEventListener('click', () => {
     calcWidget.classList.add('opacity-0', 'scale-95');

@@ -99,6 +99,9 @@
     floorUnfilteredQty: document.getElementById("floorUnfilteredQty"),
     floorPerPersonQty: document.getElementById("floorPerPersonQty"),
     filterQtySummary: document.getElementById("filterQtySummary"),
+    homeSelectionBar: document.getElementById("homeSelectionBar"),
+    homeSelectionSummary: document.getElementById("homeSelectionSummary"),
+    homeSelectionClearBtn: document.getElementById("homeSelectionClearBtn"),
     floorBars: document.getElementById("floorBars"),
     floorPanelToggleBtn: document.getElementById("floorPanelToggleBtn"),
     floorPanelToggleLabel: document.getElementById("floorPanelToggleLabel"),
@@ -158,6 +161,7 @@
     rowPickerSortAddBtn: document.getElementById("rowPickerSortAddBtn"),
     rowPickerSortResetBtn: document.getElementById("rowPickerSortResetBtn"),
     rowPickerSortZoneOPriorityBtn: document.getElementById("rowPickerSortZoneOPriorityBtn"),
+    rowPickerModalBody: document.getElementById("rowPickerModalBody"),
     rowPickerAvailableList: document.getElementById("rowPickerAvailableList"),
     rowPickerSelectedList: document.getElementById("rowPickerSelectedList"),
     rowPickerSelectedCount: document.getElementById("rowPickerSelectedCount"),
@@ -928,8 +932,8 @@
 
   function renderFilterQtySummary(filteredRows, unfilteredRows) {
     els.filterQtySummary.textContent =
-      "필터 적용 수량: " + sumQty(filteredRows).toLocaleString("ko-KR") + "개 · " +
-      "전체 수량: " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
+      "필터 적용: " + filteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(filteredRows).toLocaleString("ko-KR") + "개 · " +
+      "전체: " + unfilteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
   }
 
   function renderFloorPanel(rows, unfilteredRows) {
@@ -1643,19 +1647,29 @@
       return groups;
     }
 
-    var qtys = items.map(function (it) { return it.qty; });
-    var lo = Math.max.apply(null, qtys);
-    var hi = qtys.reduce(function (a, b) { return a + b; }, 0);
+    // 장수(행 1개)당 "평균 수량"을 1행의 기준 비용으로 잡아 수량과 장수를 같은
+    // 단위로 환산한 결합 점수로 밸런싱 — 수량이 큰 존을 담당하면 자연히 장수가
+    // 줄고, 수량이 작은 존을 담당하면 장수가 늘어나는 방향으로 균형이 잡혀서,
+    // 수량만 많고 장수는 적은/그 반대인 불공평한 배분을 방지한다.
+    var totalQty = items.reduce(function (s, it) { return s + it.qty; }, 0);
+    var totalRows = items.reduce(function (s, it) { return s + (it.rows ? it.rows.length : 0); }, 0);
+    var unitQtyPerRow = totalRows ? totalQty / totalRows : 0;
+    var scores = items.map(function (it) {
+      return it.qty + (it.rows ? it.rows.length : 0) * unitQtyPerRow;
+    });
+
+    var lo = Math.max.apply(null, scores);
+    var hi = scores.reduce(function (a, b) { return a + b; }, 0);
 
     function groupsNeeded(limit) {
       var count = 1;
       var sum = 0;
-      for (var i = 0; i < qtys.length; i++) {
-        if (sum + qtys[i] > limit) {
+      for (var i = 0; i < scores.length; i++) {
+        if (sum + scores[i] > limit) {
           count++;
-          sum = qtys[i];
+          sum = scores[i];
         } else {
-          sum += qtys[i];
+          sum += scores[i];
         }
       }
       return count;
@@ -1670,13 +1684,13 @@
     var current = [];
     var currentSum = 0;
     for (var i = 0; i < items.length; i++) {
-      if (currentSum + items[i].qty > lo && current.length) {
+      if (currentSum + scores[i] > lo && current.length) {
         result.push(current);
         current = [];
         currentSum = 0;
       }
       current.push(items[i]);
-      currentSum += items[i].qty;
+      currentSum += scores[i];
     }
     if (current.length) result.push(current);
 
@@ -1881,6 +1895,8 @@
   var rowPickerMarkedIds = new Set();
   var rowPickerDragAnchorId = null; // 드래그 셀렉트 시작 행 id(mousedown 시점)
   var rowPickerDragSelecting = false;
+  var rowPickerAutoScrollRAF = null;
+  var rowPickerLastMouseY = 0;
   // 홈 화면의 state.filters/state.sortRules와는 독립적인, 모달 전용 필터/정렬 상태
   var rowPickerFilters = {};
   var rowPickerSortRules = [];
@@ -1904,10 +1920,11 @@
   function getRowPickerScopedRows() {
     var dateVal = els.rowPickerDateSelect.value;
     var term = trim(els.rowPickerSearchInput.value).toLowerCase();
-    var assignedIds = getAssignedRowIdSet();
+    // 이미 다른 assignConfig에 배정된 행은 목록에서 완전히 숨기지 않고 남겨둔 뒤
+    // buildRowPickerTable에서 "이미 할당됨" 표시로 구분한다(선택된 행 후보에서만 제외).
     var selectedIds = new Set(rowPickerSelectedRows.map(function (r) { return r.id; }));
     return state.rows.filter(function (r) {
-      if (assignedIds.has(r.id) || selectedIds.has(r.id)) return false;
+      if (selectedIds.has(r.id)) return false;
       if (dateVal && getCreatedDate(r) !== dateVal) return false;
       if (term) {
         var hay = (String(r.groupNo) + " " + String(r.company) + " " + String(r.zone)).toLowerCase();
@@ -1978,23 +1995,28 @@
     onApply: function () { renderRowPickerAvailableList(); }
   });
 
-  function buildRowPickerTable(rows, btnClass, btnLabel, btnClickAttr, draggableSelect) {
+  function buildRowPickerTable(rows, btnClass, btnLabel, btnClickAttr, draggableSelect, assignedIds) {
     if (!rows.length) {
       return '<div class="px-4 py-6 text-center text-xs text-slate-400">해당하는 행이 없습니다.</div>';
     }
     var bodyHtml = rows.map(function (r) {
       var marked = draggableSelect && rowPickerMarkedIds.has(r.id);
+      var alreadyAssigned = !!(assignedIds && assignedIds.has(r.id));
+      var rowClasses = "row-picker-row border-b border-slate-100 last:border-b-0 transition-colors" +
+        (alreadyAssigned ? " bg-amber-50/70 opacity-60 pointer-events-none" : (draggableSelect ? " cursor-move select-none hover:bg-slate-50/80" : " hover:bg-slate-50/80")) +
+        (marked ? " bg-indigo-50" : "");
+      var badge = alreadyAssigned ? ' <span class="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-100 align-middle">이미 할당됨</span>' : "";
       return (
-        '<tr class="row-picker-row border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80 transition-colors' + (draggableSelect ? " cursor-move select-none" : "") + (marked ? " bg-indigo-50" : "") + '"' +
-        ' data-row-id="' + escapeHtml(r.id) + '">' +
-        '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + "</td>" +
+        '<tr class="' + rowClasses + '"' +
+        ' data-row-id="' + escapeHtml(r.id) + '"' + (alreadyAssigned ? ' data-assigned="1"' : "") + '>' +
+        '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + badge + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r.deadline)) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(getCreatedDate(r)) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.company) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.transportType) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r.zone) + "</td>" +
         '<td class="px-3 py-1.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>" +
-        '<td class="px-3 py-1.5 text-right"><button type="button" class="' + btnClass + ' ' + btnClickAttr + ' text-xs font-medium px-2.5 py-1 rounded-md transition-colors" data-row-id="' + escapeHtml(r.id) + '">' + btnLabel + "</button></td>" +
+        '<td class="px-3 py-1.5 text-right"><button type="button" class="' + btnClass + ' ' + btnClickAttr + ' text-xs font-medium px-2.5 py-1 rounded-md transition-colors" data-row-id="' + escapeHtml(r.id) + '"' + (alreadyAssigned ? " disabled" : "") + '>' + btnLabel + "</button></td>" +
         "</tr>"
       );
     }).join("");
@@ -2017,7 +2039,7 @@
   function renderRowPickerAvailableList() {
     rowPickerFilterBarController.updateButtonStates();
     rowPickerSortBarController.render();
-    els.rowPickerAvailableList.innerHTML = buildRowPickerTable(getRowPickerAvailableRows(), "row-picker-add-btn bg-indigo-600 hover:bg-indigo-700 text-white", "추가", "", true);
+    els.rowPickerAvailableList.innerHTML = buildRowPickerTable(getRowPickerAvailableRows(), "row-picker-add-btn bg-indigo-600 hover:bg-indigo-700 text-white", "추가", "", true, getAssignedRowIdSet());
     Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-add-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var row = state.rows.find(function (r) { return r.id === btn.dataset.rowId; });
@@ -2104,11 +2126,42 @@
   // 시작하지 못함) 순수 mouse 이벤트만으로 "범위 선택 + 드롭까지" 한 번의
   // 제스처로 처리한다: mousedown(시작) → mousemove(같은 목록 안이면 범위 갱신,
   // "선택된 행" 위로 올라가면 드롭 표시) → mouseup("선택된 행" 위에서 떼면 이동).
+  // 드래그 중 마킹된 행이 화면 밖(스크롤 영역 아래/위)에 있어도 마우스를 가장자리
+  // 근처로 가져가면 자동으로 스크롤되도록 함 — 모달 목록 자체(rowPickerAvailableList)와
+  // 모달 본문(rowPickerModalBody) 두 스크롤 영역 모두에 적용.
+  var ROW_PICKER_AUTOSCROLL_EDGE = 30;
+  var ROW_PICKER_AUTOSCROLL_SPEED = 12;
+
+  function rowPickerAutoScrollTick() {
+    if (!rowPickerDragSelecting) {
+      rowPickerAutoScrollRAF = null;
+      return;
+    }
+    [els.rowPickerAvailableList, els.rowPickerModalBody].forEach(function (container) {
+      if (!container) return;
+      var rect = container.getBoundingClientRect();
+      if (rowPickerLastMouseY < rect.top || rowPickerLastMouseY > rect.bottom) return;
+      if (rowPickerLastMouseY < rect.top + ROW_PICKER_AUTOSCROLL_EDGE) {
+        container.scrollTop -= ROW_PICKER_AUTOSCROLL_SPEED;
+      } else if (rowPickerLastMouseY > rect.bottom - ROW_PICKER_AUTOSCROLL_EDGE) {
+        container.scrollTop += ROW_PICKER_AUTOSCROLL_SPEED;
+      }
+    });
+    rowPickerAutoScrollRAF = requestAnimationFrame(rowPickerAutoScrollTick);
+  }
+
+  function startRowPickerAutoScroll() {
+    if (rowPickerAutoScrollRAF === null) {
+      rowPickerAutoScrollRAF = requestAnimationFrame(rowPickerAutoScrollTick);
+    }
+  }
+
   function setupRowPickerDragAndDrop() {
     els.rowPickerAvailableList.addEventListener("mousedown", function (e) {
       if (e.target.closest("button")) return;
       var tr = e.target.closest(".row-picker-row");
       if (!tr) return;
+      if (tr.dataset.assigned === "1") return;
       e.preventDefault();
       var id = tr.dataset.rowId;
 
@@ -2126,9 +2179,11 @@
       }
 
       rowPickerDragSelecting = true;
-      // 이미 여러 행이 마킹된 상태에서 그 중 하나를 다시 잡으면 기존 범위를
-      // 유지한 채 이동 준비만 하고, 아니면 새로 이 행부터 범위를 시작한다.
-      if (rowPickerMarkedIds.has(id) && rowPickerMarkedIds.size > 1) {
+      // 이미 여러 행이 마킹된 상태라면, 이번에 누른 행이 그 마킹의 멤버가 아니어도
+      // (스크롤 등으로 인한 오차 클릭 포함) 기존 마킹 전체를 유지한 채 이동 준비만
+      // 한다 — 그렇지 않으면 아래 else 분기가 마킹을 방금 누른 행 1개로 덮어써버려
+      // "여러 개 선택했는데 드래그하면 1개만 옮겨지는" 문제가 생긴다.
+      if (rowPickerMarkedIds.size > 1) {
         rowPickerDragAnchorId = null;
         Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (rowEl) {
           rowEl.classList.toggle("opacity-70", rowPickerMarkedIds.has(rowEl.dataset.rowId));
@@ -2139,11 +2194,14 @@
       }
       updateRowPickerDragGhost();
       positionRowPickerDragGhost(e.clientX, e.clientY);
+      rowPickerLastMouseY = e.clientY;
+      startRowPickerAutoScroll();
     });
 
     document.addEventListener("mousemove", function (e) {
       if (!rowPickerDragSelecting) return;
       positionRowPickerDragGhost(e.clientX, e.clientY);
+      rowPickerLastMouseY = e.clientY;
       var el = document.elementFromPoint(e.clientX, e.clientY);
       var overSelectedList = !!(el && els.rowPickerSelectedList.contains(el));
       els.rowPickerSelectedList.classList.toggle("ring-2", overSelectedList);
@@ -2267,10 +2325,12 @@
       if (activeWorkerIdx !== null && activeWorkerIdx !== idx) return "";
       var total = detailRows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
       var zoneList = Array.from(new Set(detailRows.map(function (r) { return r.zone; }).filter(Boolean))).join(", ");
+      var isPrinted = !!(cfg.printedWorkerIdx && cfg.printedWorkerIdx[idx]);
       return (
         '<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">' +
         '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">' +
         '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) +
+        (isPrinted ? ' <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 align-middle">✓ 출력됨</span>' : "") +
         (zoneList ? '<span class="ml-2 text-xs font-normal text-slate-500">담당 존: ' + escapeHtml(zoneList) + "</span>" : "") + "</div>" +
         '<div class="flex items-center gap-3">' +
         '<div class="text-sm font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + detailRows.length + "장</div>" +
@@ -2322,6 +2382,10 @@
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
         printWorkerLabels(cfg, groups[workerIdx]);
         resetGtForWorker(cfg, groups[workerIdx]);
+        cfg.printedWorkerIdx = cfg.printedWorkerIdx || [];
+        cfg.printedWorkerIdx[workerIdx] = true;
+        saveAssignState();
+        renderAssignPanel();
       });
     });
 
@@ -2616,6 +2680,13 @@
     renderAssignTabs();
   }
 
+  // 홈 테이블 드래그 범위선택 + Ctrl/Cmd+클릭 비연속선택 — 이동/드롭 대상은 없고
+  // "몇 행 · 몇 개 선택했는지" 실시간 요약 표시 용도. 커스텀 할당 모달의
+  // rowPickerMarkedIds/setupRowPickerDragAndDrop과 동일한 패턴을 이식.
+  var homeMarkedIds = new Set();
+  var homeDragAnchorId = null;
+  var homeDragSelecting = false;
+
   function renderTable(rows) {
     if (!rows.length) {
       els.table.classList.add("hidden");
@@ -2629,8 +2700,9 @@
     var tdBase = "px-4 py-2.5 whitespace-nowrap";
 
     els.tableBody.innerHTML = rows.map(function (r) {
+      var marked = homeMarkedIds.has(r.id);
       return (
-        '<tr class="hover:bg-slate-50/80 transition-colors">' +
+        '<tr class="home-table-row select-none hover:bg-slate-50/80 transition-colors' + (marked ? " bg-indigo-50" : "") + '" data-row-id="' + escapeHtml(r.id) + '">' +
         COLUMNS.map(function (col) {
           if (col.key === "status") {
             var cls = state.statusBadgeMap[r.status] || "";
@@ -2656,6 +2728,88 @@
     }).join("");
   }
 
+  function applyHomeMarkRange(anchorId, currentId) {
+    var rows = getSortedRows(getFilteredRows());
+    var anchorIdx = getRowIndexInRows(rows, anchorId);
+    var currentIdx = getRowIndexInRows(rows, currentId);
+    if (anchorIdx === -1 || currentIdx === -1) return;
+    var lo = Math.min(anchorIdx, currentIdx);
+    var hi = Math.max(anchorIdx, currentIdx);
+    homeMarkedIds = new Set();
+    for (var i = lo; i <= hi; i++) homeMarkedIds.add(rows[i].id);
+    Array.prototype.forEach.call(els.tableBody.querySelectorAll(".home-table-row"), function (tr) {
+      tr.classList.toggle("bg-indigo-50", homeMarkedIds.has(tr.dataset.rowId));
+    });
+    updateHomeSelectionSummary();
+  }
+
+  function updateHomeSelectionSummary() {
+    if (!homeMarkedIds.size) {
+      els.homeSelectionBar.classList.add("hidden");
+      return;
+    }
+    var qty = 0;
+    homeMarkedIds.forEach(function (id) {
+      var row = state.rows.find(function (r) { return r.id === id; });
+      if (row) qty += row.quantity || 0;
+    });
+    els.homeSelectionSummary.textContent = "선택 " + homeMarkedIds.size.toLocaleString("ko-KR") + "행 · " + qty.toLocaleString("ko-KR") + "개";
+    els.homeSelectionBar.classList.remove("hidden");
+  }
+
+  function clearHomeSelection() {
+    homeMarkedIds = new Set();
+    Array.prototype.forEach.call(els.tableBody.querySelectorAll(".home-table-row"), function (tr) {
+      tr.classList.remove("bg-indigo-50");
+    });
+    updateHomeSelectionSummary();
+  }
+
+  // 커스텀 할당 모달의 setupRowPickerDragAndDrop과 동일한 패턴 — 다만 옮길 대상이
+  // 없으므로 mousedown/mousemove로 마킹만 갱신하고 mouseup은 드래그 종료만 처리.
+  function setupHomeRowSelection() {
+    els.tableBody.addEventListener("mousedown", function (e) {
+      if (e.target.closest("button")) return;
+      var tr = e.target.closest(".home-table-row");
+      if (!tr) return;
+      e.preventDefault();
+      var id = tr.dataset.rowId;
+
+      if (e.ctrlKey || e.metaKey) {
+        if (homeMarkedIds.has(id)) {
+          homeMarkedIds.delete(id);
+        } else {
+          homeMarkedIds.add(id);
+        }
+        tr.classList.toggle("bg-indigo-50", homeMarkedIds.has(id));
+        updateHomeSelectionSummary();
+        return;
+      }
+
+      homeDragSelecting = true;
+      if (homeMarkedIds.size > 1) {
+        homeDragAnchorId = null;
+      } else {
+        homeDragAnchorId = id;
+        applyHomeMarkRange(id, id);
+      }
+    });
+
+    document.addEventListener("mousemove", function (e) {
+      if (!homeDragSelecting || homeDragAnchorId === null) return;
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var tr = el && el.closest(".home-table-row");
+      if (!tr || !els.tableBody.contains(tr)) return;
+      applyHomeMarkRange(homeDragAnchorId, tr.dataset.rowId);
+    });
+
+    document.addEventListener("mouseup", function () {
+      if (!homeDragSelecting) return;
+      homeDragSelecting = false;
+      homeDragAnchorId = null;
+    });
+  }
+
   function refreshAll() {
     // 보이지 않는 화면까지 매번 통째로 다시 그리는 낭비를 막기 위해, 현재
     // 화면(hidden 클래스 여부)에 맞는 렌더링만 실행 — switchView()가 두
@@ -2668,7 +2822,9 @@
       renderDateTabs();
       renderFloorPanel(filtered, unfiltered);
       renderFilterQtySummary(filtered, unfiltered);
+      homeMarkedIds = new Set();
       renderTable(sorted);
+      updateHomeSelectionSummary();
       updateSortHeaderClasses();
       homeFilterBarController.updateButtonStates();
       homeSortBarController.render();
@@ -2789,6 +2945,8 @@
     renderRowPickerAvailableList();
     renderRowPickerSelectedList();
   });
+
+  els.homeSelectionClearBtn.addEventListener("click", clearHomeSelection);
 
   // 체크박스가 아니라 1회성 버튼 — 누른 순간에만 O존 우선 정렬을 적용하고,
   // 이후 다른 조작으로 인한 재렌더링에는 영향을 주지 않도록 곧바로 플래그를 되돌린다.
@@ -2996,6 +3154,7 @@
   homeFilterBarController.setup();
   rowPickerFilterBarController.setup();
   setupRowPickerDragAndDrop();
+  setupHomeRowSelection();
   loadFromStorage();
   loadDateTabState();
   loadAssignState();
