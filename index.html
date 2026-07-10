@@ -112,7 +112,13 @@
         <p class="text-xs text-slate-500 font-medium">엑셀 업로드·붙여넣기 기반 집품 데이터 대시보드</p>
       </div>
     </div>
-    <button id="resetBtn" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">데이터 초기화</button>
+    <div class="flex items-center gap-2">
+      <button id="resetBtn" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">데이터 초기화</button>
+      <button id="pickCalcOpenBtn" type="button" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m-6 4h6m-6 4h2m3 0h1m-8-9h10a1 1 0 011 1v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6a1 1 0 011-1z"></path></svg>
+        <span>계산기</span>
+      </button>
+    </div>
   </div>
 </header>
 
@@ -243,6 +249,7 @@
           <th data-key="zone" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">존</span></th>
           <th data-key="quantity" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">수량</span></th>
           <th data-key="groupCompanyTotal" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap bg-indigo-50/50"><span class="th-label">업체 총수량</span></th>
+          <th class="px-3 py-3 w-12"></th>
         </tr>
       </thead>
       <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
@@ -266,7 +273,6 @@
           <button id="gtPrintBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">GT 출력</button>
           <button id="customLabelBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">커스텀 라벨 출력</button>
           <button id="labelMarginSettingsBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">라벨 여백 설정</button>
-          <button id="assignCalcOpenBtn" type="button" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">계산기</button>
         </div>
         <span class="text-sm text-slate-500">사용 가능 GT: <span id="gtAvailableCount" class="font-bold text-indigo-600">0</span>건</span>
       </div>
@@ -498,14 +504,14 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <button id="calcOpenBtn" type="button" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m-6 4h6m-6 4h2m3 0h1m-8-9h10a1 1 0 011 1v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6a1 1 0 011-1z"></path></svg>
-                    <span>계산기</span>
-                </button>
                 <div id="activeFileInfo" class="hidden text-sm bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 font-medium max-w-xs truncate flex items-center space-x-1.5">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span id="fileNameDisplay">데이터 로드됨</span>
                 </div>
+                <button id="calcOpenBtn" type="button" class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m-6 4h6m-6 4h2m3 0h1m-8-9h10a1 1 0 011 1v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6a1 1 0 011-1z"></path></svg>
+                    <span>계산기</span>
+                </button>
             </div>
         </div>
     </header>
@@ -778,6 +784,7 @@
 
 <div id="homeSelectionBar" class="hidden print:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-3 bg-indigo-600 text-white rounded-full shadow-2xl px-5 py-2.5">
   <span id="homeSelectionSummary" class="text-sm font-semibold"></span>
+  <button id="homeSelectionAssignBtn" type="button" class="text-xs font-medium bg-white text-indigo-600 hover:bg-indigo-50 rounded-full px-3 py-1 transition-colors">할당</button>
   <button id="homeSelectionClearBtn" type="button" class="text-xs font-medium bg-white/20 hover:bg-white/30 rounded-full px-3 py-1 transition-colors">선택 해제</button>
 </div>
 

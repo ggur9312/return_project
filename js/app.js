@@ -101,6 +101,7 @@
     filterQtySummary: document.getElementById("filterQtySummary"),
     homeSelectionBar: document.getElementById("homeSelectionBar"),
     homeSelectionSummary: document.getElementById("homeSelectionSummary"),
+    homeSelectionAssignBtn: document.getElementById("homeSelectionAssignBtn"),
     homeSelectionClearBtn: document.getElementById("homeSelectionClearBtn"),
     floorBars: document.getElementById("floorBars"),
     floorPanelToggleBtn: document.getElementById("floorPanelToggleBtn"),
@@ -1081,6 +1082,10 @@
 
   function switchView(view) {
     if (window.flashPageLoading) window.flashPageLoading();
+    // 홈 화면의 드래그/Ctrl 선택 상태는 홈 화면에서만 유효해야 하므로, 다른
+    // 화면으로 이동할 때는 항상 명시적으로 해제한다(refreshAll()의 암묵적
+    // 초기화는 홈이 보일 때만 실행되어 이 경우를 놓친다).
+    if (view !== "home") clearHomeSelection();
     els.homeView.classList.toggle("hidden", view !== "home");
     els.assignView.classList.toggle("hidden", view !== "assign");
     els.customAssignView.classList.toggle("hidden", view !== "custom");
@@ -1365,16 +1370,11 @@
 
   // innerHTML 갱신 직후 곧바로 print()를 호출하면 브라우저가 레이아웃을 아직
   // 반영하지 않아 이전 인쇄 내용이 나올 수 있음 — 두 번의 rAF로 페인트를 기다린 뒤 인쇄
-  function triggerPrint() {
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        window.print();
-        if (window.showToast) window.showToast("출력이 완료되었습니다.");
-      });
-    });
+  function triggerPrint(onConfirmed) {
+    window.printWithConfirm(onConfirmed);
   }
 
-  function printWorkerLabels(cfg, detailRows) {
+  function printWorkerLabels(cfg, detailRows, onConfirmed) {
     if (!detailRows.length) return;
     var labelsHtml = detailRows.map(function (r) {
       var gtKey = cfg.id + ":" + r.id;
@@ -1386,13 +1386,13 @@
 
     els.printArea.innerHTML = labelsHtml;
     renderLabelBarcodes(els.printArea, LABEL_BARCODE_OPTS);
-    triggerPrint();
+    triggerPrint(onConfirmed);
   }
 
   // 집품 할당과 무관하게 GT 바코드 자체만 담긴 라벨을 인쇄. 최근 붙여넣은
   // 순서부터(역순) 요청한 수량만큼 뽑아 인쇄하며, 인쇄된 코드는 gtPrintBtn
   // 핸들러에서 state.gtPrinted로 소진 처리되어 재사용/중복 인쇄가 불가능해짐.
-  function printGtLabels(codes) {
+  function printGtLabels(codes, onConfirmed) {
     if (!codes.length) return;
     // 빈 문자열을 그대로 넘기면 브라우저가 그 줄의 줄박스를 아예 생략해버려
     // (내용이 있는 다른 라벨보다) 위 3줄이 낮아지고 바코드 행이 더 커져버린다.
@@ -1405,7 +1405,7 @@
 
     els.printArea.innerHTML = labelsHtml;
     renderLabelBarcodes(els.printArea, LABEL_BARCODE_OPTS);
-    triggerPrint();
+    triggerPrint(onConfirmed);
   }
 
   // 데이터와 무관하게 사용자가 직접 값을 입력해 라벨을 발행. 자동매칭이면 장마다
@@ -1424,13 +1424,14 @@
     els.printArea.innerHTML = labelsHtml;
     renderLabelBarcodes(els.printArea, LABEL_BARCODE_OPTS);
 
-    if (useAutoMatch && autoCodes.length) {
-      autoCodes.forEach(function (c) { state.gtPrinted.push(c); });
-      saveGtState();
-      renderGtAvailableList();
-    }
-
-    triggerPrint();
+    // GT 소모는 출력을 실제로 확인받은 뒤에만 반영(취소 시 소모하지 않음).
+    triggerPrint(function () {
+      if (useAutoMatch && autoCodes.length) {
+        autoCodes.forEach(function (c) { state.gtPrinted.push(c); });
+        saveGtState();
+        renderGtAvailableList();
+      }
+    });
   }
 
   // 업로드된 전체 데이터(날짜탭과 무관)에서 업체명 목록을 뽑아 검색어로 필터링 —
@@ -1543,13 +1544,14 @@
     els.printArea.innerHTML = labelsHtml;
     renderLabelBarcodes(els.printArea, LABEL_BARCODE_OPTS);
 
-    if (usedCodes.length) {
-      usedCodes.forEach(function (c) { state.gtPrinted.push(c); });
-      saveGtState();
-      renderGtAvailableList();
-    }
-
-    triggerPrint();
+    // GT 소모는 출력을 실제로 확인받은 뒤에만 반영(취소 시 소모하지 않음).
+    triggerPrint(function () {
+      if (usedCodes.length) {
+        usedCodes.forEach(function (c) { state.gtPrinted.push(c); });
+        saveGtState();
+        renderGtAvailableList();
+      }
+    });
   }
 
   var pendingSparePrintRows = null;
@@ -1655,9 +1657,10 @@
     var totalQty = items.reduce(function (s, it) { return s + it.qty; }, 0);
     var totalRows = items.reduce(function (s, it) { return s + (it.rows ? it.rows.length : 0); }, 0);
     var unitQtyPerRow = totalRows ? totalQty / totalRows : 0;
-    var scores = items.map(function (it) {
+    function itemScore(it) {
       return it.qty + (it.rows ? it.rows.length : 0) * unitQtyPerRow;
-    });
+    }
+    var scores = items.map(itemScore);
 
     var lo = Math.max.apply(null, scores);
     var hi = scores.reduce(function (a, b) { return a + b; }, 0);
@@ -1713,24 +1716,81 @@
       result.splice(splitIdx, 1, group.slice(0, half), group.slice(half));
     }
     while (result.length < n) result.push([]);
+
+    // 위 이진탐색 분할은 "그룹 최대 합"만 억제할 뿐 그룹 간 편차(최대-최소)를
+    // 직접 줄이지는 않아 유독 작은 그룹이 남을 수 있다 — 인접 그룹 경계의
+    // 아이템을 한쪽씩 옮겨보며 편차가 줄어드는 이동만 반복 적용(작업자 담당
+    // 구역의 인접성은 그대로 유지한 채 편차만 추가로 최소화).
+    rebalanceContiguousGroups(result, itemScore);
     return result;
   }
 
+  function rebalanceContiguousGroups(groups, scoreOf) {
+    var sums = groups.map(function (g) {
+      return g.reduce(function (s, it) { return s + scoreOf(it); }, 0);
+    });
+    function spreadOf(arr) {
+      return Math.max.apply(null, arr) - Math.min.apply(null, arr);
+    }
+    var changed = true;
+    var guard = 0;
+    while (changed && guard < 1000) {
+      changed = false;
+      guard++;
+      for (var i = 0; i < groups.length - 1; i++) {
+        var base = spreadOf(sums);
+
+        // 왼쪽 그룹의 마지막 아이템을 오른쪽으로
+        if (groups[i].length > 1) {
+          var s1 = scoreOf(groups[i][groups[i].length - 1]);
+          var trial1 = sums.slice();
+          trial1[i] -= s1;
+          trial1[i + 1] += s1;
+          if (spreadOf(trial1) < base) {
+            groups[i + 1].unshift(groups[i].pop());
+            sums = trial1;
+            changed = true;
+            continue;
+          }
+        }
+
+        // 오른쪽 그룹의 첫 아이템을 왼쪽으로
+        if (groups[i + 1].length > 1) {
+          var s2 = scoreOf(groups[i + 1][0]);
+          var trial2 = sums.slice();
+          trial2[i] += s2;
+          trial2[i + 1] -= s2;
+          if (spreadOf(trial2) < base) {
+            groups[i].push(groups[i + 1].shift());
+            sums = trial2;
+            changed = true;
+          }
+        }
+      }
+    }
+    return groups;
+  }
+
   function getAssignZoneItems(floorInput, selectedDates) {
-    var rows = getAssignBaseRows();
+    // 화면에 표시되는 정렬(state.sortRules)을 그대로 반영해야 사용자가 고른
+    // 정렬 순서대로 존이 묶여 할당된다 — 정렬을 무시한 채 항상 존 이름
+    // 알파벳/숫자순으로 강제 정렬하던 이전 방식은 화면 정렬과 어긋나는 버그였다.
+    var rows = getSortedRows(getAssignBaseRows());
     var byZone = {};
+    var zoneOrder = [];
     rows.forEach(function (r) {
       if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
       var floorCode = getFloor(r.zone);
       if (floorCode.indexOf(floorInput) !== 0) return;
       var zone = r.zone || "(미지정)";
-      if (!byZone[zone]) byZone[zone] = { qty: 0, rows: [] };
+      if (!byZone[zone]) {
+        byZone[zone] = { qty: 0, rows: [] };
+        zoneOrder.push(zone);
+      }
       byZone[zone].qty += (r.quantity || 0);
       byZone[zone].rows.push(r);
     });
-    return Object.keys(byZone)
-      .sort(function (a, b) { return a.localeCompare(b, "ko", { numeric: true }); })
-      .map(function (z) { return { zone: z, qty: byZone[z].qty, rows: byZone[z].rows }; });
+    return zoneOrder.map(function (z) { return { zone: z, qty: byZone[z].qty, rows: byZone[z].rows }; });
   }
 
   // 존 개수가 인원수보다 적을 때, 행이 가장 많은 존을 절반씩 쪼개 아이템 수를
@@ -1897,6 +1957,9 @@
   var rowPickerMarkedIds = new Set();
   var rowPickerDragAnchorId = null; // 드래그 셀렉트 시작 행 id(mousedown 시점)
   var rowPickerDragSelecting = false;
+  var rowPickerDragAdditive = false; // true = Ctrl/Cmd+드래그 (기존 선택에 합침/뺌)
+  var rowPickerDragAdditiveMode = "add"; // "add" | "remove" — 드래그 시작 행이 이미 선택돼 있었는지로 결정
+  var rowPickerDragBaseIds = null; // 드래그 시작 전 선택 스냅샷(추가모드 기준값)
   var rowPickerAutoScrollRAF = null;
   var rowPickerLastMouseY = 0;
   // 홈 화면의 state.filters/state.sortRules와는 독립적인, 이 화면 전용 필터/정렬 상태
@@ -2086,8 +2149,19 @@
     if (anchorIdx === -1 || currentIdx === -1) return;
     var lo = Math.min(anchorIdx, currentIdx);
     var hi = Math.max(anchorIdx, currentIdx);
-    rowPickerMarkedIds = new Set();
-    for (var i = lo; i <= hi; i++) rowPickerMarkedIds.add(rows[i].id);
+    var rangeIds = [];
+    for (var i = lo; i <= hi; i++) rangeIds.push(rows[i].id);
+
+    if (rowPickerDragAdditive && rowPickerDragBaseIds) {
+      rowPickerMarkedIds = new Set(rowPickerDragBaseIds);
+      rangeIds.forEach(function (id) {
+        if (rowPickerDragAdditiveMode === "remove") rowPickerMarkedIds.delete(id);
+        else rowPickerMarkedIds.add(id);
+      });
+    } else {
+      rowPickerMarkedIds = new Set(rangeIds);
+    }
+
     Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (tr) {
       var marked = rowPickerMarkedIds.has(tr.dataset.rowId);
       tr.classList.toggle("bg-indigo-50", marked);
@@ -2162,20 +2236,26 @@
       e.preventDefault();
       var id = tr.dataset.rowId;
 
-      // Ctrl/Cmd+클릭: 범위선택 드래그를 시작하지 않고 이 행 하나만 마킹 토글 —
-      // 이렇게 모은 비연속(띄엄띄엄) 마킹도 이후 일반 클릭+드래그로 그대로 옮길 수 있다
-      // (바로 아래 "이미 여러 행이 마킹된 상태" 분기가 연속/비연속을 가리지 않기 때문).
+      // Ctrl/Cmd+클릭(드래그 없이 뗌): 이 행 하나만 마킹 토글.
+      // Ctrl/Cmd+드래그: 시작 행이 이미 선택돼 있었으면 드래그로 스치는 범위를
+      // 기존 선택에서 빼고, 아니었으면 더한다(합집합/차집합) — 비연속 다중선택 유지.
       if (e.ctrlKey || e.metaKey) {
-        if (rowPickerMarkedIds.has(id)) {
-          rowPickerMarkedIds.delete(id);
-        } else {
-          rowPickerMarkedIds.add(id);
-        }
-        tr.classList.toggle("bg-indigo-50", rowPickerMarkedIds.has(id));
+        rowPickerDragSelecting = true;
+        rowPickerDragAdditive = true;
+        rowPickerDragAdditiveMode = rowPickerMarkedIds.has(id) ? "remove" : "add";
+        rowPickerDragBaseIds = new Set(rowPickerMarkedIds);
+        rowPickerDragAnchorId = id;
+        applyRowPickerMarkRange(id, id);
+        updateRowPickerDragGhost();
+        positionRowPickerDragGhost(e.clientX, e.clientY);
+        rowPickerLastMouseY = e.clientY;
+        startRowPickerAutoScroll();
         return;
       }
 
       rowPickerDragSelecting = true;
+      rowPickerDragAdditive = false;
+      rowPickerDragBaseIds = null;
       // 이미 여러 행이 마킹된 상태라면, 이번에 누른 행이 그 마킹의 멤버가 아니어도
       // (스크롤 등으로 인한 오차 클릭 포함) 기존 마킹 전체를 유지한 채 이동 준비만
       // 한다 — 그렇지 않으면 아래 else 분기가 마킹을 방금 누른 행 1개로 덮어써버려
@@ -2213,6 +2293,8 @@
       if (!rowPickerDragSelecting) return;
       rowPickerDragSelecting = false;
       rowPickerDragAnchorId = null;
+      rowPickerDragAdditive = false;
+      rowPickerDragBaseIds = null;
       els.rowPickerSelectedList.classList.remove("ring-2", "ring-indigo-400");
       clearRowPickerDragVisuals();
       var el = document.elementFromPoint(e.clientX, e.clientY);
@@ -2377,12 +2459,13 @@
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-print-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        printWorkerLabels(cfg, groups[workerIdx]);
-        resetGtForWorker(cfg, groups[workerIdx]);
-        cfg.printedWorkerIdx = cfg.printedWorkerIdx || [];
-        cfg.printedWorkerIdx[workerIdx] = true;
-        saveAssignState();
-        renderAssignPanel();
+        printWorkerLabels(cfg, groups[workerIdx], function () {
+          resetGtForWorker(cfg, groups[workerIdx]);
+          cfg.printedWorkerIdx = cfg.printedWorkerIdx || [];
+          cfg.printedWorkerIdx[workerIdx] = true;
+          saveAssignState();
+          renderAssignPanel();
+        });
       });
     });
 
@@ -2683,6 +2766,10 @@
   var homeMarkedIds = new Set();
   var homeDragAnchorId = null;
   var homeDragSelecting = false;
+  var homeDragAdditive = false; // true = Ctrl/Cmd+드래그 (기존 선택에 합침/뺌)
+  var homeDragAdditiveMode = "add"; // "add" | "remove" — 드래그 시작 행이 이미 선택돼 있었는지로 결정
+  var homeDragBaseIds = null; // 드래그 시작 전 선택 스냅샷(추가모드 기준값)
+  var homeDragRowOrder = null; // 드래그 시작 시점에 실제 렌더링된 행 id 순서 스냅샷
 
   function renderTable(rows) {
     if (!rows.length) {
@@ -2720,20 +2807,48 @@
           return '<td class="' + tdBase + ' text-slate-700">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
         '<td class="' + tdBase + ' text-right tabular-nums font-bold text-indigo-600 bg-indigo-50/30">' + Number(r.groupCompanyTotal || 0).toLocaleString("ko-KR") + "</td>" +
+        '<td class="px-3 py-2.5 text-center"><button type="button" class="home-row-delete-btn text-slate-300 hover:text-rose-500" title="삭제" data-row-id="' + escapeHtml(r.id) + '"><svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>' +
         "</tr>"
       );
     }).join("");
   }
 
+  function deleteHomeRow(id) {
+    state.rows = state.rows.filter(function (r) { return r.id !== id; });
+    homeMarkedIds.delete(id);
+    saveToStorage();
+    refreshAll();
+    if (window.showToast) window.showToast("행이 삭제되었습니다.");
+  }
+
+  // 드래그 도중 필터/정렬을 다시 계산하면 화면에 실제로 그려진 행 순서와
+  // 어긋날 수 있어(그러면 anchor~current 범위가 의도보다 훨씬 넓어져 "전체
+  // 선택"처럼 보이는 버그로 이어짐) DOM에 그려진 순서를 그대로 스냅샷으로 쓴다.
+  function snapshotHomeRowOrder() {
+    return Array.prototype.map.call(els.tableBody.querySelectorAll(".home-table-row"), function (tr) {
+      return tr.dataset.rowId;
+    });
+  }
+
   function applyHomeMarkRange(anchorId, currentId) {
-    var rows = getSortedRows(getFilteredRows());
-    var anchorIdx = getRowIndexInRows(rows, anchorId);
-    var currentIdx = getRowIndexInRows(rows, currentId);
+    var rows = homeDragRowOrder || snapshotHomeRowOrder();
+    var anchorIdx = rows.indexOf(anchorId);
+    var currentIdx = rows.indexOf(currentId);
     if (anchorIdx === -1 || currentIdx === -1) return;
     var lo = Math.min(anchorIdx, currentIdx);
     var hi = Math.max(anchorIdx, currentIdx);
-    homeMarkedIds = new Set();
-    for (var i = lo; i <= hi; i++) homeMarkedIds.add(rows[i].id);
+    var rangeIds = rows.slice(lo, hi + 1);
+
+    if (homeDragAdditive && homeDragBaseIds) {
+      homeMarkedIds = new Set(homeDragBaseIds);
+      rangeIds.forEach(function (id) {
+        if (homeDragAdditiveMode === "remove") homeMarkedIds.delete(id);
+        else homeMarkedIds.add(id);
+      });
+    } else {
+      homeMarkedIds = new Set(rangeIds);
+    }
+
     Array.prototype.forEach.call(els.tableBody.querySelectorAll(".home-table-row"), function (tr) {
       tr.classList.toggle("bg-indigo-50", homeMarkedIds.has(tr.dataset.rowId));
     });
@@ -2765,25 +2880,34 @@
   // 커스텀 할당 모달의 setupRowPickerDragAndDrop과 동일한 패턴 — 다만 옮길 대상이
   // 없으므로 mousedown/mousemove로 마킹만 갱신하고 mouseup은 드래그 종료만 처리.
   function setupHomeRowSelection() {
+    els.tableBody.addEventListener("click", function (e) {
+      var btn = e.target.closest(".home-row-delete-btn");
+      if (!btn) return;
+      deleteHomeRow(btn.dataset.rowId);
+    });
+
     els.tableBody.addEventListener("mousedown", function (e) {
       if (e.target.closest("button")) return;
       var tr = e.target.closest(".home-table-row");
       if (!tr) return;
       e.preventDefault();
       var id = tr.dataset.rowId;
+      homeDragRowOrder = snapshotHomeRowOrder();
+      homeDragSelecting = true;
 
       if (e.ctrlKey || e.metaKey) {
-        if (homeMarkedIds.has(id)) {
-          homeMarkedIds.delete(id);
-        } else {
-          homeMarkedIds.add(id);
-        }
-        tr.classList.toggle("bg-indigo-50", homeMarkedIds.has(id));
-        updateHomeSelectionSummary();
+        // Ctrl/Cmd+드래그: 시작 행이 이미 선택돼 있었으면 드래그 범위를
+        // 기존 선택에서 빼고, 아니었으면 더한다(합집합/차집합).
+        homeDragAdditive = true;
+        homeDragAdditiveMode = homeMarkedIds.has(id) ? "remove" : "add";
+        homeDragBaseIds = new Set(homeMarkedIds);
+        homeDragAnchorId = id;
+        applyHomeMarkRange(id, id);
         return;
       }
 
-      homeDragSelecting = true;
+      homeDragAdditive = false;
+      homeDragBaseIds = null;
       if (homeMarkedIds.size > 1) {
         homeDragAnchorId = null;
       } else {
@@ -2804,6 +2928,9 @@
       if (!homeDragSelecting) return;
       homeDragSelecting = false;
       homeDragAnchorId = null;
+      homeDragAdditive = false;
+      homeDragBaseIds = null;
+      homeDragRowOrder = null;
     });
   }
 
@@ -2948,6 +3075,16 @@
     renderRowPickerSelectedList();
   });
 
+  els.homeSelectionAssignBtn.addEventListener("click", function () {
+    if (!homeMarkedIds.size) return;
+    var selectedRows = state.rows.filter(function (r) { return homeMarkedIds.has(r.id); });
+    clearHomeSelection();
+    openCustomAssignView("create");
+    rowPickerSelectedRows = selectedRows;
+    renderRowPickerAvailableList();
+    renderRowPickerSelectedList();
+  });
+
   els.homeSelectionClearBtn.addEventListener("click", clearHomeSelection);
 
   // 체크박스가 아니라 1회성 버튼 — 누른 순간에만 O존 우선 정렬을 적용하고,
@@ -3020,13 +3157,15 @@
     }
     qty = Math.min(qty, available.length);
     var codes = available.slice().reverse().slice(0, qty);
-    codes.forEach(function (c) { state.gtPrinted.push(c); });
-    saveGtState();
-    renderGtAvailableList();
     closeModalWithTransition(els.gtPrintModal, els.gtPrintModalBox);
     els.gtPrintQty.value = "";
     els.gtPrintModalMsg.textContent = "";
-    printGtLabels(codes);
+    // GT 소모는 출력을 실제로 확인받은 뒤에만 반영(취소 시 소모하지 않음).
+    printGtLabels(codes, function () {
+      codes.forEach(function (c) { state.gtPrinted.push(c); });
+      saveGtState();
+      renderGtAvailableList();
+    });
   });
 
   els.sparePrintThreshold.addEventListener("input", function () {
