@@ -94,6 +94,7 @@
     pasteApplyBtn: document.getElementById("pasteApplyBtn"),
     statusMsg: document.getElementById("statusMsg"),
     resetBtn: document.getElementById("resetBtn"),
+    pickActiveFileInfo: document.getElementById("pickActiveFileInfo"),
     laborInput: document.getElementById("laborInput"),
     floorTotalQty: document.getElementById("floorTotalQty"),
     floorUnfilteredQty: document.getElementById("floorUnfilteredQty"),
@@ -2304,26 +2305,32 @@
     switchView(rowPickerReturnView);
   }
 
+  // 선택한 행들을 단일 작업자짜리 커스텀 할당 config로 바로 생성 — 커스텀 할당
+  // 화면의 "확정"(create 모드)과 홈 선택바의 "할당" 버튼이 공유하는 로직.
+  function createCustomAssignment(rows) {
+    var dates = Array.from(new Set(rows.map(function (r) { return getCreatedDate(r); })));
+    var id = Date.now();
+    state.assignConfigs.push({
+      id: id,
+      floorInput: null,
+      custom: true,
+      count: 1,
+      workerGroups: [rows.slice()],
+      createdDates: dates
+    });
+    state.assignActiveId = id;
+    state.assignActiveWorkerIdx = null;
+    saveAssignState();
+    switchView("assign");
+    renderAssignTabs();
+    if (window.showToast) window.showToast("커스텀 할당이 생성되었습니다.");
+  }
+
   function confirmRowPicker() {
     if (!rowPickerSelectedRows.length) return;
     if (rowPickerMode === "create") {
-      var dates = Array.from(new Set(rowPickerSelectedRows.map(function (r) { return getCreatedDate(r); })));
-      var id = Date.now();
-      state.assignConfigs.push({
-        id: id,
-        floorInput: null,
-        custom: true,
-        count: 1,
-        workerGroups: [rowPickerSelectedRows.slice()],
-        createdDates: dates
-      });
-      state.assignActiveId = id;
-      state.assignActiveWorkerIdx = null;
-      saveAssignState();
+      createCustomAssignment(rowPickerSelectedRows);
       rowPickerSelectedRows = [];
-      switchView("assign");
-      renderAssignTabs();
-      if (window.showToast) window.showToast("커스텀 할당이 생성되었습니다.");
     } else if (rowPickerMode === "append") {
       var cfg = state.assignConfigs.find(function (c) { return c.id === rowPickerTargetCfgId; });
       if (cfg) {
@@ -2754,6 +2761,9 @@
     els.emptyState.classList.add("hidden");
 
     var tdBase = "px-4 py-2.5 whitespace-nowrap";
+    // 커스텀 할당(홈 선택바의 "할당" 버튼 포함)으로 이미 배정된 행은 상태 옆에
+    // "할당됨" 배지를 붙여준다 — 중복 할당을 막지는 않고 표시만 한다.
+    var assignedRowIds = getAssignedRowIdSet();
 
     els.tableBody.innerHTML = rows.map(function (r) {
       var marked = homeMarkedIds.has(r.id);
@@ -2762,7 +2772,10 @@
         COLUMNS.map(function (col) {
           if (col.key === "status") {
             var cls = state.statusBadgeMap[r.status] || "";
-            return '<td class="' + tdBase + '"><span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ' + cls + '">' + escapeHtml(r.status) + "</span></td>";
+            var assignedBadge = assignedRowIds.has(r.id)
+              ? ' <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">할당됨</span>'
+              : "";
+            return '<td class="' + tdBase + '"><span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ' + cls + '">' + escapeHtml(r.status) + "</span>" + assignedBadge + "</td>";
           }
           if (col.key === "groupNo") {
             return '<td class="' + tdBase + ' font-semibold text-slate-900">' + escapeHtml(r.groupNo) + "</td>";
@@ -2907,6 +2920,10 @@
   }
 
   function refreshAll() {
+    // 트럭현황의 #activeFileInfo와 동일하게, 데이터가 있으면 상단바에 "데이터
+    // 로드됨" 배지를 표시 — 화면 전환과 무관하게 항상 최신 상태를 반영해야 하므로
+    // 아래 화면별 분기와 달리 무조건 실행한다.
+    els.pickActiveFileInfo.classList.toggle("hidden", state.rows.length === 0);
     // 보이지 않는 화면까지 매번 통째로 다시 그리는 낭비를 막기 위해, 현재
     // 화면(hidden 클래스 여부)에 맞는 렌더링만 실행 — switchView()가 두
     // 화면의 hidden 클래스만 토글하므로 그 상태를 그대로 기준으로 삼는다.
@@ -3044,14 +3061,19 @@
     renderRowPickerSelectedList();
   });
 
-  els.homeSelectionAssignBtn.addEventListener("click", function () {
+  els.homeSelectionAssignBtn.addEventListener("click", async function () {
     if (!homeMarkedIds.size) return;
     var selectedRows = state.rows.filter(function (r) { return homeMarkedIds.has(r.id); });
+    var assignedIds = getAssignedRowIdSet();
+    var alreadyAssignedCount = selectedRows.filter(function (r) { return assignedIds.has(r.id); }).length;
+    if (alreadyAssignedCount > 0) {
+      var msg = alreadyAssignedCount === selectedRows.length
+        ? "선택한 행이 이미 할당되어 있습니다. 그래도 할당하시겠습니까?"
+        : "선택한 " + selectedRows.length + "행 중 " + alreadyAssignedCount + "건이 이미 할당되어 있습니다. 그래도 할당하시겠습니까?";
+      if (!(await window.confirmModal(msg))) return;
+    }
     clearHomeSelection();
-    openCustomAssignView("create");
-    rowPickerSelectedRows = selectedRows;
-    renderRowPickerAvailableList();
-    renderRowPickerSelectedList();
+    createCustomAssignment(selectedRows);
   });
 
   els.homeSelectionClearBtn.addEventListener("click", clearHomeSelection);

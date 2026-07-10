@@ -155,7 +155,6 @@ function calcEquals() {
 
 const calcWidget = document.getElementById('calcWidget');
 const calcOpenBtn = document.getElementById('calcOpenBtn');
-const pickCalcOpenBtn = document.getElementById('pickCalcOpenBtn');
 const calcCloseBtn = document.getElementById('calcCloseBtn');
 const calcDragHandle = document.getElementById('calcDragHandle');
 
@@ -167,7 +166,6 @@ function calcOpenWidget() {
 }
 
 if (calcOpenBtn) calcOpenBtn.addEventListener('click', calcOpenWidget);
-if (pickCalcOpenBtn) pickCalcOpenBtn.addEventListener('click', calcOpenWidget);
 
 calcCloseBtn.addEventListener('click', () => {
     calcWidget.classList.add('opacity-0', 'scale-95');
@@ -884,11 +882,11 @@ function executePrint() {
         }
     }
 
-    // Trigger Print — 브라우저 인쇄창은 취소 여부를 알 수 없으므로 창이 닫힌
-    // 뒤 printWithConfirm의 자체 확인모달로 실제 출력 여부를 재확인한다.
-    closePrintModal();
+    // Trigger Print
     setTimeout(() => {
-        window.printWithConfirm();
+        window.print();
+        closePrintModal();
+        showToast('출력이 완료되었습니다.');
     }, 300);
 }
 
