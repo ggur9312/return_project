@@ -460,16 +460,24 @@
     return values;
   }
 
-  function getPreFilteredRowsFrom(baseRows) {
-    return baseRows.filter(function (r) {
-      for (var i = 0; i < COLUMNS.length; i++) {
-        var col = COLUMNS[i];
-        var filterSet = state.filters[col.key];
+  // rows를 필터링하되 exceptKey 컬럼의 필터는 건너뛴다 — 그 컬럼 자신의 드롭다운
+  // 후보값을 "다른 필터가 전부 적용된 상태" 기준으로 계산하기 위함(엑셀 자동필터처럼
+  // 캐스케이딩: 다른 필터를 걸면 이 필터에는 이제 나올 수 없는 값이 안 보인다).
+  function filterRowsExceptKey(rows, columns, filters, exceptKey) {
+    return rows.filter(function (r) {
+      for (var i = 0; i < columns.length; i++) {
+        var col = columns[i];
+        if (col.key === exceptKey) continue;
+        var filterSet = filters[col.key];
         if (filterSet === null || filterSet === undefined) continue;
         if (!filterSet.has(String(r[col.key]))) return false;
       }
       return true;
     });
+  }
+
+  function getPreFilteredRowsFrom(baseRows) {
+    return filterRowsExceptKey(baseRows, COLUMNS, state.filters);
   }
 
   function computeGroupCompanyTotals(rows) {
@@ -481,17 +489,32 @@
     return map;
   }
 
-  // 헤더 필터 드롭다운의 후보값 목록: 원본 컬럼은 활성 날짜 탭 범위 전체 기준,
-  // 파생 컬럼(groupCompanyTotal)은 다른 9개 컬럼 필터만 적용한 중간 결과 기준
-  // (자기 자신의 필터와는 순환 참조되지 않도록)
+  // 헤더 필터 드롭다운의 후보값 목록 — 엑셀 자동필터처럼, key 자신의 필터를 뺀
+  // 나머지 모든 활성 필터(원본 9개 컬럼 + 파생 groupCompanyTotal 컬럼)를 반영해서
+  // 계산한다. 그래야 존 필터를 걸면 수량 필터 후보값이 그 존에 실제 존재하는
+  // 수량으로만 좁혀지는 식의 캐스케이딩이 된다.
   function getCandidateValues(key) {
+    var exceptRegular = filterRowsExceptKey(getDateScopedRows(), COLUMNS, state.filters, key);
+    var gcMap = computeGroupCompanyTotals(exceptRegular);
+    var withAgg = exceptRegular.map(function (r) {
+      var clone = Object.assign({}, r);
+      clone.groupCompanyTotal = gcMap[r.groupNo + "" + r.company];
+      return clone;
+    });
     if (key === AGG_COLUMN.key) {
-      var preFiltered = getPreFilteredRowsFrom(getDateScopedRows());
-      var gcMap = computeGroupCompanyTotals(preFiltered);
-      return uniqueValuesFrom(preFiltered, function (r) { return gcMap[r.groupNo + "" + r.company]; })
+      return uniqueValuesFrom(withAgg, function (r) { return r.groupCompanyTotal; })
         .sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
     }
-    return uniqueValues(key);
+    var aggFilterSet = state.filters[AGG_COLUMN.key];
+    var rowsForKey = (aggFilterSet === null || aggFilterSet === undefined)
+      ? withAgg
+      : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var values = uniqueValuesFrom(rowsForKey, function (r) { return r[key]; });
+    var col = COLUMNS.find(function (c) { return c.key === key; });
+    if (col && col.type === "number") {
+      values.sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
+    }
+    return values;
   }
 
   // 컬럼 필터 + 집계(groupCompanyTotal) 필터를 baseRows 위에 적용 — 홈 화면
@@ -1755,8 +1778,11 @@
     els.sparePrintPreview.textContent = "0";
   }
 
-  // 정렬된 존 목록(수량)을 n명에게 연속 구간으로, 가장 많이 배정된 사람의 합계를
-  // 최소화하는 방식으로 나눔("Split Array Largest Sum"과 동일한 이진 탐색 분할).
+  // 정렬된 아이템 목록(존 오름차순으로 정렬된 행 단위 아이템)을 n명에게 연속
+  // 구간으로, 가장 많이 배정된 사람의 합계를 최소화하는 방식으로 나눔
+  // ("Split Array Largest Sum"과 동일한 이진 탐색 분할). 아이템이 행 단위이므로
+  // 구간 경계가 존 중간에서 갈릴 수 있는데, 이는 인접한 두 사람 사이에서만
+  // 일어나고 전체 순서는 그대로 유지되므로 오름차순 동선은 깨지지 않는다.
   function splitBalanced(items, n) {
     if (!items.length) {
       var emptyGroups = [];
@@ -1890,59 +1916,21 @@
     return groups;
   }
 
-  function getAssignZoneItems(floorInput, selectedDates) {
-    // 화면에 표시되는 정렬(state.sortRules)을 그대로 반영해야 사용자가 고른
-    // 정렬 순서대로 존이 묶여 할당된다 — 정렬을 무시한 채 항상 존 이름
-    // 알파벳/숫자순으로 강제 정렬하던 이전 방식은 화면 정렬과 어긋나는 버그였다.
+  // 화면에 표시되는 정렬(state.sortRules, O존 우선 옵션 포함)을 그대로 반영해
+  // 정렬된 순서의 행 하나하나를 아이템 하나로 만든다 — 존 단위로 미리 묶지
+  // 않기 때문에 splitBalanced가 필요하면 같은 존도 인접한 두 사람 사이에서
+  // 나눠 배정할 수 있어(전체 순서는 그대로 유지되므로 오름차순 보장), 존 개수가
+  // 인원수 이하라도 수량 균형을 맞출 여지가 생긴다.
+  function getAssignRowItems(floorInput, selectedDates) {
     var rows = getSortedRows(getAssignBaseRows());
-    var byZone = {};
-    var zoneOrder = [];
+    var items = [];
     rows.forEach(function (r) {
       if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
       var floorCode = getFloor(r.zone);
       if (floorCode.indexOf(floorInput) !== 0) return;
-      var zone = r.zone || "(미지정)";
-      if (!byZone[zone]) {
-        byZone[zone] = { qty: 0, rows: [] };
-        zoneOrder.push(zone);
-      }
-      byZone[zone].qty += (r.quantity || 0);
-      byZone[zone].rows.push(r);
+      items.push({ zone: r.zone || "(미지정)", qty: (r.quantity || 0), rows: [r] });
     });
-    return zoneOrder.map(function (z) { return { zone: z, qty: byZone[z].qty, rows: byZone[z].rows }; });
-  }
-
-  // 존 개수가 인원수보다 적을 때, 행이 가장 많은 존을 절반씩 쪼개 아이템 수를
-  // 늘려서(같은 존이라도 별도 아이템으로) 인원수만큼 나눠 가질 여지를 만든다.
-  // 더 쪼갤 아이템(행 2개 이상)이 없으면 중단 — 데이터 자체가 인원수보다 적은
-  // 불가피한 경우.
-  function expandZoneItemsForCount(items, n) {
-    var result = items.map(function (it) {
-      return { zone: it.zone, qty: it.qty, rows: it.rows.slice() };
-    });
-    function sumQty(rows) {
-      return rows.reduce(function (s, r) { return s + (r.quantity || 0); }, 0);
-    }
-    while (result.length < n) {
-      var idx = -1;
-      var maxRows = 1;
-      for (var i = 0; i < result.length; i++) {
-        if (result[i].rows.length > maxRows) {
-          maxRows = result[i].rows.length;
-          idx = i;
-        }
-      }
-      if (idx === -1) break;
-      var item = result[idx];
-      var half = Math.ceil(item.rows.length / 2);
-      var rowsA = item.rows.slice(0, half);
-      var rowsB = item.rows.slice(half);
-      result.splice(idx, 1,
-        { zone: item.zone, qty: sumQty(rowsA), rows: rowsA },
-        { zone: item.zone, qty: sumQty(rowsB), rows: rowsB }
-      );
-    }
-    return result;
+    return items;
   }
 
   function renderAssignTabs() {
@@ -1999,7 +1987,7 @@
       var opts = "";
       for (var w = 0; w < groupCount; w++) {
         var selected = (String(c.id) === String(cfgId) && w === workerIdx) ? " selected" : "";
-        opts += '<option value="' + c.id + ':' + w + '"' + selected + '>작업자 ' + (w + 1) + "</option>";
+        opts += '<option value="' + c.id + ':' + w + '"' + selected + '>' + (c.custom ? "커스텀" : ("작업자 " + (w + 1))) + "</option>";
       }
       return '<optgroup label="' + escapeHtml(label) + '">' + opts + "</optgroup>";
     }).join("");
@@ -2126,8 +2114,11 @@
     return state.rows.filter(function (r) { return !selectedIds.has(r.id); });
   }
 
+  // key 자신의 필터를 뺀 나머지 필터를 반영해 후보값을 계산 — 엑셀 자동필터처럼
+  // 다른 컬럼에 필터가 걸려 있으면 이 컬럼 드롭다운도 그만큼 좁혀진다.
   function getRowPickerCandidateValues(key) {
-    var values = uniqueValuesFrom(getRowPickerScopedRows(), function (r) { return r[key]; });
+    var rows = filterRowsExceptKey(getRowPickerScopedRows(), ROW_PICKER_COLUMNS, rowPickerFilters, key);
+    var values = uniqueValuesFrom(rows, function (r) { return r[key]; });
     var col = ROW_PICKER_COLUMNS.find(function (c) { return c.key === key; });
     if (col && col.type === "number") {
       values.sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
@@ -2136,15 +2127,7 @@
   }
 
   function computeRowPickerFilteredRows(baseRows) {
-    return baseRows.filter(function (r) {
-      for (var i = 0; i < ROW_PICKER_COLUMNS.length; i++) {
-        var col = ROW_PICKER_COLUMNS[i];
-        var filterSet = rowPickerFilters[col.key];
-        if (filterSet === null || filterSet === undefined) continue;
-        if (!filterSet.has(String(r[col.key]))) return false;
-      }
-      return true;
-    });
+    return filterRowsExceptKey(baseRows, ROW_PICKER_COLUMNS, rowPickerFilters);
   }
 
   function getRowPickerSortedRows(rows) {
@@ -2193,7 +2176,7 @@
     if (!rows.length) {
       return '<div class="px-4 py-6 text-center text-xs text-slate-400">해당하는 행이 없습니다.</div>';
     }
-    var bodyHtml = rows.map(function (r) {
+    var bodyHtml = rows.map(function (r, i) {
       var marked = draggableSelect && rowPickerMarkedIds.has(r.id);
       var alreadyAssigned = !!(assignedIds && assignedIds.has(r.id));
       // 이미 다른 곳에 할당된 행이라도 여기서 다시 선택/드래그할 수 있어야 하므로
@@ -2207,6 +2190,7 @@
       return (
         '<tr class="' + rowClasses + '"' +
         ' data-row-id="' + escapeHtml(r.id) + '">' +
+        '<td class="px-3 py-1.5 text-center text-slate-400">' + (i + 1) + "</td>" +
         '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + badge + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r.deadline)) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(getCreatedDate(r)) + "</td>" +
@@ -2221,7 +2205,7 @@
     return (
       '<table class="w-full text-xs border-collapse">' +
       '<thead><tr class="bg-slate-50 text-slate-500 font-bold text-left sticky top-0">' +
-      '<th class="px-3 py-1.5">그룹번호</th><th class="px-3 py-1.5">마감일시</th><th class="px-3 py-1.5">생성일자</th><th class="px-3 py-1.5">업체명</th><th class="px-3 py-1.5">운송타입</th><th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5"></th>' +
+      '<th class="px-3 py-1.5 text-center w-10">번호</th><th class="px-3 py-1.5">그룹번호</th><th class="px-3 py-1.5">마감일시</th><th class="px-3 py-1.5">생성일자</th><th class="px-3 py-1.5">업체명</th><th class="px-3 py-1.5">운송타입</th><th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5"></th>' +
       "</tr></thead><tbody>" + bodyHtml + "</tbody></table>"
     );
   }
@@ -2572,13 +2556,7 @@
 
   function computeAssignWorkerFilteredRows(rows, cfgId, workerIdx) {
     var filters = getAssignWorkerFilters(cfgId, workerIdx);
-    return rows.filter(function (r) {
-      return ASSIGN_DETAIL_COLUMNS.every(function (col) {
-        var filterSet = filters[col.key];
-        if (filterSet === null || filterSet === undefined) return true;
-        return filterSet.has(String(r[col.key]));
-      });
-    });
+    return filterRowsExceptKey(rows, ASSIGN_DETAIL_COLUMNS, filters);
   }
 
   function getAssignWorkerSortedRows(rows, cfgId, workerIdx) {
@@ -2598,10 +2576,11 @@
     return copy;
   }
 
-  // 후보값은 다른 필터가 이미 적용된 rows가 아니라 작업자의 전체 행 기준으로
-  // 계산해야, 한 컬럼을 필터링해도 다른 컬럼의 드롭다운 목록이 줄어들지 않는다.
-  function getAssignWorkerCandidateValues(allWorkerRows, key) {
-    var values = uniqueValuesFrom(allWorkerRows, function (r) { return r[key]; });
+  // 엑셀 자동필터처럼 key 자신의 필터를 뺀 나머지 필터를 반영해 후보값을 계산한다
+  // — 다른 컬럼에 필터가 걸려 있으면 이 컬럼 드롭다운도 그만큼 좁혀진다.
+  function getAssignWorkerCandidateValues(allWorkerRows, filters, key) {
+    var rows = filterRowsExceptKey(allWorkerRows, ASSIGN_DETAIL_COLUMNS, filters, key);
+    var values = uniqueValuesFrom(rows, function (r) { return r[key]; });
     var col = ASSIGN_DETAIL_COLUMNS.find(function (c) { return c.key === key; });
     if (col && col.type === "number") {
       values.sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
@@ -2618,7 +2597,7 @@
 
     var filterBtnsHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
       var active = filters[col.key] !== null && filters[col.key] !== undefined;
-      var candidateValues = getAssignWorkerCandidateValues(allWorkerRows, col.key);
+      var candidateValues = getAssignWorkerCandidateValues(allWorkerRows, filters, col.key);
       var effectiveSet = filters[col.key] || new Set(candidateValues);
       var itemsHtml = candidateValues.map(function (v) {
         var checked = effectiveSet.has(v) ? " checked" : "";
@@ -2698,8 +2677,8 @@
       var zoneList = Array.from(new Set(detailRows.map(function (r) { return r.zone; }).filter(Boolean))).join(", ");
       var isPrinted = !!(cfg.printedWorkerIdx && cfg.printedWorkerIdx[idx]);
       return (
-        '<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">' +
-        '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">' +
+        '<div class="bg-white border border-slate-200 rounded-xl shadow-sm">' +
+        '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200 rounded-t-xl">' +
         '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) +
         (isPrinted ? ' <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 align-middle">✓ 출력됨</span>' : "") +
         (zoneList ? '<span class="ml-2 text-xs font-normal text-slate-500">담당 존: ' + escapeHtml(zoneList) + "</span>" : "") + "</div>" +
@@ -2854,7 +2833,7 @@
         var workerIdx = parseInt(cb.dataset.workerIdx, 10);
         var colKey = cb.dataset.colKey;
         var filters = getAssignWorkerFilters(cfg.id, workerIdx);
-        var allValues = getAssignWorkerCandidateValues(groups[workerIdx], colKey);
+        var allValues = getAssignWorkerCandidateValues(groups[workerIdx], filters, colKey);
         var set = filters[colKey] ? new Set(filters[colKey]) : new Set(allValues);
         if (cb.checked) set.add(cb.value); else set.delete(cb.value);
         filters[colKey] = set.size === allValues.length ? null : set;
@@ -2983,9 +2962,9 @@
       return;
     }
     // 미리보기 생성 시점의 존/행 데이터를 스냅샷으로 고정 — 이후 홈 화면 필터가 바뀌어도
-    // 확정된 배정은 유지됨(재조회하지 않음). 존 단위 균형 분배(splitBalanced) 결과를
+    // 확정된 배정은 유지됨(재조회하지 않음). 행 단위 균형 분배(splitBalanced) 결과를
     // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
-    var items = expandZoneItemsForCount(getAssignZoneItems(floorInput, selectedDates), count);
+    var items = getAssignRowItems(floorInput, selectedDates);
     var groups = splitBalanced(items, count);
     assignPreviewGroups = groups.map(function (g) {
       return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
