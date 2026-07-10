@@ -16,8 +16,8 @@
   var AGG_COLUMN = { key: "groupCompanyTotal", label: "업체 총수량", type: "number" };
   var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN]);
 
-  // 커스텀 할당 모달의 "사용 가능한 행" 테이블에 실제로 보이는 컬럼만 대상 —
-  // 생성일자는 이미 rowPickerDateSelect가 별도로 담당하므로 제외
+  // 커스텀 할당 화면의 "사용 가능한 행" 테이블에 실제로 보이는 컬럼만 대상 —
+  // 생성일자는 이 화면에서 별도로 필터링할 수 있는 컬럼이 아니라서 제외
   var ROW_PICKER_COLUMNS = ["groupNo", "deadline", "company", "transportType", "zone", "quantity"]
     .map(function (key) { return COLUMNS.find(function (c) { return c.key === key; }); });
 
@@ -133,6 +133,7 @@
     sortZoneOPriorityBtn: document.getElementById("sortZoneOPriorityBtn"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
+    navCustomBtn: document.getElementById("navCustomBtn"),
     mainNavAside: document.getElementById("mainNavAside"),
     homeView: document.getElementById("homeView"),
     assignView: document.getElementById("assignView"),
@@ -154,8 +155,6 @@
     assignDeleteAllBtn: document.getElementById("assignDeleteAllBtn"),
     assignCustomBtn: document.getElementById("assignCustomBtn"),
     rowPickerTitle: document.getElementById("rowPickerTitle"),
-    rowPickerDateSelect: document.getElementById("rowPickerDateSelect"),
-    rowPickerSearchInput: document.getElementById("rowPickerSearchInput"),
     rowPickerFilterButtonsContainer: document.getElementById("rowPickerFilterButtonsContainer"),
     rowPickerFilterResetAllBtn: document.getElementById("rowPickerFilterResetAllBtn"),
     rowPickerSortRulesContainer: document.getElementById("rowPickerSortRulesContainer"),
@@ -170,7 +169,6 @@
     rowPickerDragGhost: document.getElementById("rowPickerDragGhost"),
     rowPickerConfirmBtn: document.getElementById("rowPickerConfirmBtn"),
     rowPickerCancelBtn: document.getElementById("rowPickerCancelBtn"),
-    rowPickerCloseBtn: document.getElementById("rowPickerCloseBtn"),
     gtPasteArea: document.getElementById("gtPasteArea"),
     gtSaveBtn: document.getElementById("gtSaveBtn"),
     gtClearBtn: document.getElementById("gtClearBtn"),
@@ -1092,15 +1090,9 @@
     if (view === "home") els.homeView.classList.add("animate-fadeIn");
     if (view === "assign") els.assignView.classList.add("animate-fadeIn");
     if (view === "custom") els.customAssignView.classList.add("animate-fadeIn");
-    // 커스텀 할당 화면은 진행 중인 선택을 실수로 잃지 않도록(모달일 때 배경
-    // 클릭으로 못 닫던 것과 동일한 안전장치) 좌측 내비를 숨긴다. 홈/할당
-    // 내비 버튼 활성 스타일은 그 두 화면 사이를 오갈 때만 갱신하고, 커스텀
-    // 화면에서는 진입 직전 상태를 그대로 유지한다.
-    els.mainNavAside.classList.toggle("hidden", view === "custom");
-    if (view === "home" || view === "assign") {
-      els.navHomeBtn.className = view === "home" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
-      els.navAssignBtn.className = view === "assign" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
-    }
+    els.navHomeBtn.className = view === "home" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
+    els.navAssignBtn.className = view === "assign" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
+    els.navCustomBtn.className = view === "custom" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     // refreshAll()은 숨겨진 화면의 렌더링을 건너뛰므로, 방금 보이게 된 화면이
     // 숨겨져 있는 동안 놓쳤을 수 있는 갱신을 따라잡도록 전환 직후 한 번 그려준다.
     refreshAll();
@@ -1980,23 +1972,13 @@
     return ids;
   }
 
-  // 생성일자 선택 + 검색어 + 이미 배정/선택된 행 제외까지만 적용한, 컬럼 필터 이전 범위 —
+  // 이미 배정/선택된 행 제외까지만 적용한, 컬럼 필터 이전 범위 —
   // 필터 드롭다운의 후보값(getRowPickerCandidateValues)도 이 범위를 기준으로 계산
   function getRowPickerScopedRows() {
-    var dateVal = els.rowPickerDateSelect.value;
-    var term = trim(els.rowPickerSearchInput.value).toLowerCase();
     // 이미 다른 assignConfig에 배정된 행은 목록에서 완전히 숨기지 않고 남겨둔 뒤
     // buildRowPickerTable에서 "이미 할당됨" 표시로 구분한다(선택된 행 후보에서만 제외).
     var selectedIds = new Set(rowPickerSelectedRows.map(function (r) { return r.id; }));
-    return state.rows.filter(function (r) {
-      if (selectedIds.has(r.id)) return false;
-      if (dateVal && getCreatedDate(r) !== dateVal) return false;
-      if (term) {
-        var hay = (String(r.groupNo) + " " + String(r.company) + " " + String(r.zone)).toLowerCase();
-        if (hay.indexOf(term) === -1) return false;
-      }
-      return true;
-    });
+    return state.rows.filter(function (r) { return !selectedIds.has(r.id); });
   }
 
   function getRowPickerCandidateValues(key) {
@@ -2091,14 +2073,6 @@
       '<th class="px-3 py-1.5">그룹번호</th><th class="px-3 py-1.5">마감일시</th><th class="px-3 py-1.5">생성일자</th><th class="px-3 py-1.5">업체명</th><th class="px-3 py-1.5">운송타입</th><th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5"></th>' +
       "</tr></thead><tbody>" + bodyHtml + "</tbody></table>"
     );
-  }
-
-  function renderRowPickerDateSelect() {
-    var dates = getAllCreatedDates();
-    var current = els.rowPickerDateSelect.value;
-    els.rowPickerDateSelect.innerHTML = '<option value="">전체</option>' + dates.map(function (d) {
-      return '<option value="' + escapeHtml(d) + '"' + (d === current ? " selected" : "") + '>' + escapeHtml(d) + "</option>";
-    }).join("");
   }
 
   function renderRowPickerAvailableList() {
@@ -2322,8 +2296,6 @@
     rowPickerSortRules = [{ key: "zone", dir: 1 }];
     els.rowPickerTitle.textContent = mode === "append" ? "작업자 " + (workerIdx + 1) + "에게 행 추가" : "커스텀 할당 만들기";
     els.rowPickerConfirmBtn.textContent = mode === "append" ? "추가" : "확정";
-    els.rowPickerDateSelect.value = "";
-    els.rowPickerSearchInput.value = "";
     switchView("custom");
   }
 
@@ -2958,7 +2930,6 @@
       renderAssignPanel();
     }
     if (!els.customAssignView.classList.contains("hidden")) {
-      renderRowPickerDateSelect();
       renderRowPickerAvailableList();
       renderRowPickerSelectedList();
     }
@@ -3039,6 +3010,7 @@
 
   els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
   els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
+  els.navCustomBtn.addEventListener("click", function () { openCustomAssignView("create"); });
   els.assignOpenModalBtn.addEventListener("click", openAssignCreateModal);
   els.assignPreviewBtn.addEventListener("click", async function () {
     if (hasActiveFilter()) {
@@ -3062,11 +3034,8 @@
   });
 
   els.assignCustomBtn.addEventListener("click", function () { openCustomAssignView("create"); });
-  els.rowPickerDateSelect.addEventListener("change", renderRowPickerAvailableList);
-  els.rowPickerSearchInput.addEventListener("input", renderRowPickerAvailableList);
   els.rowPickerConfirmBtn.addEventListener("click", confirmRowPicker);
   els.rowPickerCancelBtn.addEventListener("click", closeCustomAssignView);
-  els.rowPickerCloseBtn.addEventListener("click", closeCustomAssignView);
   els.rowPickerDeleteAllBtn.addEventListener("click", async function () {
     if (!rowPickerSelectedRows.length) return;
     if (!(await window.confirmModal("선택된 행을 모두 삭제할까요?"))) return;
