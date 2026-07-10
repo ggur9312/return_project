@@ -460,16 +460,24 @@
     return values;
   }
 
-  function getPreFilteredRowsFrom(baseRows) {
-    return baseRows.filter(function (r) {
-      for (var i = 0; i < COLUMNS.length; i++) {
-        var col = COLUMNS[i];
-        var filterSet = state.filters[col.key];
+  // rows를 필터링하되 exceptKey 컬럼의 필터는 건너뛴다 — 그 컬럼 자신의 드롭다운
+  // 후보값을 "다른 필터가 전부 적용된 상태" 기준으로 계산하기 위함(엑셀 자동필터처럼
+  // 캐스케이딩: 다른 필터를 걸면 이 필터에는 이제 나올 수 없는 값이 안 보인다).
+  function filterRowsExceptKey(rows, columns, filters, exceptKey) {
+    return rows.filter(function (r) {
+      for (var i = 0; i < columns.length; i++) {
+        var col = columns[i];
+        if (col.key === exceptKey) continue;
+        var filterSet = filters[col.key];
         if (filterSet === null || filterSet === undefined) continue;
         if (!filterSet.has(String(r[col.key]))) return false;
       }
       return true;
     });
+  }
+
+  function getPreFilteredRowsFrom(baseRows) {
+    return filterRowsExceptKey(baseRows, COLUMNS, state.filters);
   }
 
   function computeGroupCompanyTotals(rows) {
@@ -481,17 +489,32 @@
     return map;
   }
 
-  // 헤더 필터 드롭다운의 후보값 목록: 원본 컬럼은 활성 날짜 탭 범위 전체 기준,
-  // 파생 컬럼(groupCompanyTotal)은 다른 9개 컬럼 필터만 적용한 중간 결과 기준
-  // (자기 자신의 필터와는 순환 참조되지 않도록)
+  // 헤더 필터 드롭다운의 후보값 목록 — 엑셀 자동필터처럼, key 자신의 필터를 뺀
+  // 나머지 모든 활성 필터(원본 9개 컬럼 + 파생 groupCompanyTotal 컬럼)를 반영해서
+  // 계산한다. 그래야 존 필터를 걸면 수량 필터 후보값이 그 존에 실제 존재하는
+  // 수량으로만 좁혀지는 식의 캐스케이딩이 된다.
   function getCandidateValues(key) {
+    var exceptRegular = filterRowsExceptKey(getDateScopedRows(), COLUMNS, state.filters, key);
+    var gcMap = computeGroupCompanyTotals(exceptRegular);
+    var withAgg = exceptRegular.map(function (r) {
+      var clone = Object.assign({}, r);
+      clone.groupCompanyTotal = gcMap[r.groupNo + "" + r.company];
+      return clone;
+    });
     if (key === AGG_COLUMN.key) {
-      var preFiltered = getPreFilteredRowsFrom(getDateScopedRows());
-      var gcMap = computeGroupCompanyTotals(preFiltered);
-      return uniqueValuesFrom(preFiltered, function (r) { return gcMap[r.groupNo + "" + r.company]; })
+      return uniqueValuesFrom(withAgg, function (r) { return r.groupCompanyTotal; })
         .sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
     }
-    return uniqueValues(key);
+    var aggFilterSet = state.filters[AGG_COLUMN.key];
+    var rowsForKey = (aggFilterSet === null || aggFilterSet === undefined)
+      ? withAgg
+      : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var values = uniqueValuesFrom(rowsForKey, function (r) { return r[key]; });
+    var col = COLUMNS.find(function (c) { return c.key === key; });
+    if (col && col.type === "number") {
+      values.sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
+    }
+    return values;
   }
 
   // 컬럼 필터 + 집계(groupCompanyTotal) 필터를 baseRows 위에 적용 — 홈 화면
@@ -891,6 +914,14 @@
     return sa.localeCompare(sb, "ko");
   }
 
+  // 이미 배정된 작업자/할당에 행을 추가·이동할 때 단순히 배열 끝에 push하면 존
+  // 순서가 흐트러지므로, 합친 뒤 배열 전체를 존 오름차순으로 다시 정렬한다.
+  // Array.prototype.sort는 안정 정렬이라 같은 존을 가진 기존 행들의 상대 순서는 유지된다.
+  function insertRowsSortedByZone(targetArray, rowsToInsert) {
+    targetArray.push.apply(targetArray, rowsToInsert);
+    targetArray.sort(function (a, b) { return compareZoneAscending(a.zone, b.zone); });
+  }
+
   // 72/73층(알파벳 제거한 층코드가 "7"로 시작)에서는 실제 동선상 O존을 가장 먼저
   // 지나가므로, zoneOPriority 버튼을 누르면 같은 층 안에서 O존(예: 72O, 73O)을
   // 그 층의 다른 존(72K, 72A 등)보다 앞으로 보낸다. 층이 다르면(72층 vs 73층 등)
@@ -1116,6 +1147,10 @@
     // 화면으로 이동할 때는 항상 명시적으로 해제한다(refreshAll()의 암묵적
     // 초기화는 홈이 보일 때만 실행되어 이 경우를 놓친다).
     if (view !== "home") clearHomeSelection();
+    // 커스텀 할당 화면(row-picker)의 마킹/선택 상태도 홈과 마찬가지로 그 화면에서만
+    // 유효해야 한다 — 좌측 네비 버튼은 closeCustomAssignView()를 거치지 않고 이
+    // 함수를 직접 호출하므로, 여기서 처리하지 않으면 선택이 다른 화면까지 남는다.
+    if (view !== "custom") clearRowPickerState();
     els.homeView.classList.toggle("hidden", view !== "home");
     els.assignView.classList.toggle("hidden", view !== "assign");
     els.customAssignView.classList.toggle("hidden", view !== "custom");
@@ -1743,8 +1778,11 @@
     els.sparePrintPreview.textContent = "0";
   }
 
-  // 정렬된 존 목록(수량)을 n명에게 연속 구간으로, 가장 많이 배정된 사람의 합계를
-  // 최소화하는 방식으로 나눔("Split Array Largest Sum"과 동일한 이진 탐색 분할).
+  // 정렬된 아이템 목록(존 오름차순으로 정렬된 행 단위 아이템)을 n명에게 연속
+  // 구간으로, 가장 많이 배정된 사람의 합계를 최소화하는 방식으로 나눔
+  // ("Split Array Largest Sum"과 동일한 이진 탐색 분할). 아이템이 행 단위이므로
+  // 구간 경계가 존 중간에서 갈릴 수 있는데, 이는 인접한 두 사람 사이에서만
+  // 일어나고 전체 순서는 그대로 유지되므로 오름차순 동선은 깨지지 않는다.
   function splitBalanced(items, n) {
     if (!items.length) {
       var emptyGroups = [];
@@ -1878,59 +1916,21 @@
     return groups;
   }
 
-  function getAssignZoneItems(floorInput, selectedDates) {
-    // 화면에 표시되는 정렬(state.sortRules)을 그대로 반영해야 사용자가 고른
-    // 정렬 순서대로 존이 묶여 할당된다 — 정렬을 무시한 채 항상 존 이름
-    // 알파벳/숫자순으로 강제 정렬하던 이전 방식은 화면 정렬과 어긋나는 버그였다.
+  // 화면에 표시되는 정렬(state.sortRules, O존 우선 옵션 포함)을 그대로 반영해
+  // 정렬된 순서의 행 하나하나를 아이템 하나로 만든다 — 존 단위로 미리 묶지
+  // 않기 때문에 splitBalanced가 필요하면 같은 존도 인접한 두 사람 사이에서
+  // 나눠 배정할 수 있어(전체 순서는 그대로 유지되므로 오름차순 보장), 존 개수가
+  // 인원수 이하라도 수량 균형을 맞출 여지가 생긴다.
+  function getAssignRowItems(floorInput, selectedDates) {
     var rows = getSortedRows(getAssignBaseRows());
-    var byZone = {};
-    var zoneOrder = [];
+    var items = [];
     rows.forEach(function (r) {
       if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
       var floorCode = getFloor(r.zone);
       if (floorCode.indexOf(floorInput) !== 0) return;
-      var zone = r.zone || "(미지정)";
-      if (!byZone[zone]) {
-        byZone[zone] = { qty: 0, rows: [] };
-        zoneOrder.push(zone);
-      }
-      byZone[zone].qty += (r.quantity || 0);
-      byZone[zone].rows.push(r);
+      items.push({ zone: r.zone || "(미지정)", qty: (r.quantity || 0), rows: [r] });
     });
-    return zoneOrder.map(function (z) { return { zone: z, qty: byZone[z].qty, rows: byZone[z].rows }; });
-  }
-
-  // 존 개수가 인원수보다 적을 때, 행이 가장 많은 존을 절반씩 쪼개 아이템 수를
-  // 늘려서(같은 존이라도 별도 아이템으로) 인원수만큼 나눠 가질 여지를 만든다.
-  // 더 쪼갤 아이템(행 2개 이상)이 없으면 중단 — 데이터 자체가 인원수보다 적은
-  // 불가피한 경우.
-  function expandZoneItemsForCount(items, n) {
-    var result = items.map(function (it) {
-      return { zone: it.zone, qty: it.qty, rows: it.rows.slice() };
-    });
-    function sumQty(rows) {
-      return rows.reduce(function (s, r) { return s + (r.quantity || 0); }, 0);
-    }
-    while (result.length < n) {
-      var idx = -1;
-      var maxRows = 1;
-      for (var i = 0; i < result.length; i++) {
-        if (result[i].rows.length > maxRows) {
-          maxRows = result[i].rows.length;
-          idx = i;
-        }
-      }
-      if (idx === -1) break;
-      var item = result[idx];
-      var half = Math.ceil(item.rows.length / 2);
-      var rowsA = item.rows.slice(0, half);
-      var rowsB = item.rows.slice(half);
-      result.splice(idx, 1,
-        { zone: item.zone, qty: sumQty(rowsA), rows: rowsA },
-        { zone: item.zone, qty: sumQty(rowsB), rows: rowsB }
-      );
-    }
-    return result;
+    return items;
   }
 
   function renderAssignTabs() {
@@ -1966,14 +1966,32 @@
   }
 
   var ASSIGN_DETAIL_COLUMNS = [
-    { key: "groupNo", label: "그룹번호" },
-    { key: "deadline", label: "마감일시" },
-    { key: "createdAt", label: "생성일시" },
-    { key: "company", label: "업체명" },
-    { key: "transportType", label: "운송타입" },
-    { key: "zone", label: "존" },
-    { key: "quantity", label: "수량" }
+    { key: "groupNo", label: "그룹번호", type: "string" },
+    { key: "deadline", label: "마감일시", type: "date" },
+    { key: "createdAt", label: "생성일시", type: "date" },
+    { key: "company", label: "업체명", type: "string" },
+    { key: "transportType", label: "운송타입", type: "string" },
+    { key: "zone", label: "존", type: "string" },
+    { key: "quantity", label: "수량", type: "number" }
   ];
+
+  // renderAssignDetailTable의 작업자 이동 select용 — 현재 존재하는 모든 커스텀/집품
+  // 할당(cfg)을 optgroup으로 묶고, 각 cfg의 작업자를 option으로 나열한다.
+  // option value는 "cfgId:workerIdx" — 같은 cfg 내 이동과 다른 cfg로의 이동을
+  // 하나의 select로 처리하기 위함(이동 핸들러에서 다시 split해서 사용).
+  function buildAssignMoveOptionsHtml(cfgId, workerIdx) {
+    return state.assignConfigs.map(function (c) {
+      var groupCount = (c.workerGroups && c.workerGroups.length) || c.count || 1;
+      var label = c.custom ? "커스텀" : (c.floorInput + "층 · " + c.count + "명");
+      if (c.createdDates && c.createdDates.length) label += " · " + c.createdDates.join(", ");
+      var opts = "";
+      for (var w = 0; w < groupCount; w++) {
+        var selected = (String(c.id) === String(cfgId) && w === workerIdx) ? " selected" : "";
+        opts += '<option value="' + c.id + ':' + w + '"' + selected + '>' + (c.custom ? "커스텀" : ("작업자 " + (w + 1))) + "</option>";
+      }
+      return '<optgroup label="' + escapeHtml(label) + '">' + opts + "</optgroup>";
+    }).join("");
+  }
 
   function renderAssignDetailTable(rows, cfgId, workerIdx, workerCount) {
     if (!rows.length) {
@@ -1982,15 +2000,12 @@
     var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
       return '<th class="px-4 py-2.5 text-left' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
     }).join("") + '<th class="px-4 py-2.5 text-left">GT 바코드</th><th class="px-4 py-2.5 text-right">작업자</th><th class="px-4 py-2.5"></th>';
-    var workerOptionsHtml = "";
-    for (var w = 0; w < workerCount; w++) {
-      workerOptionsHtml += '<option value="' + w + '"' + (w === workerIdx ? " selected" : "") + '>작업자 ' + (w + 1) + "</option>";
-    }
+    var moveOptionsHtml = buildAssignMoveOptionsHtml(cfgId, workerIdx);
     var bodyHtml = rows.map(function (r) {
       var gtKey = cfgId + ":" + r.id;
       var gtValue = state.gtAssignments[gtKey] || "";
-      var moveSelectHtml = workerCount > 1
-        ? '<select class="assign-result-row-select bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-row-id="' + escapeHtml(r.id) + '" data-from-worker="' + workerIdx + '">' + workerOptionsHtml + "</select>"
+      var moveSelectHtml = (workerCount > 1 || state.assignConfigs.length > 1)
+        ? '<select class="assign-result-row-select bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-row-id="' + escapeHtml(r.id) + '" data-from-worker="' + workerIdx + '" data-from-cfg="' + escapeHtml(String(cfgId)) + '">' + moveOptionsHtml + "</select>"
         : "";
       return (
         '<tr class="hover:bg-slate-50/80 transition-colors">' +
@@ -2099,8 +2114,11 @@
     return state.rows.filter(function (r) { return !selectedIds.has(r.id); });
   }
 
+  // key 자신의 필터를 뺀 나머지 필터를 반영해 후보값을 계산 — 엑셀 자동필터처럼
+  // 다른 컬럼에 필터가 걸려 있으면 이 컬럼 드롭다운도 그만큼 좁혀진다.
   function getRowPickerCandidateValues(key) {
-    var values = uniqueValuesFrom(getRowPickerScopedRows(), function (r) { return r[key]; });
+    var rows = filterRowsExceptKey(getRowPickerScopedRows(), ROW_PICKER_COLUMNS, rowPickerFilters, key);
+    var values = uniqueValuesFrom(rows, function (r) { return r[key]; });
     var col = ROW_PICKER_COLUMNS.find(function (c) { return c.key === key; });
     if (col && col.type === "number") {
       values.sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
@@ -2109,15 +2127,7 @@
   }
 
   function computeRowPickerFilteredRows(baseRows) {
-    return baseRows.filter(function (r) {
-      for (var i = 0; i < ROW_PICKER_COLUMNS.length; i++) {
-        var col = ROW_PICKER_COLUMNS[i];
-        var filterSet = rowPickerFilters[col.key];
-        if (filterSet === null || filterSet === undefined) continue;
-        if (!filterSet.has(String(r[col.key]))) return false;
-      }
-      return true;
-    });
+    return filterRowsExceptKey(baseRows, ROW_PICKER_COLUMNS, rowPickerFilters);
   }
 
   function getRowPickerSortedRows(rows) {
@@ -2157,6 +2167,8 @@
     resetBtn: els.rowPickerSortResetBtn,
     getSortRules: function () { return rowPickerSortRules; },
     setSortRules: function (rules) { rowPickerSortRules = rules; },
+    // 홈의 "정렬 초기화"가 O존 우선 정렬도 함께 끄는 것과 동일한 동작.
+    onResetExtra: function () { rowPickerZoneOPriority = false; },
     onApply: function () { renderRowPickerAvailableList(); }
   });
 
@@ -2164,7 +2176,7 @@
     if (!rows.length) {
       return '<div class="px-4 py-6 text-center text-xs text-slate-400">해당하는 행이 없습니다.</div>';
     }
-    var bodyHtml = rows.map(function (r) {
+    var bodyHtml = rows.map(function (r, i) {
       var marked = draggableSelect && rowPickerMarkedIds.has(r.id);
       var alreadyAssigned = !!(assignedIds && assignedIds.has(r.id));
       // 이미 다른 곳에 할당된 행이라도 여기서 다시 선택/드래그할 수 있어야 하므로
@@ -2178,6 +2190,7 @@
       return (
         '<tr class="' + rowClasses + '"' +
         ' data-row-id="' + escapeHtml(r.id) + '">' +
+        '<td class="px-3 py-1.5 text-center text-slate-400">' + (i + 1) + "</td>" +
         '<td class="px-3 py-1.5 font-semibold text-slate-900 whitespace-nowrap">' + escapeHtml(r.groupNo) + badge + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(formatDateDisplay(r.deadline)) + "</td>" +
         '<td class="px-3 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(getCreatedDate(r)) + "</td>" +
@@ -2192,7 +2205,7 @@
     return (
       '<table class="w-full text-xs border-collapse">' +
       '<thead><tr class="bg-slate-50 text-slate-500 font-bold text-left sticky top-0">' +
-      '<th class="px-3 py-1.5">그룹번호</th><th class="px-3 py-1.5">마감일시</th><th class="px-3 py-1.5">생성일자</th><th class="px-3 py-1.5">업체명</th><th class="px-3 py-1.5">운송타입</th><th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5"></th>' +
+      '<th class="px-3 py-1.5 text-center w-10">번호</th><th class="px-3 py-1.5">그룹번호</th><th class="px-3 py-1.5">마감일시</th><th class="px-3 py-1.5">생성일자</th><th class="px-3 py-1.5">업체명</th><th class="px-3 py-1.5">운송타입</th><th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5"></th>' +
       "</tr></thead><tbody>" + bodyHtml + "</tbody></table>"
     );
   }
@@ -2292,6 +2305,20 @@
     updateRowPickerSelectionSummary();
   }
 
+  // 커스텀 할당 화면(row-picker)의 마킹/선택/필터/정렬/O존우선 상태를 전부 초기값으로
+  // 되돌린다. switchView()가 "custom" 화면을 벗어날 때(선택이 다른 화면까지 유지되면
+  // 안 되므로), 그리고 openCustomAssignView()가 화면에 새로 진입할 때 공통으로 쓴다.
+  // #rowPickerSelectionBar는 customAssignView 안이 아니라 DOM상 별도의 fixed
+  // 엘리먼트라 화면 전환만으로는 가려지지 않으므로 여기서 직접 숨긴다.
+  function clearRowPickerState() {
+    rowPickerMarkedIds = new Set();
+    rowPickerSelectedRows = [];
+    rowPickerFilters = {};
+    rowPickerSortRules = [{ key: "zone", dir: 1 }];
+    rowPickerZoneOPriority = false;
+    els.rowPickerSelectionBar.classList.add("hidden");
+  }
+
   // 드래그 중임을 알기 쉽게 커서를 따라다니며 이동 건수 + 수량 합계를 보여주는 배지
   function updateRowPickerDragGhost() {
     if (!rowPickerDragSelecting || !rowPickerMarkedIds.size) {
@@ -2377,11 +2404,12 @@
       rowPickerDragSelecting = true;
       rowPickerDragAdditive = false;
       rowPickerDragBaseIds = null;
-      // 이미 여러 행이 마킹된 상태라면, 이번에 누른 행이 그 마킹의 멤버가 아니어도
-      // (스크롤 등으로 인한 오차 클릭 포함) 기존 마킹 전체를 유지한 채 이동 준비만
-      // 한다 — 그렇지 않으면 아래 else 분기가 마킹을 방금 누른 행 1개로 덮어써버려
-      // "여러 개 선택했는데 드래그하면 1개만 옮겨지는" 문제가 생긴다.
-      if (rowPickerMarkedIds.size > 1) {
+      // 이미 여러 행이 마킹된 상태에서 그중 한 행을 다시 누르면(이동 준비) 기존
+      // 마킹을 그대로 두지만, 마킹돼 있지 않은 새 행을 누르면 그건 새로운 드래그
+      // 선택을 시작하려는 의도이므로 기존 마킹을 지우고 새로 앵커를 잡는다 —
+      // 이전엔 rowPickerMarkedIds.size > 1이기만 하면 무조건 앵커를 비워, O존 우선
+      // 정렬로 여러 행을 마킹한 뒤 다른 존에서 새로 드래그해도 마킹이 그대로 굳어버렸다.
+      if (rowPickerMarkedIds.size > 1 && rowPickerMarkedIds.has(id)) {
         rowPickerDragAnchorId = null;
         Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (rowEl) {
           rowEl.classList.toggle("opacity-70", rowPickerMarkedIds.has(rowEl.dataset.rowId));
@@ -2421,7 +2449,9 @@
       var el = document.elementFromPoint(e.clientX, e.clientY);
       if (el && els.rowPickerSelectedList.contains(el) && rowPickerMarkedIds.size) {
         var idsToMove = Array.from(rowPickerMarkedIds);
-        var movedRows = state.rows.filter(function (r) { return idsToMove.indexOf(r.id) !== -1; });
+        // 위 rowPickerSelectionAssignBtn과 동일한 이유로 state.rows가 아니라
+        // getRowPickerAvailableRows()(화면에 보이는 정렬/필터 순서) 기준으로 뽑는다.
+        var movedRows = getRowPickerAvailableRows().filter(function (r) { return idsToMove.indexOf(r.id) !== -1; });
         rowPickerSelectedRows = rowPickerSelectedRows.concat(movedRows);
         rowPickerMarkedIds = new Set();
         updateRowPickerSelectionSummary();
@@ -2438,19 +2468,14 @@
     // 취소/닫기 시 어느 화면으로 돌아갈지 — 홈에서 진입("create")했으면 홈으로,
     // 할당 결과 화면의 "행 추가"("append")로 진입했으면 할당 화면으로.
     rowPickerReturnView = mode === "append" ? "assign" : "home";
-    rowPickerSelectedRows = [];
-    rowPickerMarkedIds = new Set();
-    rowPickerFilters = {};
-    rowPickerSortRules = [{ key: "zone", dir: 1 }];
-    rowPickerZoneOPriority = false;
-    els.rowPickerTitle.textContent = mode === "append" ? "작업자 " + (workerIdx + 1) + "에게 행 추가" : "커스텀 할당 만들기";
+    clearRowPickerState();
+    els.rowPickerTitle.textContent = mode === "append" ? "작업자 " + (workerIdx + 1) + "에게 할당 추가" : "커스텀 할당 만들기";
     els.rowPickerConfirmBtn.textContent = mode === "append" ? "추가" : "확정";
     updateRowPickerSelectionSummary();
     switchView("custom");
   }
 
   function closeCustomAssignView() {
-    rowPickerSelectedRows = [];
     switchView(rowPickerReturnView);
   }
 
@@ -2498,13 +2523,120 @@
           cfg.workerGroups = splitBalanced(cfg.items || [], cfg.count).map(flattenWorkerGroup);
         }
         var targetGroup = cfg.workerGroups[rowPickerTargetWorkerIdx];
-        targetGroup.push.apply(targetGroup, rowPickerSelectedRows);
+        insertRowsSortedByZone(targetGroup, rowPickerSelectedRows);
         saveAssignState();
       }
       rowPickerSelectedRows = [];
       switchView("assign");
       if (window.showToast) window.showToast("선택한 행이 추가되었습니다.");
     }
+  }
+
+  // 집품 할당 결과 화면의 작업자 카드별 정렬/필터 — 홈/row-picker의 전역 상태와 달리
+  // (cfgId + ":" + workerIdx)로 스코프된다. cfg 객체 위에 얹지 않는 이유: cfg는
+  // saveAssignState()로 그대로 localStorage에 저장되므로, 여기에 얹으면 화면 전용
+  // 정렬/필터까지 영구 저장되어 row-picker의 선례(비영속)와 어긋난다. 이 화면 표시만
+  // 바뀔 뿐 cfg.workerGroups(실제 배정 데이터)는 절대 건드리지 않는다.
+  var assignWorkerSortState = {};   // key "cfgId:workerIdx" -> [{key,dir}, ...]
+  var assignWorkerFilterState = {}; // key "cfgId:workerIdx" -> { colKey: Set|null }
+
+  function assignWorkerStateKey(cfgId, workerIdx) { return cfgId + ":" + workerIdx; }
+
+  function getAssignWorkerSortRules(cfgId, workerIdx) {
+    var key = assignWorkerStateKey(cfgId, workerIdx);
+    if (!assignWorkerSortState[key]) assignWorkerSortState[key] = [];
+    return assignWorkerSortState[key];
+  }
+
+  function getAssignWorkerFilters(cfgId, workerIdx) {
+    var key = assignWorkerStateKey(cfgId, workerIdx);
+    if (!assignWorkerFilterState[key]) assignWorkerFilterState[key] = {};
+    return assignWorkerFilterState[key];
+  }
+
+  function computeAssignWorkerFilteredRows(rows, cfgId, workerIdx) {
+    var filters = getAssignWorkerFilters(cfgId, workerIdx);
+    return filterRowsExceptKey(rows, ASSIGN_DETAIL_COLUMNS, filters);
+  }
+
+  function getAssignWorkerSortedRows(rows, cfgId, workerIdx) {
+    var rules = getAssignWorkerSortRules(cfgId, workerIdx);
+    var activeRules = rules
+      .map(function (rule) { return { col: ASSIGN_DETAIL_COLUMNS.find(function (c) { return c.key === rule.key; }), dir: rule.dir }; })
+      .filter(function (r) { return r.col; });
+    if (!activeRules.length) return rows;
+    var copy = rows.slice();
+    copy.sort(function (a, b) {
+      for (var i = 0; i < activeRules.length; i++) {
+        var diff = compareValues(a, b, activeRules[i].col, false) * activeRules[i].dir;
+        if (diff !== 0) return diff;
+      }
+      return 0;
+    });
+    return copy;
+  }
+
+  // 엑셀 자동필터처럼 key 자신의 필터를 뺀 나머지 필터를 반영해 후보값을 계산한다
+  // — 다른 컬럼에 필터가 걸려 있으면 이 컬럼 드롭다운도 그만큼 좁혀진다.
+  function getAssignWorkerCandidateValues(allWorkerRows, filters, key) {
+    var rows = filterRowsExceptKey(allWorkerRows, ASSIGN_DETAIL_COLUMNS, filters, key);
+    var values = uniqueValuesFrom(rows, function (r) { return r[key]; });
+    var col = ASSIGN_DETAIL_COLUMNS.find(function (c) { return c.key === key; });
+    if (col && col.type === "number") {
+      values.sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
+    }
+    return values;
+  }
+
+  // 작업자 카드 안에 삽입되는 필터 버튼/정렬 칩 행 — 홈/row-picker 필터바와 톤은
+  // 맞추되, 카드가 렌더링마다 통째로 다시 그려지는 구조라 별도 적용 버튼 없이
+  // 체크박스를 누르는 즉시 반영되는 경량 버전으로 구현(설계 근거는 위 상태 변수 주석 참고).
+  function buildAssignWorkerFilterSortBarHtml(cfgId, workerIdx, allWorkerRows) {
+    var filters = getAssignWorkerFilters(cfgId, workerIdx);
+    var sortRules = getAssignWorkerSortRules(cfgId, workerIdx);
+
+    var filterBtnsHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
+      var active = filters[col.key] !== null && filters[col.key] !== undefined;
+      var candidateValues = getAssignWorkerCandidateValues(allWorkerRows, filters, col.key);
+      var effectiveSet = filters[col.key] || new Set(candidateValues);
+      var itemsHtml = candidateValues.map(function (v) {
+        var checked = effectiveSet.has(v) ? " checked" : "";
+        var displayText = col.type === "date" ? formatDateDisplay(v) : v;
+        return '<label class="flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" class="assign-worker-filter-item-cb accent-indigo-600" data-worker-idx="' + workerIdx + '" data-col-key="' + col.key + '" value="' + escapeHtml(v) + '"' + checked + "> " + escapeHtml(displayText) + "</label>";
+      }).join("");
+      return (
+        '<div class="relative inline-block">' +
+        '<button type="button" class="assign-worker-filter-btn ' + (active ? FILTER_BTN_ACTIVE : FILTER_BTN_INACTIVE) + '" data-worker-idx="' + workerIdx + '">' + escapeHtml(col.label) + ' <span class="text-[9px]">▾</span></button>' +
+        '<div class="assign-worker-filter-dropdown hidden absolute top-full left-0 mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 flex flex-col gap-1 max-h-44 overflow-y-auto">' + (itemsHtml || '<span class="text-xs text-slate-400">값 없음</span>') + "</div>" +
+        "</div>"
+      );
+    }).join("");
+
+    var sortChipsHtml = !sortRules.length
+      ? '<span class="text-xs text-slate-400">정렬 기준 없음</span>'
+      : sortRules.map(function (rule, ridx) {
+          var colOptions = ASSIGN_DETAIL_COLUMNS.map(function (c) {
+            return '<option value="' + c.key + '"' + (c.key === rule.key ? " selected" : "") + '>' + c.label + "</option>";
+          }).join("");
+          var dirLabel = rule.dir === 1 ? "오름차순 ▲" : "내림차순 ▼";
+          return (
+            '<span class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 rounded-lg pl-2 pr-1 py-1">' +
+            '<select class="assign-worker-sort-rule-key bg-white border border-slate-200 rounded-md px-1.5 py-1 text-xs" data-worker-idx="' + workerIdx + '" data-idx="' + ridx + '">' + colOptions + "</select>" +
+            '<button type="button" class="assign-worker-sort-rule-dir-btn text-xs font-medium text-indigo-700 px-1.5 py-1 hover:bg-indigo-100 rounded-md" data-worker-idx="' + workerIdx + '" data-idx="' + ridx + '">' + dirLabel + "</button>" +
+            '<button type="button" class="assign-worker-sort-rule-remove-btn text-slate-400 hover:text-rose-500 px-1" data-worker-idx="' + workerIdx + '" data-idx="' + ridx + '">✕</button>' +
+            "</span>"
+          );
+        }).join("");
+
+    return (
+      '<div class="px-5 py-3 border-b border-slate-100 space-y-2 bg-slate-50/60">' +
+      '<div class="flex items-center gap-2 flex-wrap"><span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">필터</span>' + filterBtnsHtml +
+      '<button type="button" class="assign-worker-filter-reset-btn text-xs font-medium text-rose-600 hover:text-rose-700 px-2 py-1" data-worker-idx="' + workerIdx + '">필터 초기화</button></div>' +
+      '<div class="flex items-center gap-2 flex-wrap"><span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">정렬</span>' + sortChipsHtml +
+      '<button type="button" class="assign-worker-sort-add-btn text-xs font-medium text-indigo-600 hover:text-indigo-700 px-2 py-1" data-worker-idx="' + workerIdx + '">+ 정렬 기준 추가</button>' +
+      '<button type="button" class="assign-worker-sort-reset-btn text-xs font-medium text-rose-600 hover:text-rose-700 px-2 py-1" data-worker-idx="' + workerIdx + '">정렬 초기화</button></div>' +
+      "</div>"
+    );
   }
 
   function renderAssignPanel() {
@@ -2545,22 +2677,22 @@
       var zoneList = Array.from(new Set(detailRows.map(function (r) { return r.zone; }).filter(Boolean))).join(", ");
       var isPrinted = !!(cfg.printedWorkerIdx && cfg.printedWorkerIdx[idx]);
       return (
-        '<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">' +
-        '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">' +
+        '<div class="bg-white border border-slate-200 rounded-xl shadow-sm">' +
+        '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200 rounded-t-xl">' +
         '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) +
         (isPrinted ? ' <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 align-middle">✓ 출력됨</span>' : "") +
         (zoneList ? '<span class="ml-2 text-xs font-normal text-slate-500">담당 존: ' + escapeHtml(zoneList) + "</span>" : "") + "</div>" +
         '<div class="flex items-center gap-3">' +
         '<div class="text-sm font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + detailRows.length + "장</div>" +
-        '<button type="button" class="assign-add-row-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">행 추가</button>' +
+        '<button type="button" class="assign-add-row-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">할당 추가</button>' +
         '<button type="button" class="assign-automatch-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
         '<button type="button" class="assign-gt-reset-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
         '<button type="button" class="assign-spare-print-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">여분 출력</button>' +
         '<button type="button" class="assign-print-btn bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all duration-150" data-worker-idx="' + idx + '">출력</button>' +
         (groups.length > 1 ? '<button type="button" class="assign-delete-worker-btn bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">삭제</button>' : "") +
         "</div>" +
-        "</div>" +
-        renderAssignDetailTable(detailRows, cfg.id, idx, groups.length) +
+        buildAssignWorkerFilterSortBarHtml(cfg.id, idx, detailRows) +
+        renderAssignDetailTable(getAssignWorkerSortedRows(computeAssignWorkerFilteredRows(detailRows, cfg.id, idx), cfg.id, idx), cfg.id, idx, groups.length) +
         "</div>"
       );
     }).join("");
@@ -2630,15 +2762,39 @@
 
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-result-row-select"), function (sel) {
       sel.addEventListener("change", function () {
+        var fromCfgId = sel.dataset.fromCfg;
         var fromIdx = parseInt(sel.dataset.fromWorker, 10);
-        var toIdx = parseInt(sel.value, 10);
-        if (fromIdx === toIdx) return;
         var rowId = sel.dataset.rowId;
-        var fromGroup = cfg.workerGroups[fromIdx];
+        var parts = sel.value.split(":");
+        var toCfgId = parts[0];
+        var toIdx = parseInt(parts[1], 10);
+        if (fromCfgId === toCfgId && fromIdx === toIdx) return;
+
+        var fromCfg = state.assignConfigs.find(function (c) { return String(c.id) === String(fromCfgId); });
+        var toCfg = state.assignConfigs.find(function (c) { return String(c.id) === toCfgId; });
+        if (!fromCfg || !toCfg) return;
+        if (!toCfg.workerGroups) {
+          toCfg.workerGroups = splitBalanced(toCfg.items || [], toCfg.count).map(flattenWorkerGroup);
+        }
+
+        var fromGroup = fromCfg.workerGroups[fromIdx];
         var rowIdx = fromGroup.findIndex(function (r) { return r && r.id === rowId; });
         if (rowIdx === -1) return;
         var row = fromGroup.splice(rowIdx, 1)[0];
-        cfg.workerGroups[toIdx].push(row);
+        insertRowsSortedByZone(toCfg.workerGroups[toIdx], [row]);
+
+        // GT 바코드 키가 "cfgId:rowId" 형태라, 다른 할당으로 옮길 때는 매칭도 새 키로 옮겨야
+        // 유실되지 않는다. 같은 할당 내 작업자 이동은 cfgId가 안 바뀌므로 영향 없음.
+        if (String(fromCfg.id) !== String(toCfg.id)) {
+          var oldGtKey = fromCfg.id + ":" + rowId;
+          var newGtKey = toCfg.id + ":" + rowId;
+          if (state.gtAssignments[oldGtKey] !== undefined) {
+            state.gtAssignments[newGtKey] = state.gtAssignments[oldGtKey];
+            delete state.gtAssignments[oldGtKey];
+            saveGtState();
+          }
+        }
+
         saveAssignState();
         renderAssignPanel();
       });
@@ -2657,6 +2813,79 @@
         renderAssignPanel();
       });
     });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-filter-btn"), function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var dd = btn.nextElementSibling; // .assign-worker-filter-dropdown
+        var wasHidden = dd.classList.contains("hidden");
+        Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-filter-dropdown"), function (o) { o.classList.add("hidden"); });
+        dd.classList.toggle("hidden", !wasHidden);
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-filter-dropdown"), function (dd) {
+      dd.addEventListener("click", function (e) { e.stopPropagation(); });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-filter-item-cb"), function (cb) {
+      cb.addEventListener("change", function () {
+        var workerIdx = parseInt(cb.dataset.workerIdx, 10);
+        var colKey = cb.dataset.colKey;
+        var filters = getAssignWorkerFilters(cfg.id, workerIdx);
+        var allValues = getAssignWorkerCandidateValues(groups[workerIdx], filters, colKey);
+        var set = filters[colKey] ? new Set(filters[colKey]) : new Set(allValues);
+        if (cb.checked) set.add(cb.value); else set.delete(cb.value);
+        filters[colKey] = set.size === allValues.length ? null : set;
+        renderAssignPanel();
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-filter-reset-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        assignWorkerFilterState[assignWorkerStateKey(cfg.id, parseInt(btn.dataset.workerIdx, 10))] = {};
+        renderAssignPanel();
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-sort-rule-key"), function (sel) {
+      sel.addEventListener("change", function () {
+        getAssignWorkerSortRules(cfg.id, parseInt(sel.dataset.workerIdx, 10))[parseInt(sel.dataset.idx, 10)].key = sel.value;
+        renderAssignPanel();
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-sort-rule-dir-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        getAssignWorkerSortRules(cfg.id, parseInt(btn.dataset.workerIdx, 10))[parseInt(btn.dataset.idx, 10)].dir *= -1;
+        renderAssignPanel();
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-sort-rule-remove-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        getAssignWorkerSortRules(cfg.id, parseInt(btn.dataset.workerIdx, 10)).splice(parseInt(btn.dataset.idx, 10), 1);
+        renderAssignPanel();
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-sort-add-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var workerIdx = parseInt(btn.dataset.workerIdx, 10);
+        var rules = getAssignWorkerSortRules(cfg.id, workerIdx);
+        var usedKeys = rules.map(function (r) { return r.key; });
+        var nextCol = ASSIGN_DETAIL_COLUMNS.find(function (c) { return usedKeys.indexOf(c.key) === -1; }) || ASSIGN_DETAIL_COLUMNS[0];
+        rules.push({ key: nextCol.key, dir: 1 });
+        renderAssignPanel();
+      });
+    });
+
+    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-worker-sort-reset-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        assignWorkerSortState[assignWorkerStateKey(cfg.id, parseInt(btn.dataset.workerIdx, 10))] = [];
+        renderAssignPanel();
+      });
+    });
   }
 
   function removeAssignWorker(cfg) {
@@ -2670,6 +2899,11 @@
       var target = cfg.workerGroups[cfg.workerGroups.length - 1];
       if (target) target.push.apply(target, removed);
     }
+    // 항상 마지막 작업자만 제거되므로(위 pop()), 그 인덱스의 카드 정렬/필터 상태(고아 키)만
+    // 정리하면 된다 — 안 지우면 이후 작업자를 다시 추가했을 때 엉뚱한 정렬/필터가 남아있게 됨.
+    var removedWorkerKey = assignWorkerStateKey(cfg.id, cfg.count - 1);
+    delete assignWorkerSortState[removedWorkerKey];
+    delete assignWorkerFilterState[removedWorkerKey];
     cfg.count -= 1;
     saveAssignState();
     renderAssignTabs();
@@ -2728,9 +2962,9 @@
       return;
     }
     // 미리보기 생성 시점의 존/행 데이터를 스냅샷으로 고정 — 이후 홈 화면 필터가 바뀌어도
-    // 확정된 배정은 유지됨(재조회하지 않음). 존 단위 균형 분배(splitBalanced) 결과를
+    // 확정된 배정은 유지됨(재조회하지 않음). 행 단위 균형 분배(splitBalanced) 결과를
     // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
-    var items = expandZoneItemsForCount(getAssignZoneItems(floorInput, selectedDates), count);
+    var items = getAssignRowItems(floorInput, selectedDates);
     var groups = splitBalanced(items, count);
     assignPreviewGroups = groups.map(function (g) {
       return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
@@ -2895,6 +3129,13 @@
       if (key.indexOf(prefix) === 0) delete state.gtAssignments[key];
     });
     saveGtState();
+    // 이 config에 속했던 작업자 카드 정렬/필터 상태(고아 키)도 함께 정리
+    Object.keys(assignWorkerSortState).forEach(function (key) {
+      if (key.indexOf(prefix) === 0) delete assignWorkerSortState[key];
+    });
+    Object.keys(assignWorkerFilterState).forEach(function (key) {
+      if (key.indexOf(prefix) === 0) delete assignWorkerFilterState[key];
+    });
     saveAssignState();
     renderAssignTabs();
   }
@@ -3053,7 +3294,12 @@
 
       homeDragAdditive = false;
       homeDragBaseIds = null;
-      if (homeMarkedIds.size > 1) {
+      // 이미 여러 행이 선택된 상태에서 그중 한 행을 누르면(향후 이동 등 확장 대비)
+      // 기존 선택을 그대로 두지만, 선택돼 있지 않은 새 행을 누르면 그건 새로운
+      // 드래그 선택을 시작하려는 의도이므로 기존 선택을 지우고 새로 앵커를 잡는다 —
+      // 이전엔 homeMarkedIds.size > 1이기만 하면 무조건 앵커를 비워, O존 우선 정렬로
+      // 여러 행을 선택한 뒤 다른 존에서 새로 드래그해도 선택이 그대로 굳어버렸다.
+      if (homeMarkedIds.size > 1 && homeMarkedIds.has(id)) {
         homeDragAnchorId = null;
       } else {
         homeDragAnchorId = id;
@@ -3232,7 +3478,9 @@
 
   els.homeSelectionAssignBtn.addEventListener("click", async function () {
     if (!homeMarkedIds.size) return;
-    var selectedRows = state.rows.filter(function (r) { return homeMarkedIds.has(r.id); });
+    // state.rows(원본 업로드 순서)가 아니라 화면에 실제로 보이는 정렬/필터 순서에서
+    // 골라야, 홈에서 정렬한 순서 그대로 커스텀 할당에 반영된다.
+    var selectedRows = getSortedRows(getFilteredRows()).filter(function (r) { return homeMarkedIds.has(r.id); });
     var assignedIds = getAssignedRowIdSet();
     var alreadyAssignedCount = selectedRows.filter(function (r) { return assignedIds.has(r.id); }).length;
     if (alreadyAssignedCount > 0) {
@@ -3253,7 +3501,9 @@
   els.rowPickerSelectionAssignBtn.addEventListener("click", function () {
     if (!rowPickerMarkedIds.size) return;
     var idsToMove = Array.from(rowPickerMarkedIds);
-    var movedRows = state.rows.filter(function (r) { return idsToMove.indexOf(r.id) !== -1; });
+    // state.rows(원본 업로드 순서)가 아니라 이 화면에 실제로 보이는 정렬/필터 순서에서
+    // 골라야, 이 화면에서 정렬한 순서 그대로 "선택된 행"에 반영된다.
+    var movedRows = getRowPickerAvailableRows().filter(function (r) { return idsToMove.indexOf(r.id) !== -1; });
     rowPickerSelectedRows = rowPickerSelectedRows.concat(movedRows);
     rowPickerMarkedIds = new Set();
     updateRowPickerSelectionSummary();
@@ -3273,12 +3523,14 @@
     if (window.showToast) window.showToast("72·73층 O존 우선 정렬이 적용되었습니다.");
   });
 
-  // 커스텀 할당 화면은 자체 정렬(rowPickerSortRules)처럼 화면을 나가면 초기화되는 게
-  // 맞으므로, 홈과 별개인 rowPickerZoneOPriority로 기존과 동일하게 1회성 적용한다.
+  // 홈의 state.zoneOPriority와 마찬가지로, 화면을 나가기 전까지는 계속 켜진 상태를
+  // 유지한다(clearRowPickerState()가 화면 진입/이탈 시, onResetExtra가 "정렬 초기화"
+  // 클릭 시 끈다) — 이전엔 렌더링 직후 바로 꺼버려서, 드래그 중 다시 계산되는 정렬
+  // 순서(꺼진 상태)가 화면에 이미 그려진 순서(켜진 상태)와 어긋나 드래그 범위선택이
+  // 엉뚱한 인덱스로 계산되는 버그(다른 존으로 넘어가는 순간 전체선택됨)가 있었다.
   els.rowPickerSortZoneOPriorityBtn.addEventListener("click", function () {
     rowPickerZoneOPriority = true;
     renderRowPickerAvailableList();
-    rowPickerZoneOPriority = false;
     if (window.showToast) window.showToast("72·73층 O존 우선 정렬이 적용되었습니다.");
   });
 
@@ -3420,6 +3672,14 @@
         e.target !== els.customLabelCompanySearch) {
       closeCustomLabelCompanyDropdown();
     }
+  });
+
+  // 작업자 카드 필터 드롭다운 바깥 클릭 시 닫기 — renderAssignPanel()이 카드를 통째로
+  // 재생성하므로, 카드 렌더마다 다시 등록하지 않고 여기서 한 번만(라이브 DOM 조회) 등록한다.
+  document.addEventListener("click", function () {
+    Array.prototype.forEach.call(document.querySelectorAll(".assign-worker-filter-dropdown:not(.hidden)"), function (dd) {
+      dd.classList.add("hidden");
+    });
   });
 
   els.customLabelCancelBtn.addEventListener("click", function () {
