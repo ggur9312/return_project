@@ -1168,35 +1168,114 @@
     return state.gtCodes.filter(function (code) { return !used[code]; });
   }
 
+  // GT 데이터가 수천~수만 건으로 늘어나면 전체를 한 번에 DOM으로 그리는 게
+  // 병목이 되므로(스크롤 박스 안에 몇 줄만 보이는데도 전체를 매번 다시 그림),
+  // 실제로 보이는 구간만 렌더링하는 가상 스크롤로 처리한다. 위치값은 코드
+  // 개수만큼 서로 다른 Tailwind 임의값 클래스를 만들지 않도록 인라인 style로
+  // 직접 지정한다(이 프로젝트는 브라우저에서 클래스명을 감지해 CSS를 그때그때
+  // 컴파일하는 Tailwind Play CDN을 쓰므로, 행마다 다른 클래스를 쓰면 그 자체가
+  // 또 다른 성능 문제가 된다).
+  // 헤더는 스크롤 영역 바깥의 별도 flex 자식으로 분리한다 — 헤더를 스크롤
+  // 영역 "안"에 sticky로 두면 헤더의 실제 높이만큼 행의 절대좌표 기준(스크롤
+  // 컨테이너 top=0)과 스크롤 가능한 콘텐츠의 실제 시작 위치가 어긋나서,
+  // 스크롤 끝부분에서 헤더와 마지막 행들이 서로 겹쳐 보이는 버그가 생긴다.
+  var GT_LIST_ROW_HEIGHT = 24;
+  var GT_LIST_BUFFER_ROWS = 5;
+  var GT_LIST_CONTAINER_CLASS_EMPTY = "overflow-x-auto overflow-y-auto max-h-40 bg-slate-50 border border-slate-100 rounded-lg p-2 min-h-[2.5rem]";
+  var GT_LIST_CONTAINER_CLASS_FULL = "max-h-40 bg-slate-50 border border-slate-100 rounded-lg p-2 min-h-[2.5rem] flex flex-col";
+  var gtListMatchOrder = [];
+  var gtListUsedSet = {};
+  var gtListRowsEl = null;
+  var gtListScrollBodyEl = null;
+  var gtListScrollListenerAttached = false;
+
+  function buildGtRowHtml(code, idx, used) {
+    var isUsed = !!used[code];
+    var statusHtml = isUsed
+      ? '<span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 text-[10px] font-semibold">사용중</span>'
+      : '<span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold">사용가능</span>';
+    return (
+      '<div data-gt-row style="position:absolute;left:0;top:' + (idx * GT_LIST_ROW_HEIGHT) + 'px;width:100%;height:' + GT_LIST_ROW_HEIGHT + 'px" class="flex items-center border-b border-slate-100 text-xs">' +
+      '<div class="w-10 shrink-0 px-2 text-slate-400 text-right">' + (idx + 1) + "</div>" +
+      '<div class="flex-1 min-w-0 px-2 truncate font-mono font-medium ' + (isUsed ? "text-slate-400" : "text-indigo-700") + '">' + escapeHtml(code) + "</div>" +
+      '<div class="w-20 shrink-0 px-2 text-right">' + statusHtml + "</div>" +
+      "</div>"
+    );
+  }
+
+  function renderGtVisibleRows() {
+    if (!gtListRowsEl || !gtListScrollBodyEl) return;
+    var total = gtListMatchOrder.length;
+    var scrollTop = gtListScrollBodyEl.scrollTop;
+    var viewportHeight = gtListScrollBodyEl.clientHeight;
+    var firstVisible = Math.floor(scrollTop / GT_LIST_ROW_HEIGHT);
+    var visibleCount = Math.ceil(viewportHeight / GT_LIST_ROW_HEIGHT) + 1;
+    var start = Math.max(0, firstVisible - GT_LIST_BUFFER_ROWS);
+    var end = Math.min(total, firstVisible + visibleCount + GT_LIST_BUFFER_ROWS);
+    var html = "";
+    for (var i = start; i < end; i++) {
+      html += buildGtRowHtml(gtListMatchOrder[i], i, gtListUsedSet);
+    }
+    gtListRowsEl.innerHTML = html;
+  }
+
+  function attachGtListScrollListener() {
+    if (gtListScrollListenerAttached) return;
+    gtListScrollListenerAttached = true;
+    var ticking = false;
+    gtListScrollBodyEl.addEventListener("scroll", function () {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        ticking = false;
+        renderGtVisibleRows();
+      });
+    }, { passive: true });
+  }
+
   function renderGtAvailableList() {
     var used = getGtUsedSet();
-    var availableCount = state.gtCodes.filter(function (code) { return !used[code]; }).length;
+    var availableCount = 0;
+    for (var i = 0; i < state.gtCodes.length; i++) {
+      if (!used[state.gtCodes[i]]) availableCount++;
+    }
     els.gtAvailableCount.textContent = availableCount;
+
     if (!state.gtCodes.length) {
+      els.gtAvailableList.className = GT_LIST_CONTAINER_CLASS_EMPTY;
       els.gtAvailableList.innerHTML = '<span class="text-xs text-slate-400">저장된 GT 데이터가 없습니다.</span>';
+      gtListMatchOrder = [];
+      gtListUsedSet = {};
+      gtListRowsEl = null;
+      gtListScrollBodyEl = null;
+      gtListScrollListenerAttached = false;
       return;
     }
+
     // 자동매칭/GT출력과 동일한 역순(나중에 붙여넣은 것부터)으로 보여줘서
     // 1행이 곧 다음 매칭에 쓰일 코드임을 그대로 확인할 수 있게 함
-    var matchOrder = state.gtCodes.slice().reverse();
-    var rowsHtml = matchOrder.map(function (code, idx) {
-      var isUsed = !!used[code];
-      var statusHtml = isUsed
-        ? '<span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 text-[10px] font-semibold">사용중</span>'
-        : '<span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold">사용가능</span>';
-      return (
-        '<tr class="border-b border-slate-100 last:border-b-0">' +
-        '<td class="px-2 py-1 text-slate-400 text-right w-10">' + (idx + 1) + "</td>" +
-        '<td class="px-2 py-1 font-mono font-medium ' + (isUsed ? "text-slate-400" : "text-indigo-700") + '">' + escapeHtml(code) + "</td>" +
-        '<td class="px-2 py-1 text-right">' + statusHtml + "</td>" +
-        "</tr>"
-      );
-    }).join("");
+    gtListMatchOrder = state.gtCodes.slice().reverse();
+    gtListUsedSet = used;
+    var totalHeight = gtListMatchOrder.length * GT_LIST_ROW_HEIGHT;
+
+    els.gtAvailableList.className = GT_LIST_CONTAINER_CLASS_FULL;
     els.gtAvailableList.innerHTML =
-      '<table class="w-full text-xs border-collapse">' +
-      '<thead><tr class="text-slate-400 border-b border-slate-200"><th class="px-2 py-1 text-right font-medium w-10">순번</th><th class="px-2 py-1 text-left font-medium">GT 코드</th><th class="px-2 py-1 text-right font-medium">상태</th></tr></thead>' +
-      "<tbody>" + rowsHtml + "</tbody>" +
-      "</table>";
+      '<div class="flex text-slate-400 border-b border-slate-200 text-xs font-medium shrink-0">' +
+      '<div class="w-10 shrink-0 px-2 py-1 text-right">순번</div>' +
+      '<div class="flex-1 min-w-0 px-2 py-1 text-left">GT 코드</div>' +
+      '<div class="w-20 shrink-0 px-2 py-1 text-right">상태</div>' +
+      "</div>" +
+      '<div id="gtListScrollBody" class="flex-1 min-h-0 overflow-y-auto overflow-x-auto">' +
+      '<div style="position:relative;height:' + totalHeight + 'px">' +
+      '<div id="gtListRows" style="position:absolute;left:0;top:0;width:100%"></div>' +
+      "</div>" +
+      "</div>";
+
+    gtListScrollBodyEl = document.getElementById("gtListScrollBody");
+    gtListRowsEl = document.getElementById("gtListRows");
+    gtListScrollListenerAttached = false;
+    attachGtListScrollListener();
+    renderGtVisibleRows();
   }
 
   function setAssignGt(key, code) {
