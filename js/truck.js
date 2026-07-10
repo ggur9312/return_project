@@ -155,7 +155,6 @@ function calcEquals() {
 
 const calcWidget = document.getElementById('calcWidget');
 const calcOpenBtn = document.getElementById('calcOpenBtn');
-const assignCalcOpenBtn = document.getElementById('assignCalcOpenBtn');
 const calcCloseBtn = document.getElementById('calcCloseBtn');
 const calcDragHandle = document.getElementById('calcDragHandle');
 
@@ -166,8 +165,7 @@ function calcOpenWidget() {
     });
 }
 
-calcOpenBtn.addEventListener('click', calcOpenWidget);
-if (assignCalcOpenBtn) assignCalcOpenBtn.addEventListener('click', calcOpenWidget);
+if (calcOpenBtn) calcOpenBtn.addEventListener('click', calcOpenWidget);
 
 calcCloseBtn.addEventListener('click', () => {
     calcWidget.classList.add('opacity-0', 'scale-95');
@@ -490,6 +488,11 @@ function renderDashboard(data) {
                     </td>
                     <td class="px-4 py-3 w-32 text-right font-bold text-indigo-600 bg-indigo-50/30" id="calc32-${safeTabDate}-${itemIdx}">${exp32}</td>
                     <td class="px-4 py-3 w-32 text-right font-bold text-teal-600 bg-teal-50/30" id="calc24-${safeTabDate}-${itemIdx}">${exp24}</td>
+                    <td class="px-3 py-2 w-12 text-center">
+                        <button onclick="deleteTruckRow('${date}', ${itemIdx})" class="text-slate-300 hover:text-rose-500" title="삭제">
+                            <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </td>
                 </tr>
             `;
         });
@@ -508,6 +511,7 @@ function renderDashboard(data) {
                             <th class="px-3 py-3">팔레트 GT</th>
                             <th class="px-3 py-3 bg-indigo-50/50">예상 팔레트<br><span class="text-[10px] text-indigo-400 font-medium">(32BOX)</span></th>
                             <th class="px-3 py-3 bg-teal-50/50">예상 팔레트<br><span class="text-[10px] text-teal-400 font-medium">(24BOX)</span></th>
+                            <th class="px-3 py-3 w-12"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200">
@@ -564,6 +568,15 @@ function toggleItemPicking(date, index, checked) {
     if (globalProcessedData[date] && globalProcessedData[date][index]) {
         globalProcessedData[date][index].picking = checked;
         renderDashboard(globalProcessedData);
+    }
+}
+
+function deleteTruckRow(date, index) {
+    if (globalProcessedData[date] && globalProcessedData[date][index]) {
+        globalProcessedData[date].splice(index, 1);
+        renderDashboard(globalProcessedData);
+        saveState();
+        if (window.showToast) window.showToast('행이 삭제되었습니다.');
     }
 }
 
@@ -1353,14 +1366,9 @@ function executeCyclePrint() {
 
     const printArea = document.getElementById('truckPrintArea');
 
-    // 출력 시점에 실제 사용된 CT를 풀에서 차감 (수동 입력한 CT도 여기서 반영됨)
-    selectedRows.forEach(row => {
-        if (row.ct.trim() !== '') {
-            consumeCtFromPool(row.ct);
-        }
-    });
-    renderCtAvailableList();
-
+    // CT 소모/행 초기화는 인쇄창이 닫힌 뒤 자체 확인모달에서 실제 출력을
+    // 확인받은 다음에만 반영한다(취소해도 CT가 이미 소모돼버리던 버그 수정) —
+    // 라벨 렌더링에는 CT 값이 그대로 필요하므로 여기서는 아직 지우지 않는다.
     let html = '';
     selectedRows.forEach((row, idx) => {
         const hasCt = row.ct.trim() !== '';
@@ -1394,15 +1402,18 @@ function executeCyclePrint() {
         }
     });
 
-    selectedRows.forEach(row => {
-        row.ct = '';
-    });
-    renderCycleTable();
-    saveState();
-
     setTimeout(() => {
-        window.print();
-        showToast('출력이 완료되었습니다.');
+        window.printWithConfirm(() => {
+            selectedRows.forEach(row => {
+                if (row.ct.trim() !== '') {
+                    consumeCtFromPool(row.ct);
+                }
+            });
+            selectedRows.forEach(row => {
+                row.ct = '';
+            });
+            renderCycleTable();
+        });
     }, 300);
 }
 

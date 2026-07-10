@@ -137,3 +137,45 @@
   window.confirmModal = function (message) { return showUiModal(message, true); };
   window.alertModal = function (message) { return showUiModal(message, false); };
 })();
+
+// 두 앱 공용 인쇄 헬퍼 — 브라우저 인쇄창은 JS로 "출력함"과 "취소함"을 구분할
+// 방법이 없다. afterprint 이벤트로 인쇄창이 닫힌 시점만 감지한 뒤, 위 확인모달로
+// 실제 출력 여부를 사용자에게 다시 확인받아 그 답에 따라서만 상태변경(onConfirmed)과
+// 성공 토스트를 실행한다. innerHTML 갱신 직후 곧바로 print()하면 레이아웃이 아직
+// 반영되지 않아 이전 인쇄 내용이 나올 수 있어 두 번의 rAF로 페인트를 기다린다.
+(function () {
+  "use strict";
+
+  var AFTERPRINT_FALLBACK_MS = 4000;
+
+  window.printWithConfirm = function (onConfirmed) {
+    return new Promise(function (resolve) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          var settled = false;
+          function finish(detected) {
+            if (settled) return;
+            settled = true;
+            window.removeEventListener("afterprint", onAfterPrint);
+            resolve(detected);
+          }
+          function onAfterPrint() { finish(true); }
+          window.addEventListener("afterprint", onAfterPrint);
+          window.print();
+          // afterprint를 지원/발생시키지 않는 예외적 환경 대비 폴백 — 감지 실패 시
+          // 출력 성공을 함부로 단정하지 않는다(아래에서 확인모달 없이 조용히 종료).
+          setTimeout(function () { finish(false); }, AFTERPRINT_FALLBACK_MS);
+        });
+      });
+    }).then(function (detected) {
+      if (!detected) return false;
+      return window.confirmModal("출력을 완료하셨나요?\n(확인 = 출력 완료 / 취소 = 출력하지 않음)").then(function (confirmed) {
+        if (confirmed) {
+          if (typeof onConfirmed === "function") onConfirmed();
+          window.showToast("출력이 완료되었습니다.");
+        }
+        return confirmed;
+      });
+    });
+  };
+})();
