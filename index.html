@@ -350,7 +350,7 @@
         <button id="rowPickerSortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
       </div>
       <div>
-        <div class="text-sm font-semibold text-slate-700 mb-1.5">사용 가능한 행</div>
+        <div class="text-sm font-semibold text-slate-700 mb-1.5">사용 가능한 행 <span class="text-xs font-normal text-slate-400">(드래그로 범위선택 · Ctrl/Cmd+클릭으로 개별선택)</span></div>
         <div id="rowPickerAvailableList" class="border border-slate-200 rounded-lg max-h-56 overflow-y-auto overflow-x-auto"></div>
       </div>
       <div>
@@ -415,13 +415,21 @@
 <div id="labelMarginModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
   <div id="labelMarginModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 transform scale-95 transition-transform duration-200">
     <h3 class="text-sm font-semibold text-slate-900">라벨 여백 설정</h3>
-    <p class="text-xs text-slate-500">GT출력/할당출력/여분출력/커스텀출력 등 GT 라벨류 인쇄 시 라벨 오른쪽·아래쪽에 추가할 여백입니다. 실제 프린터로 인쇄해보고 여전히 잘리거나 밀리면 숫자만 조정하면 됩니다(라벨 자체 크기는 바뀌지 않습니다).</p>
-    <label class="flex flex-col gap-1 text-sm text-slate-600">오른쪽 여백(mm)
-      <input type="number" id="labelMarginRightInput" min="0" step="0.5" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-    </label>
-    <label class="flex flex-col gap-1 text-sm text-slate-600">아래쪽 여백(mm)
-      <input type="number" id="labelMarginBottomInput" min="0" step="0.5" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-    </label>
+    <p class="text-xs text-slate-500">GT출력/할당출력/여분출력/커스텀출력 등 GT 라벨류 인쇄 시 라벨 왼쪽·오른쪽·위쪽·아래쪽에 추가할 여백입니다. 실제 프린터로 인쇄해보고 여전히 잘리거나 밀리면 숫자만 조정하면 됩니다(라벨 자체 크기는 바뀌지 않습니다).</p>
+    <div class="grid grid-cols-2 gap-3">
+      <label class="flex flex-col gap-1 text-sm text-slate-600">왼쪽 여백(mm)
+        <input type="number" id="labelMarginLeftInput" min="0" step="0.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+      <label class="flex flex-col gap-1 text-sm text-slate-600">오른쪽 여백(mm)
+        <input type="number" id="labelMarginRightInput" min="0" step="0.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+      <label class="flex flex-col gap-1 text-sm text-slate-600">위쪽 여백(mm)
+        <input type="number" id="labelMarginTopInput" min="0" step="0.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+      <label class="flex flex-col gap-1 text-sm text-slate-600">아래쪽 여백(mm)
+        <input type="number" id="labelMarginBottomInput" min="0" step="0.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      </label>
+    </div>
     <div class="flex gap-2 pt-2">
       <button id="labelMarginSaveBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">저장</button>
       <button id="labelMarginCancelBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">취소</button>
