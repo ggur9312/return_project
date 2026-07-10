@@ -42,10 +42,13 @@
   var GT_PRINTED_KEY = "pickListGtPrinted";
   var LABEL_MARGIN_RIGHT_KEY = "pickListLabelMarginRight";
   var LABEL_MARGIN_BOTTOM_KEY = "pickListLabelMarginBottom";
+  var LABEL_MARGIN_LEFT_KEY = "pickListLabelMarginLeft";
+  var LABEL_MARGIN_TOP_KEY = "pickListLabelMarginTop";
   var FLOOR_PANEL_COLLAPSED_KEY = "pickListFloorPanelCollapsed";
   var UPLOAD_COLLAPSED_KEY = "pickListUploadCollapsed";
   var FILTER_SORT_COLLAPSED_KEY = "pickListFilterSortCollapsed";
   var LABEL_MARGIN_DEFAULT = 3;
+  var LABEL_MARGIN_LEFT_TOP_DEFAULT = 0;
   var BADGE_CLASSES = [
     "bg-emerald-50 text-emerald-700 border border-emerald-100",
     "bg-blue-50 text-blue-700 border border-blue-100",
@@ -190,6 +193,8 @@
     labelMarginModalBox: document.getElementById("labelMarginModalBox"),
     labelMarginRightInput: document.getElementById("labelMarginRightInput"),
     labelMarginBottomInput: document.getElementById("labelMarginBottomInput"),
+    labelMarginLeftInput: document.getElementById("labelMarginLeftInput"),
+    labelMarginTopInput: document.getElementById("labelMarginTopInput"),
     labelMarginSaveBtn: document.getElementById("labelMarginSaveBtn"),
     labelMarginCancelBtn: document.getElementById("labelMarginCancelBtn"),
     gtPrintModal: document.getElementById("gtPrintModal"),
@@ -838,10 +843,25 @@
     return String(zone || "").replace(/[0-9]/g, "").trim().toUpperCase() === "O";
   }
 
+  // 존 문자열에서 층 번호를 우선 숫자로 비교하고(9 -> 10 -> 72), 층이 같을 때만
+  // 문자열로 비교 — 순수 문자열(사전식) 비교로는 "10A"가 "9A"보다 앞서는 등
+  // 자릿수가 다른 층 번호에서 사람이 기대하는 순서와 어긋나는 문제를 해결한다.
+  function compareZoneAscending(za, zb) {
+    var sa = String(za || "").trim();
+    var sb = String(zb || "").trim();
+    var floorA = getFloor(sa);
+    var floorB = getFloor(sb);
+    var numA = floorSortKey(floorA);
+    var numB = floorSortKey(floorB);
+    if (numA !== numB) return numA - numB;
+    if (floorA !== floorB) return floorA.localeCompare(floorB, "ko");
+    return sa.localeCompare(sb, "ko");
+  }
+
   // 72/73층(알파벳 제거한 층코드가 "7"로 시작)에서는 실제 동선상 O존을 가장 먼저
   // 지나가므로, zoneOPriority 버튼을 누르면 같은 층 안에서 O존(예: 72O, 73O)을
   // 그 층의 다른 존(72K, 72A 등)보다 앞으로 보낸다. 층이 다르면(72층 vs 73층 등)
-  // 층끼리의 상대적 순서는 건드리지 않고 기존 로케일 비교 그대로 유지.
+  // 층끼리의 상대적 순서는 건드리지 않고 숫자 기준 오름차순을 그대로 유지.
   function compareZoneWithOPriority(za, zb) {
     var sa = String(za || "").trim();
     var sb = String(zb || "").trim();
@@ -853,7 +873,7 @@
       if (aIsO && !bIsO) return -1;
       if (bIsO && !aIsO) return 1;
     }
-    return sa.localeCompare(sb, "ko");
+    return compareZoneAscending(sa, sb);
   }
 
   function compareValues(a, b, col) {
@@ -865,8 +885,10 @@
       var tb = Date.parse(b[col.key]);
       if (!isNaN(ta) && !isNaN(tb)) return ta - tb;
     }
-    if (col.key === "zone" && state.zoneOPriority) {
-      return compareZoneWithOPriority(a[col.key], b[col.key]);
+    if (col.key === "zone") {
+      return state.zoneOPriority
+        ? compareZoneWithOPriority(a[col.key], b[col.key])
+        : compareZoneAscending(a[col.key], b[col.key]);
     }
     return String(a[col.key]).localeCompare(String(b[col.key]), "ko");
   }
@@ -1313,23 +1335,27 @@
   // GT 라벨류(GT출력/할당출력/여분출력/커스텀출력) 인쇄 여백 — 프린터/라벨지에
   // 따라 필요한 여백이 달라질 수 있어 코드에 값을 고정하지 않고, 사용자가 "라벨
   // 여백 설정" 모달에서 mm 단위로 직접 조절해 localStorage에 저장하도록 함.
-  // 라벨 콘텐츠 자체(w-[5cm] h-[4cm])는 항상 고정, 오른쪽/아래쪽 여유 공간만 조절됨.
+  // 라벨 콘텐츠 자체(w-[5cm] h-[4cm])는 항상 고정, 4방향 여유 공간만 조절됨.
   function loadLabelMargin() {
     var right = parseFloat(localStorage.getItem(LABEL_MARGIN_RIGHT_KEY));
     var bottom = parseFloat(localStorage.getItem(LABEL_MARGIN_BOTTOM_KEY));
+    var left = parseFloat(localStorage.getItem(LABEL_MARGIN_LEFT_KEY));
+    var top = parseFloat(localStorage.getItem(LABEL_MARGIN_TOP_KEY));
     return {
       right: isNaN(right) ? LABEL_MARGIN_DEFAULT : right,
-      bottom: isNaN(bottom) ? LABEL_MARGIN_DEFAULT : bottom
+      bottom: isNaN(bottom) ? LABEL_MARGIN_DEFAULT : bottom,
+      left: isNaN(left) ? LABEL_MARGIN_LEFT_TOP_DEFAULT : left,
+      top: isNaN(top) ? LABEL_MARGIN_LEFT_TOP_DEFAULT : top
     };
   }
 
-  function applyGtLabelPageStyle(rightMm, bottomMm) {
+  function applyGtLabelPageStyle(rightMm, bottomMm, leftMm, topMm) {
     var styleEl = document.getElementById("gtLabelPageStyleOverride");
     if (!styleEl) return;
-    var pageWidthCm = 5 + rightMm / 10;
-    var pageHeightCm = 4 + bottomMm / 10;
+    var pageWidthCm = 5 + rightMm / 10 + leftMm / 10;
+    var pageHeightCm = 4 + bottomMm / 10 + topMm / 10;
     styleEl.textContent =
-      "@media print { @page pick-label { size: " + pageWidthCm + "cm " + pageHeightCm + "cm; margin: 0 " + rightMm + "mm " + bottomMm + "mm 0; } }";
+      "@media print { @page pick-label { size: " + pageWidthCm + "cm " + pageHeightCm + "cm; margin: " + topMm + "mm " + rightMm + "mm " + bottomMm + "mm " + leftMm + "mm; } }";
   }
 
   // innerHTML 갱신 직후 곧바로 print()를 호출하면 브라우저가 레이아웃을 아직
@@ -2084,8 +2110,22 @@
       var tr = e.target.closest(".row-picker-row");
       if (!tr) return;
       e.preventDefault();
-      rowPickerDragSelecting = true;
       var id = tr.dataset.rowId;
+
+      // Ctrl/Cmd+클릭: 범위선택 드래그를 시작하지 않고 이 행 하나만 마킹 토글 —
+      // 이렇게 모은 비연속(띄엄띄엄) 마킹도 이후 일반 클릭+드래그로 그대로 옮길 수 있다
+      // (바로 아래 "이미 여러 행이 마킹된 상태" 분기가 연속/비연속을 가리지 않기 때문).
+      if (e.ctrlKey || e.metaKey) {
+        if (rowPickerMarkedIds.has(id)) {
+          rowPickerMarkedIds.delete(id);
+        } else {
+          rowPickerMarkedIds.add(id);
+        }
+        tr.classList.toggle("bg-indigo-50", rowPickerMarkedIds.has(id));
+        return;
+      }
+
+      rowPickerDragSelecting = true;
       // 이미 여러 행이 마킹된 상태에서 그 중 하나를 다시 잡으면 기존 범위를
       // 유지한 채 이동 준비만 하고, 아니면 새로 이 행부터 범위를 시작한다.
       if (rowPickerMarkedIds.has(id) && rowPickerMarkedIds.size > 1) {
@@ -2139,7 +2179,7 @@
     rowPickerSelectedRows = [];
     rowPickerMarkedIds = new Set();
     rowPickerFilters = {};
-    rowPickerSortRules = [];
+    rowPickerSortRules = [{ key: "zone", dir: 1 }];
     els.rowPickerTitle.textContent = mode === "append" ? "작업자 " + (workerIdx + 1) + "에게 행 추가" : "커스텀 할당 만들기";
     els.rowPickerConfirmBtn.textContent = mode === "append" ? "추가" : "확정";
     els.rowPickerDateSelect.value = "";
@@ -2924,6 +2964,8 @@
     var margin = loadLabelMargin();
     els.labelMarginRightInput.value = margin.right;
     els.labelMarginBottomInput.value = margin.bottom;
+    els.labelMarginLeftInput.value = margin.left;
+    els.labelMarginTopInput.value = margin.top;
     openModalWithTransition(els.labelMarginModal, els.labelMarginModalBox);
   });
 
@@ -2934,11 +2976,17 @@
   els.labelMarginSaveBtn.addEventListener("click", function () {
     var right = parseFloat(els.labelMarginRightInput.value);
     var bottom = parseFloat(els.labelMarginBottomInput.value);
+    var left = parseFloat(els.labelMarginLeftInput.value);
+    var top = parseFloat(els.labelMarginTopInput.value);
     if (isNaN(right) || right < 0) right = LABEL_MARGIN_DEFAULT;
     if (isNaN(bottom) || bottom < 0) bottom = LABEL_MARGIN_DEFAULT;
+    if (isNaN(left) || left < 0) left = LABEL_MARGIN_LEFT_TOP_DEFAULT;
+    if (isNaN(top) || top < 0) top = LABEL_MARGIN_LEFT_TOP_DEFAULT;
     localStorage.setItem(LABEL_MARGIN_RIGHT_KEY, String(right));
     localStorage.setItem(LABEL_MARGIN_BOTTOM_KEY, String(bottom));
-    applyGtLabelPageStyle(right, bottom);
+    localStorage.setItem(LABEL_MARGIN_LEFT_KEY, String(left));
+    localStorage.setItem(LABEL_MARGIN_TOP_KEY, String(top));
+    applyGtLabelPageStyle(right, bottom, left, top);
     closeModalWithTransition(els.labelMarginModal, els.labelMarginModalBox);
     if (window.showToast) window.showToast("라벨 여백이 저장되었습니다.");
   });
@@ -2952,7 +3000,7 @@
   loadDateTabState();
   loadAssignState();
   loadGtState();
-  (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom); })();
+  (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom, margin.left, margin.top); })();
   applyCardCollapsed(loadFloorPanelCollapsed(), els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
   applyCardCollapsed(loadUploadCollapsed(), els.uploadToggleLabel, els.uploadToggleIcon, els.uploadCardBody, null);
   applyCardCollapsed(loadFilterSortCollapsed(), els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
