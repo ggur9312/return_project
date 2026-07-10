@@ -34,6 +34,7 @@
 
   var STORAGE_KEY = "pickListData";
   var SORT_RULES_KEY = "pickListSortRules";
+  var ZONE_O_PRIORITY_KEY = "pickListZoneOPriority";
   var LABOR_STORAGE_KEY = "pickListLaborInput";
   var ASSIGN_CONFIGS_KEY = "pickListAssignConfigs";
   var ASSIGN_ACTIVE_KEY = "pickListAssignActiveId";
@@ -325,6 +326,7 @@
   // 상태라 대상이 아니다.
   function saveSortRules() {
     localStorage.setItem(SORT_RULES_KEY, JSON.stringify(state.sortRules));
+    localStorage.setItem(ZONE_O_PRIORITY_KEY, state.zoneOPriority ? "1" : "");
   }
 
   function loadSortRules() {
@@ -334,6 +336,7 @@
     } catch (e) {
       // 저장된 값이 손상됐으면 state의 기본 정렬을 그대로 사용
     }
+    state.zoneOPriority = localStorage.getItem(ZONE_O_PRIORITY_KEY) === "1";
   }
 
   function setStatusMsg(msg, kind) {
@@ -615,6 +618,7 @@
     if (options.resetBtn) {
       options.resetBtn.addEventListener("click", function () {
         options.setSortRules([]);
+        if (options.onResetExtra) options.onResetExtra();
         options.onApply();
       });
     }
@@ -629,6 +633,9 @@
     resetBtn: els.sortResetBtn,
     getSortRules: function () { return state.sortRules; },
     setSortRules: function (rules) { state.sortRules = rules; },
+    // "정렬 초기화"는 O존 우선 정렬도 함께 끄는 게 자연스러움 — 커스텀 할당 쪽
+    // 컨트롤러는 이 옵션을 넘기지 않아 rowPickerZoneOPriority에는 영향 없음.
+    onResetExtra: function () { state.zoneOPriority = false; },
     onApply: function () { refreshAll(); }
   });
 
@@ -902,7 +909,7 @@
     return compareZoneAscending(sa, sb);
   }
 
-  function compareValues(a, b, col) {
+  function compareValues(a, b, col, zoneOPriority) {
     if (col.type === "number") {
       return (a[col.key] || 0) - (b[col.key] || 0);
     }
@@ -912,7 +919,7 @@
       if (!isNaN(ta) && !isNaN(tb)) return ta - tb;
     }
     if (col.key === "zone") {
-      return state.zoneOPriority
+      return zoneOPriority
         ? compareZoneWithOPriority(a[col.key], b[col.key])
         : compareZoneAscending(a[col.key], b[col.key]);
     }
@@ -927,7 +934,7 @@
     var copy = rows.slice();
     copy.sort(function (a, b) {
       for (var i = 0; i < activeRules.length; i++) {
-        var diff = compareValues(a, b, activeRules[i].col) * activeRules[i].dir;
+        var diff = compareValues(a, b, activeRules[i].col, state.zoneOPriority) * activeRules[i].dir;
         if (diff !== 0) return diff;
       }
       return 0;
@@ -2065,6 +2072,9 @@
   // 홈 화면의 state.filters/state.sortRules와는 독립적인, 이 화면 전용 필터/정렬 상태
   var rowPickerFilters = {};
   var rowPickerSortRules = [];
+  // 홈의 state.zoneOPriority와 별개인 이 화면 전용 O존 우선 플래그 — 홈처럼 저장하지
+  // 않고 기존대로 1회성(적용 직후 되돌림)으로 유지한다.
+  var rowPickerZoneOPriority = false;
 
   // 이미 어떤 assignConfig에도 배정된 행의 id 집합 — 중복 배정 방지용
   function getAssignedRowIdSet() {
@@ -2118,7 +2128,7 @@
     var copy = rows.slice();
     copy.sort(function (a, b) {
       for (var i = 0; i < activeRules.length; i++) {
-        var diff = compareValues(a, b, activeRules[i].col) * activeRules[i].dir;
+        var diff = compareValues(a, b, activeRules[i].col, rowPickerZoneOPriority) * activeRules[i].dir;
         if (diff !== 0) return diff;
       }
       return 0;
@@ -2432,6 +2442,7 @@
     rowPickerMarkedIds = new Set();
     rowPickerFilters = {};
     rowPickerSortRules = [{ key: "zone", dir: 1 }];
+    rowPickerZoneOPriority = false;
     els.rowPickerTitle.textContent = mode === "append" ? "작업자 " + (workerIdx + 1) + "에게 행 추가" : "커스텀 할당 만들기";
     els.rowPickerConfirmBtn.textContent = mode === "append" ? "추가" : "확정";
     updateRowPickerSelectionSummary();
@@ -3254,17 +3265,20 @@
 
   // 체크박스가 아니라 1회성 버튼 — 누른 순간에만 O존 우선 정렬을 적용하고,
   // 이후 다른 조작으로 인한 재렌더링에는 영향을 주지 않도록 곧바로 플래그를 되돌린다.
+  // 홈에서는 다른 페이지를 갔다 와도 유지돼야 하므로(정렬과 동일하게) 되돌리지 않는다 —
+  // refreshAll()의 홈 분기가 끝에서 saveSortRules()를 호출해 자동으로 저장된다.
   els.sortZoneOPriorityBtn.addEventListener("click", function () {
     state.zoneOPriority = true;
     refreshAll();
-    state.zoneOPriority = false;
     if (window.showToast) window.showToast("72·73층 O존 우선 정렬이 적용되었습니다.");
   });
 
+  // 커스텀 할당 화면은 자체 정렬(rowPickerSortRules)처럼 화면을 나가면 초기화되는 게
+  // 맞으므로, 홈과 별개인 rowPickerZoneOPriority로 기존과 동일하게 1회성 적용한다.
   els.rowPickerSortZoneOPriorityBtn.addEventListener("click", function () {
-    state.zoneOPriority = true;
+    rowPickerZoneOPriority = true;
     renderRowPickerAvailableList();
-    state.zoneOPriority = false;
+    rowPickerZoneOPriority = false;
     if (window.showToast) window.showToast("72·73층 O존 우선 정렬이 적용되었습니다.");
   });
 
