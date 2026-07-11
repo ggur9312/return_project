@@ -25,35 +25,40 @@ To verify a change actually works, drive the app in a real browser (Playwright w
 js/vendor/tailwindcss.browser.js   (Tailwind, browser JIT build)
 js/vendor/JsBarcode.all.min.js
 js/vendor/xlsx.full.min.js
-js/app.js     -- 집품 현황 screen, wrapped in its own IIFE
-js/truck.js   -- 트럭 현황 screen, NOT wrapped — declares directly in global scope
-js/shell.js   -- shared cross-screen UI utils, IIFE, exposes window.confirmModal / window.showToast / window.flashPageLoading
+js/truck.js         -- 트럭 현황 screen, NOT wrapped — declares directly in global scope
+js/shell.js         -- shared cross-screen UI utils, IIFE, exposes window.confirmModal / window.showToast / window.flashPageLoading
+js/pick/main.js     -- 집품 현황 screen entry point, loaded as <script type="module">
 ```
 
-- **`js/app.js`** (~3800 lines) is a single `(function () { "use strict"; ... })()`. Every function/variable inside is private to that closure — there is no module system, so "where is X defined" always means "grep inside this one IIFE."
-- **`js/truck.js`** is *not* wrapped — its top-level `let`/`const`/`function` declarations are real globals. It is a separate, older subsystem for truck loading cycles; it does not share state with `js/app.js` except through `window.confirmModal`/`window.showToast` from `shell.js`.
+- **`js/pick/*.js`** — the 집품 현황 screen, split into 6 ES modules (originally one ~3800-line `js/app.js`; split for editing/reading ergonomics, see next section). Loaded via `<script type="module" src="js/pick/main.js">`, which pulls in the other 5 files via `import`. Being a module, it's deferred (runs after HTML parsing) and placed *after* `js/truck.js`/`js/shell.js` in `index.html` specifically so `window.confirmModal`/`window.showToast` are guaranteed to exist first.
+- **`js/truck.js`** is *not* wrapped — its top-level `let`/`const`/`function` declarations are real globals. It is a separate, older subsystem for truck loading cycles; it does not share state with `js/pick/*` except through `window.confirmModal`/`window.showToast` from `shell.js`.
 - **`js/shell.js`** only provides tiny cross-cutting UI helpers (loading overlay, a shared confirm-modal promise wrapper, toast notifications). It has no domain logic.
 - `js/vendor/*` are unmodified third-party libraries (Tailwind JIT ~270KB, JsBarcode ~60KB, xlsx ~880KB). **Never grep or read these** — they are not part of this app's logic and reading them wastes a large amount of context for no benefit.
 
-## `js/app.js` structure (the file you'll touch most)
+## `js/pick/*.js` structure (the files you'll touch most)
 
-No ES modules — everything is one IIFE, organized top-to-bottom by section comments (`// --- X ---`). Approximate landmarks (grep the exact heading text since the file grows):
+Real ES modules (`import`/`export`), one file per domain. Grep the symbol name to find which file owns it rather than guessing from this table — it's a map, not gospel:
 
-| Lines | Section |
-|---|---|
-| 1–~430 | Column defs (`COLUMNS`, `ASSIGN_DETAIL_COLUMNS`, `ROW_PICKER_COLUMNS`), `state` object, `els` (all `document.getElementById` lookups, grabbed once), localStorage keys/load/save helpers |
-| ~430–678 | Home-screen row filtering/dedup/date helpers, zone-sort comparators (`compareZoneAscending`, `compareZoneWithOPriority`) |
-| ~559 | `// --- 정렬 ---` — `createSortBarController` factory + home's instantiation |
-| ~678 | `// --- 필터 바 컨트롤러 팩토리 ---` — `createFilterBarController` factory + home's instantiation. **Both factories are reused verbatim by the row-picker and the assign-panel screens** — before writing new filter/sort UI, check whether you can just instantiate these instead of hand-rolling HTML |
-| ~1101 | 홈 화면 생성일자 탭 |
-| ~1161 | 뷰 전환 (홈 / 집품 할당 / 커스텀 할당 / 트럭) |
-| ~1187 | 집품 할당(assignConfigs) persistence |
-| ~1218–2106 | GT 바코드 매칭/출력, 라벨 인쇄, 스페어 인쇄 |
-| ~2125–~3400 | 커스텀 할당 화면 (row-picker: drag-select, filter/sort via the same controller factories) *and* the 집품 할당 결과 화면 (`renderAssignPanel`, `renderAssignDetailTable`, `buildAssignMoveOptionsHtml`, `splitBalanced` — the zone-balancing algorithm) |
-| ~3399 | `// --- Event wiring ---` — nearly all `addEventListener` calls live here, at the bottom, after every function is already defined |
-| ~3767 | `// --- Init ---` — `*BarController.setup()` calls (must run exactly once), `loadFromStorage()`, `loadSortRules()`, `loadAssignState()`, initial render |
+| File | ~Lines | Owns |
+|---|---|---|
+| `core.js` | 1250 | `COLUMNS`/`ALL_COLUMNS`, `state`, `els` (every `document.getElementById`, grabbed once), all localStorage keys + load/save helpers, generic utils (`escapeHtml`, `debounce`, `parseFlexibleDate`, `filterRowsExceptKey`...), zone-sort comparators (`compareZoneAscending`, `compareZoneWithOPriority`), `createSortBarController`/`createFilterBarController` factories + home's own instantiation (`homeSortBarController`/`homeFilterBarController`), home's filtering/sorting engine, floor panel, date tabs, `switchView`, `assignConfigs` save/load |
+| `gt-print.js` | 630 | GT 바코드 관리/매칭, 라벨 출력 (barcode HTML, print modals), 스페어(여분) 출력 |
+| `assign-panel.js` | 900 | 집품 할당 전체: `splitBalanced`/`rebalanceContiguousGroups` (the zone-balancing algorithm), `ASSIGN_DETAIL_COLUMNS`, `renderAssignPanel`/`renderAssignDetailTable`, the assign screen's own filter/sort controllers (`assignFilterBarController`/`assignSortBarController`, built lazily — see gotcha below), create/confirm/delete-config flow |
+| `custom-assign.js` | 510 | 커스텀 할당 (row-picker) screen: drag-select, its own filter/sort controllers, `createCustomAssignment`, `confirmRowPicker` |
+| `home-table.js` | 195 | Home table rendering + home's own drag-select/Ctrl-click multi-select |
+| `main.js` | 390 | `refreshAll()` (re-renders whichever screen is visible) + **every** `addEventListener` call + the init sequence at the bottom (`loadFromStorage()`, `loadSortRules()`, `loadAssignState()`, `loadGtState()`, first render). This is the `<script type="module">` entry point. |
 
-Because function declarations are hoisted, code order inside the IIFE mostly doesn't matter for correctness — but keep new code near its thematic section rather than appending to the end.
+**Both `createSortBarController`/`createFilterBarController` factories (in `core.js`) are reused verbatim by home, row-picker, and the assign panel** — before writing new filter/sort UI, check whether you can just instantiate these instead of hand-rolling HTML.
+
+### Gotcha: circular imports and `els`/`state`
+
+`core.js` and several other files import from each other in both directions (e.g. `core.js` imports `refreshAll` from `main.js`; `custom-assign.js` and `assign-panel.js` both import `els`/`state` from `core.js`, while `core.js` imports helpers back from them). This is fine for `function` declarations (hoisted — always safe to call later, even mid-cycle) but **not** for reading a `var`-initialized object like `els`/`state` at a file's own top level, because the exporting module (`core.js`) may not have reached that assignment yet when the importing module's top-level code runs.
+
+Two consequences to keep in mind:
+- **Never reassign an imported binding directly.** ES module imports are read-only live views. If file A needs to mutate a piece of state that file B owns, add a setter/action function in B and call that from A — see `resetHomeMarkedIds()` (`home-table.js`), `nextCustomAssignSeq()` (`core.js`), `deleteAllRowPickerSelected()`/`moveMarkedRowsToSelected()`/`enableRowPickerZoneOPriority()` (`custom-assign.js`), `cancelSparePrintModal()`/`confirmSparePrintModal()` (`gt-print.js`) for the existing pattern.
+- **Don't read `els`/`state` (or call anything that touches them) at a *non-entry* module's top level.** `assignFilterBarController`/`assignSortBarController` (`assign-panel.js`) and `rowPickerFilterBarController`/`rowPickerSortBarController` (`custom-assign.js`) are declared as bare `export var X;` and only actually constructed inside an exported `initAssignPanelControllers()` / `initRowPickerControllers()` function, called explicitly from `main.js`'s init sequence — because `main.js` is the `<script type="module">` entry point, its own top-level code (including the init sequence) is guaranteed to run only after every other module has finished evaluating, so `els`/`state` are safe to use there. `main.js`'s huge top-level block of `els.foo.addEventListener(...)` calls relies on this same guarantee — don't move that logic into a non-entry file without applying the same deferred-init pattern.
+
+Because function declarations are hoisted, code order *within* a single file mostly doesn't matter for correctness — but keep new code near its thematic section (and in the file that owns the state it touches) rather than appending to the end.
 
 ## Core state shapes
 
@@ -62,6 +67,6 @@ Because function declarations are hoisted, code order inside the IIFE mostly doe
 - Zone strings encode floor + sub-zone with no separator (e.g. `"72A"`, `"72O"` = floor 72, zone O) — `getFloor()`/`isOZone()` parse this. 72/73-floor zones whose name is `"O"` are physically first on the walking route, hence the "O존 우선 정렬" feature threaded through every sort comparator via a `zoneOPriority` boolean argument.
 - Filter/sort UI state for a given screen is **not** persisted on the domain objects themselves (deliberately, to avoid saving throwaway UI state into `localStorage` alongside real data) — each screen keeps its own module-level map (e.g. `assignWorkerFilterState`/`assignWorkerSortState` keyed by config id) read through small getter helpers (`getAssignWorkerFilters(cfgId)`, etc.).
 
-## Working with the large `js/app.js` file
+## Working with `js/pick/*.js`
 
-The file is large (~3800 lines). Prefer targeted `Grep` for a function/class name to get its line number, then `Read` with `offset`/`limit` around that line, rather than reading the whole file. The section table above should get you within a few hundred lines of anything relevant.
+Grep for the symbol name across `js/pick/` to find which file owns it (the table above tells you roughly what's where, but confirm with grep before editing — files grow). Each file is small enough (200–1250 lines) to `Read` in full once you know which one you need.
