@@ -230,14 +230,6 @@
     { key: "quantity", label: "수량", type: "number" }
   ];
 
-  // renderAssignDetailTable이 table-layout:fixed로 표를 항상 카드 폭에 딱 맞추기
-  // 위한 컬럼별 퍼센트 폭(합 100% — 나머지 GT바코드/작업자이동/삭제 3칸은 함수 안에서
-  // 직접 지정). 화면 크기와 무관하게 표가 카드를 넘치지 않고, 넘치는 텍스트는
-  // 가로 스크롤 대신 말줄임(truncate)으로 처리한다.
-  var ASSIGN_DETAIL_COLUMN_WIDTHS = {
-    groupNo: 12, deadline: 12, createdAt: 12, company: 14, transportType: 8, zone: 7, quantity: 7
-  };
-
   // 집품 할당 필터바에서만 쓰는 "작업자" 가상 컬럼(실제 행 필드가 아니라 어느 작업자
   // 카드를 보여줄지 고르는 용도) 포함 목록 — getAssignPanelCandidateValues가 "__worker__"
   // 키를 특별 취급해서 후보값을 만든다.
@@ -261,54 +253,58 @@
     }).join("");
   }
 
+  // 컬럼별 truncate 최대폭(긴 자유텍스트 컬럼만) — table-layout:fixed의 퍼센트 강제
+  // 대신 내용에 따라 자연스럽게 폭이 잡히도록 하고, 정말 긴 값만 이 폭에서 말줄임(title
+  // 툴팁 병행)한다. 존/수량/운송타입처럼 짧고 정형화된 값은 폭 제한 없이 그대로 보여준다.
+  var ASSIGN_DETAIL_TRUNCATE_MAX_W = {
+    groupNo: "max-w-[110px]", deadline: "max-w-[140px]", createdAt: "max-w-[140px]", company: "max-w-[130px]"
+  };
+
   function renderAssignDetailTable(rows, cfgId, workerIdx, workerCount) {
     if (!rows.length) {
       return '<div class="px-5 py-6 text-center text-sm text-slate-400">배정 없음</div>';
     }
-    // table-layout:fixed라 <colgroup> 폭이 실제 렌더 폭을 결정 — 카드/화면 크기와
-    // 무관하게 표가 항상 카드 폭 100%에 맞고, 넘치는 텍스트는 truncate로 말줄임된다.
-    var colgroupHtml = "<colgroup>" +
-      ASSIGN_DETAIL_COLUMNS.map(function (col) {
-        return '<col style="width:' + ASSIGN_DETAIL_COLUMN_WIDTHS[col.key] + '%">';
-      }).join("") +
-      '<col style="width:14%"><col style="width:9%"><col style="width:5%">' +
-      "</colgroup>";
     var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
-      return '<th class="px-3 py-2.5 text-left truncate' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
+      return '<th class="px-3 py-2.5 text-left whitespace-nowrap' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
     }).join("") + '<th class="px-3 py-2.5 text-left">GT 바코드</th><th class="px-3 py-2.5 text-right">작업자</th><th class="px-3 py-2.5"></th>';
     var moveOptionsHtml = buildAssignMoveOptionsHtml(cfgId, workerIdx);
-    var bodyHtml = rows.map(function (r) {
+    var bodyHtml = rows.map(function (r, i) {
       var gtKey = cfgId + ":" + r.id;
       var gtValue = state.gtAssignments[gtKey] || "";
       var moveSelectHtml = (workerCount > 1 || state.assignConfigs.length > 1)
         ? '<select class="assign-result-row-select w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-row-id="' + escapeHtml(r.id) + '" data-from-worker="' + workerIdx + '" data-from-cfg="' + escapeHtml(String(cfgId)) + '">' + moveOptionsHtml + "</select>"
         : "";
+      var rowBg = i % 2 === 1 ? "bg-slate-50/60" : "bg-white";
       return (
-        '<tr class="hover:bg-slate-50/80 transition-colors">' +
+        '<tr class="' + rowBg + ' hover:bg-indigo-50/40 transition-colors">' +
         ASSIGN_DETAIL_COLUMNS.map(function (col) {
+          var maxW = ASSIGN_DETAIL_TRUNCATE_MAX_W[col.key];
+          var truncateCls = maxW ? (" truncate " + maxW) : " whitespace-nowrap";
           if (col.key === "quantity") {
-            return '<td class="px-3 py-2 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
+            return '<td class="px-3 py-2.5 text-right tabular-nums text-slate-700 whitespace-nowrap">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
           }
           if (col.key === "groupNo") {
-            return '<td class="px-3 py-2 font-semibold text-slate-900 truncate" title="' + escapeHtml(r.groupNo) + '">' + escapeHtml(r.groupNo) + "</td>";
+            return '<td class="px-3 py-2.5 font-semibold text-slate-900' + truncateCls + '" title="' + escapeHtml(r.groupNo) + '">' + escapeHtml(r.groupNo) + "</td>";
+          }
+          if (col.key === "zone") {
+            return '<td class="px-3 py-2.5 font-medium text-slate-700 whitespace-nowrap">' + escapeHtml(r.zone) + "</td>";
           }
           if (col.key === "deadline" || col.key === "createdAt") {
             var displayVal = formatDateDisplay(r[col.key]);
-            return '<td class="px-3 py-2 text-slate-700 truncate" title="' + escapeHtml(displayVal) + '">' + escapeHtml(displayVal) + "</td>";
+            return '<td class="px-3 py-2.5 text-slate-700' + truncateCls + '" title="' + escapeHtml(displayVal) + '">' + escapeHtml(displayVal) + "</td>";
           }
-          return '<td class="px-3 py-2 text-slate-700 truncate" title="' + escapeHtml(r[col.key]) + '">' + escapeHtml(r[col.key]) + "</td>";
+          return '<td class="px-3 py-2.5 text-slate-700' + truncateCls + '" title="' + escapeHtml(r[col.key]) + '">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
-        '<td class="px-3 py-2"><input type="text" class="assign-gt-input w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '"></td>' +
-        '<td class="px-3 py-2 text-right">' + moveSelectHtml + "</td>" +
-        '<td class="px-3 py-2 text-right"><button type="button" class="assign-result-row-delete-btn text-slate-300 hover:text-rose-500 transition-colors" data-row-id="' + escapeHtml(r.id) + '" data-worker-idx="' + workerIdx + '" title="배정에서 빼기">✕</button></td>' +
+        '<td class="px-3 py-2.5 min-w-[130px]"><input type="text" class="assign-gt-input w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '"></td>' +
+        '<td class="px-3 py-2.5 text-right min-w-[110px]">' + moveSelectHtml + "</td>" +
+        '<td class="px-3 py-2.5 text-right"><button type="button" class="assign-result-row-delete-btn inline-flex items-center justify-center w-6 h-6 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" data-row-id="' + escapeHtml(r.id) + '" data-worker-idx="' + workerIdx + '" title="배정에서 빼기">✕</button></td>' +
         "</tr>"
       );
     }).join("");
     return (
-      '<div class="overflow-x-auto px-5">' +
-      '<table class="w-full border-collapse text-left text-xs table-fixed">' +
-      colgroupHtml +
-      '<thead><tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">' + headHtml + "</tr></thead>" +
+      '<div class="overflow-x-auto px-5 pb-1">' +
+      '<table class="w-full border-collapse text-left text-xs">' +
+      '<thead><tr class="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600">' + headHtml + "</tr></thead>" +
       '<tbody class="divide-y divide-slate-100">' + bodyHtml + "</tbody>" +
       "</table></div>"
     );
@@ -485,6 +481,20 @@
     });
   }
 
+  // 작업자 카드 헤더에 인덱스별로 순환 적용하는 색상 — "전체" 보기에서 카드가 여러 개
+  // 쌓였을 때 전부 같은 색이라 하나로 뭉쳐 보이던 문제(카드마다 구분이 안 됨)를
+  // 해결하기 위해, 카드마다 다른 색으로 즉시 구분되게 한다. rail은 헤더를 지나
+  // 스크롤해도 어느 작업자 구역인지 계속 보이도록 카드 왼쪽에 얇게 붙이는 액센트 바.
+  // 색상 순서는 바로 옆 카드끼리 색상환에서 최대한 멀리 떨어지도록(인디고→앰버→틸→로즈→스카이)
+  // 골라, 인접한 두 카드가 비슷한 색이라 헷갈리는 일이 없게 했다.
+  var WORKER_CARD_ACCENTS = [
+    { header: "bg-indigo-50/80 border-indigo-100", rail: "border-l-indigo-400" },
+    { header: "bg-amber-50/80 border-amber-100", rail: "border-l-amber-400" },
+    { header: "bg-teal-50/80 border-teal-100", rail: "border-l-teal-400" },
+    { header: "bg-rose-50/80 border-rose-100", rail: "border-l-rose-400" },
+    { header: "bg-sky-50/80 border-sky-100", rail: "border-l-sky-400" }
+  ];
+
   function renderAssignPanel() {
     var cfg = state.assignConfigs.find(function (c) { return c.id === state.assignActiveId; });
     if (!cfg) {
@@ -536,20 +546,25 @@
       var total = detailRows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
       var zoneList = Array.from(new Set(detailRows.map(function (r) { return r.zone; }).filter(Boolean))).join(", ");
       var isPrinted = !!(cfg.printedWorkerIdx && cfg.printedWorkerIdx[idx]);
+      var accent = WORKER_CARD_ACCENTS[idx % WORKER_CARD_ACCENTS.length];
+      var ghostBtn = "inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 font-medium text-xs px-2.5 py-1.5 rounded-md transition-colors";
       return (
-        '<div class="bg-white border border-slate-200 rounded-2xl shadow-md overflow-hidden">' +
-        '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-indigo-50/70 border-b border-indigo-100">' +
+        '<div class="bg-white border-t border-r border-b border-slate-200 border-l-4 ' + accent.rail + ' rounded-2xl shadow-md overflow-hidden">' +
+        '<div class="px-5 py-3 ' + accent.header + ' border-b space-y-2">' +
+        '<div class="flex items-center justify-between flex-wrap gap-2">' +
         '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) +
-        (isPrinted ? ' <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 align-middle">✓ 출력됨</span>' : "") +
+        (isPrinted ? ' <span class="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white shadow-sm align-middle">✓ 출력됨</span>' : "") +
         (zoneList ? '<span class="ml-2 text-xs font-normal text-slate-500">담당 존: ' + escapeHtml(zoneList) + "</span>" : "") + "</div>" +
-        '<div class="flex items-center gap-3">' +
         '<div class="text-sm font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + detailRows.length + "장</div>" +
-        '<button type="button" class="assign-add-row-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">할당 추가</button>' +
-        '<button type="button" class="assign-automatch-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
-        '<button type="button" class="assign-gt-reset-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
-        '<button type="button" class="assign-spare-print-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">여분 출력</button>' +
+        "</div>" +
+        '<div class="flex items-center justify-end flex-wrap gap-1">' +
+        '<button type="button" class="assign-add-row-btn ' + ghostBtn + '" data-worker-idx="' + idx + '">할당 추가</button>' +
+        '<button type="button" class="assign-automatch-btn ' + ghostBtn + '" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
+        '<button type="button" class="assign-gt-reset-btn ' + ghostBtn + '" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
+        '<button type="button" class="assign-spare-print-btn ' + ghostBtn + '" data-worker-idx="' + idx + '">여분 출력</button>' +
         '<button type="button" class="assign-print-btn bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all duration-150" data-worker-idx="' + idx + '">출력</button>' +
         (groups.length > 1 ? '<button type="button" class="assign-delete-worker-btn bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">삭제</button>' : "") +
+        "</div>" +
         "</div>" +
         renderAssignDetailTable(getAssignWorkerSortedRows(computeAssignWorkerFilteredRows(detailRows, cfg.id), cfg.id), cfg.id, idx, groups.length) +
         "</div>"
@@ -932,7 +947,6 @@
   Pick.getAssignRowItems = getAssignRowItems;
   Pick.renderAssignTabs = renderAssignTabs;
   Pick.ASSIGN_DETAIL_COLUMNS = ASSIGN_DETAIL_COLUMNS;
-  Pick.ASSIGN_DETAIL_COLUMN_WIDTHS = ASSIGN_DETAIL_COLUMN_WIDTHS;
   Pick.ASSIGN_FILTER_COLUMNS = ASSIGN_FILTER_COLUMNS;
   Pick.buildAssignMoveOptionsHtml = buildAssignMoveOptionsHtml;
   Pick.renderAssignDetailTable = renderAssignDetailTable;

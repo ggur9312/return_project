@@ -199,7 +199,7 @@
   });
 
   var debouncedRenderFloorPanel = debounce(function () {
-    renderFloorPanel(getFilteredRows());
+    renderFloorPanel(getFilteredRows(), getDateScopedRows());
   }, 200);
 
   els.laborInput.addEventListener("input", function () {

@@ -48,6 +48,24 @@ There is no debug hook / global `state` export. The only way to get rows into
 Omitting the header row silently fails validation (`assignMsg`/`statusMsg`
 will say a column/header is missing or no dates found) — always prepend it.
 
+### Home "층별 인원 배치 계산" floor panel
+
+Collapsible section (`#floorPanelCard`, toggle `#floorPanelToggleBtn`,
+default state read from localStorage — expand explicitly if a test needs to
+read `#floorBars` and it might start collapsed). `renderFloorPanel()` in
+`js/pick/core.js` buckets rows by exact floor code (`getFloor(zone)`, e.g.
+"72", "73", "9") into per-floor rows. **In addition**, whenever 2+ distinct
+floor codes share the same leading digit (e.g. "72"/"73" both start with
+"7"), a bold "N층대" summary row (`bg-indigo-50 border-indigo-100`, no
+progress bar — the middle column instead lists which floors it combines,
+e.g. "72층 + 73층") is inserted directly before those floors' individual
+rows. A floor with no same-leading-digit sibling (e.g. a lone "9") gets no
+family row — only shown when it actually combines something. The same
+family totals are prefixed onto `#floorPanelSummary`'s collapsed-state text.
+`#laborInput` changes trigger `debouncedRenderFloorPanel()` (200ms debounce,
+`js/pick/main.js`) which computes labor-per-floor and labor-per-family the
+same way.
+
 ### Picking-allocation ("집품 할당") flow
 
 - Open modal: `#assignOpenModalBtn`.
@@ -91,12 +109,20 @@ Clicking the button directly while the panel is collapsed times out
   home's `#sortZoneOPriorityBtn` and row-picker's `#rowPickerSortZoneOPriorityBtn`
   — three independent flags, one per screen, all non-persisted).
 - Worker cards: `#assignTableContainer > div.space-y-8 > div` (bg-white,
-  rounded-2xl, shadow-md — the extra gap/shadow and the `bg-indigo-50/70`
-  card-header tint exist specifically so 2+ cards in "전체" view read as
-  separate blocks instead of blending together). Filter/sort candidate
-  values are scoped to whichever workers currently pass the "작업자" virtual
-  filter — see `getAssignPanelCandidateValues` in `js/pick/assign-panel.js`
-  if a test needs exact candidate-list behavior.
+  rounded-2xl, shadow-md, `border-l-4` left accent). Each card's header tint
+  and left accent rail cycle through `WORKER_CARD_ACCENTS` in
+  `js/pick/assign-panel.js` (indigo/amber/teal/rose/sky, chosen so adjacent
+  cards never look alike) so 2+ cards in "전체" view read as separate blocks
+  instead of blending together — don't assume a fixed header color when
+  asserting on card styling, check `WORKER_CARD_ACCENTS[idx % 5]` instead.
+  The "✓ 출력됨" badge is a solid `bg-emerald-500 text-white` pill (not a pale
+  `emerald-50` tint) specifically so it stays visible after printing. The
+  detail table inside each card no longer uses `table-fixed`/`<colgroup>`
+  percentage widths — columns size to content, with `truncate`+`title`
+  tooltip only on the long free-text columns (그룹번호/마감일시/생성일시/업체명).
+  Filter/sort candidate values are scoped to whichever workers currently pass
+  the "작업자" virtual filter — see `getAssignPanelCandidateValues` in
+  `js/pick/assign-panel.js` if a test needs exact candidate-list behavior.
 
 ## Gotchas learned
 

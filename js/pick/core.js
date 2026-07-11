@@ -1025,6 +1025,14 @@
       "전체: " + unfilteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
   }
 
+  // 층 코드의 첫 글자가 숫자면 그 숫자를 "층대" 키로 추출(72→"7", 73→"7", 9→"9",
+  // 10→"1") — 72층/73층처럼 첫자리가 같은 여러 층을 묶어 보여주기 위함. 문자로
+  // 시작하는 층 코드나 "(미지정)"은 묶을 대상이 아니므로 null을 반환한다.
+  function getFloorFamily(floor) {
+    var m = String(floor || "").match(/^\d/);
+    return m ? m[0] : null;
+  }
+
   function renderFloorPanel(rows, unfilteredRows) {
     var byFloor = {};
     rows.forEach(function (r) {
@@ -1032,6 +1040,19 @@
       byFloor[floor] = (byFloor[floor] || 0) + (r.quantity || 0);
     });
     var floors = Object.keys(byFloor).sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); });
+
+    // 실제로 같은 첫자리를 공유하는 층이 2개 이상일 때만 "층대" 합계를 보여준다 —
+    // 층이 하나뿐이면 "N층대"가 "N층"과 완전히 같은 값이라 중복 표시가 된다.
+    var familyQty = {};
+    var familyMembers = {};
+    floors.forEach(function (f) {
+      var family = getFloorFamily(f);
+      if (!family) return;
+      familyQty[family] = (familyQty[family] || 0) + byFloor[f];
+      familyMembers[family] = familyMembers[family] || [];
+      familyMembers[family].push(f);
+    });
+    var multiFamilies = Object.keys(familyQty).filter(function (fam) { return familyMembers[fam].length > 1; });
 
     var totalQty = floors.reduce(function (sum, f) { return sum + byFloor[f]; }, 0);
     els.floorTotalQty.textContent = totalQty.toLocaleString("ko-KR") + "개";
@@ -1043,10 +1064,16 @@
     els.floorPerPersonQty.textContent = perPersonText;
     var maxQty = floors.reduce(function (m, f) { return Math.max(m, byFloor[f]); }, 0) || 1;
 
+    var familySummaryText = multiFamilies
+      .sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); })
+      .map(function (fam) { return fam + "층대 " + familyQty[fam].toLocaleString("ko-KR") + "개"; })
+      .join(" · ");
+    var floorSummaryText = floors.map(function (f) { return f + "층 " + byFloor[f].toLocaleString("ko-KR") + "개"; }).join(" · ");
     els.floorPanelSummary.textContent = floors.length
-      ? floors.map(function (f) { return f + "층 " + byFloor[f].toLocaleString("ko-KR") + "개"; }).join(" · ")
+      ? (familySummaryText ? familySummaryText + " · " : "") + floorSummaryText
       : "데이터 없음";
 
+    var renderedFamilies = {};
     els.floorBars.innerHTML = floors.map(function (f) {
       var qty = byFloor[f];
       var widthPct = (qty / maxQty) * 100;
@@ -1063,7 +1090,7 @@
         laborHtml = '<span class="text-slate-400">-</span>';
         perPersonHtml = '<span class="text-slate-400">-</span>';
       }
-      return (
+      var floorRowHtml = (
         '<div class="grid grid-cols-[60px_1fr_90px_110px_100px] items-center gap-2.5 text-xs">' +
         '<div class="text-slate-500 whitespace-nowrap">' + escapeHtml(f) + "층</div>" +
         '<div class="bg-slate-100 rounded-full overflow-hidden h-[10px]"><div class="bg-indigo-500 h-full rounded-full" style="width:' + widthPct + '%"></div></div>' +
@@ -1072,6 +1099,37 @@
         '<div class="text-right tabular-nums text-slate-500">' + perPersonHtml + "</div>" +
         "</div>"
       );
+
+      // 이 층이 속한 "층대"를 처음 만나는 시점에, 개별 층 막대들보다 먼저 굵게
+      // 강조된 요약 줄(예: "7층대 500개")을 끼워 넣는다. 가운데 칸(막대 자리)에는
+      // 진행바 대신 어느 층들이 합쳐졌는지("72층+73층") 보여준다.
+      var family = getFloorFamily(f);
+      var familyHeaderHtml = "";
+      if (family && multiFamilies.indexOf(family) !== -1 && !renderedFamilies[family]) {
+        renderedFamilies[family] = true;
+        var famQty = familyQty[family];
+        var famLaborHtml, famPerPersonHtml;
+        if (hasLabor) {
+          var famLaborRaw = labor * (famQty / totalQty);
+          famLaborHtml = '<span class="inline-block bg-indigo-100 text-indigo-800 border border-indigo-200 text-sm font-bold px-3 py-1 rounded-full">' + famLaborRaw.toFixed(1) + "명</span>";
+          var famRoundedLabor = Math.round(famLaborRaw);
+          famPerPersonHtml = famRoundedLabor > 0
+            ? Math.round(famQty / famRoundedLabor).toLocaleString("ko-KR") + "개/인"
+            : '<span class="text-slate-400">-</span>';
+        } else {
+          famLaborHtml = '<span class="text-slate-400">-</span>';
+          famPerPersonHtml = '<span class="text-slate-400">-</span>';
+        }
+        familyHeaderHtml =
+          '<div class="grid grid-cols-[60px_1fr_90px_110px_100px] items-center gap-2.5 text-xs bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1.5">' +
+          '<div class="text-indigo-700 font-bold whitespace-nowrap">' + escapeHtml(family) + "층대</div>" +
+          '<div class="text-[11px] text-indigo-400 font-medium truncate">' + familyMembers[family].map(function (m) { return escapeHtml(m) + "층"; }).join(" + ") + "</div>" +
+          '<div class="text-right tabular-nums font-bold text-indigo-700">' + famQty.toLocaleString("ko-KR") + "개</div>" +
+          '<div class="text-right tabular-nums">' + famLaborHtml + "</div>" +
+          '<div class="text-right tabular-nums text-indigo-500">' + famPerPersonHtml + "</div>" +
+          "</div>";
+      }
+      return familyHeaderHtml + floorRowHtml;
     }).join("");
   }
 
