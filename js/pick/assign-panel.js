@@ -253,19 +253,30 @@
     }).join("");
   }
 
-  // 컬럼별 truncate 최대폭(긴 자유텍스트 컬럼만) — table-layout:fixed의 퍼센트 강제
-  // 대신 내용에 따라 자연스럽게 폭이 잡히도록 하고, 정말 긴 값만 이 폭에서 말줄임(title
-  // 툴팁 병행)한다. 존/수량/운송타입처럼 짧고 정형화된 값은 폭 제한 없이 그대로 보여준다.
-  var ASSIGN_DETAIL_TRUNCATE_MAX_W = {
-    groupNo: "max-w-[110px]", deadline: "max-w-[140px]", createdAt: "max-w-[140px]", company: "max-w-[130px]"
+  // renderAssignDetailTable이 table-layout:fixed로 표를 항상 카드 폭에 딱 맞추기
+  // 위한 컬럼별 퍼센트 폭(합 100% — 나머지 GT바코드/작업자이동/삭제 3칸은 함수 안에서
+  // 직접 지정). table-layout:auto(내용 기반 자연폭)로 해봤더니 <input>/<select>가 든
+  // 유연한 셀이 남는 공간을 과도하게 흡수해 양쪽 끝(그룹번호/작업자) 컬럼이 부자연스럽게
+  // 좁아지고 표가 카드에 고르게 안 맞는 문제가 있어 고정폭으로 되돌렸다 — 원래 퍼센트보다
+  // GT바코드/작업자 칸은 더 넉넉하게 잡음.
+  var ASSIGN_DETAIL_COLUMN_WIDTHS = {
+    groupNo: 10, deadline: 10, createdAt: 10, company: 12, transportType: 8, zone: 8, quantity: 8
   };
 
   function renderAssignDetailTable(rows, cfgId, workerIdx, workerCount) {
     if (!rows.length) {
       return '<div class="px-5 py-6 text-center text-sm text-slate-400">배정 없음</div>';
     }
+    // table-layout:fixed라 <colgroup> 폭이 실제 렌더 폭을 결정 — 카드/화면 크기와
+    // 무관하게 표가 항상 카드 폭 100%에 맞고, 넘치는 텍스트는 truncate로 말줄임된다.
+    var colgroupHtml = "<colgroup>" +
+      ASSIGN_DETAIL_COLUMNS.map(function (col) {
+        return '<col style="width:' + ASSIGN_DETAIL_COLUMN_WIDTHS[col.key] + '%">';
+      }).join("") +
+      '<col style="width:18%"><col style="width:11%"><col style="width:5%">' +
+      "</colgroup>";
     var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
-      return '<th class="px-3 py-2.5 text-left whitespace-nowrap' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
+      return '<th class="px-3 py-2.5 text-left truncate' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
     }).join("") + '<th class="px-3 py-2.5 text-left">GT 바코드</th><th class="px-3 py-2.5 text-right">작업자</th><th class="px-3 py-2.5"></th>';
     var moveOptionsHtml = buildAssignMoveOptionsHtml(cfgId, workerIdx);
     var bodyHtml = rows.map(function (r, i) {
@@ -278,32 +289,28 @@
       return (
         '<tr class="' + rowBg + ' hover:bg-indigo-50/40 transition-colors">' +
         ASSIGN_DETAIL_COLUMNS.map(function (col) {
-          var maxW = ASSIGN_DETAIL_TRUNCATE_MAX_W[col.key];
-          var truncateCls = maxW ? (" truncate " + maxW) : " whitespace-nowrap";
           if (col.key === "quantity") {
-            return '<td class="px-3 py-2.5 text-right tabular-nums text-slate-700 whitespace-nowrap">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
+            return '<td class="px-3 py-2.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
           }
           if (col.key === "groupNo") {
-            return '<td class="px-3 py-2.5 font-semibold text-slate-900' + truncateCls + '" title="' + escapeHtml(r.groupNo) + '">' + escapeHtml(r.groupNo) + "</td>";
-          }
-          if (col.key === "zone") {
-            return '<td class="px-3 py-2.5 font-medium text-slate-700 whitespace-nowrap">' + escapeHtml(r.zone) + "</td>";
+            return '<td class="px-3 py-2.5 font-semibold text-slate-900 truncate" title="' + escapeHtml(r.groupNo) + '">' + escapeHtml(r.groupNo) + "</td>";
           }
           if (col.key === "deadline" || col.key === "createdAt") {
             var displayVal = formatDateDisplay(r[col.key]);
-            return '<td class="px-3 py-2.5 text-slate-700' + truncateCls + '" title="' + escapeHtml(displayVal) + '">' + escapeHtml(displayVal) + "</td>";
+            return '<td class="px-3 py-2.5 text-slate-700 truncate" title="' + escapeHtml(displayVal) + '">' + escapeHtml(displayVal) + "</td>";
           }
-          return '<td class="px-3 py-2.5 text-slate-700' + truncateCls + '" title="' + escapeHtml(r[col.key]) + '">' + escapeHtml(r[col.key]) + "</td>";
+          return '<td class="px-3 py-2.5 text-slate-700 truncate" title="' + escapeHtml(r[col.key]) + '">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
-        '<td class="px-3 py-2.5 min-w-[130px]"><input type="text" class="assign-gt-input w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '"></td>' +
-        '<td class="px-3 py-2.5 text-right min-w-[110px]">' + moveSelectHtml + "</td>" +
+        '<td class="px-3 py-2.5"><input type="text" class="assign-gt-input w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '"></td>' +
+        '<td class="px-3 py-2.5 text-right">' + moveSelectHtml + "</td>" +
         '<td class="px-3 py-2.5 text-right"><button type="button" class="assign-result-row-delete-btn inline-flex items-center justify-center w-6 h-6 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" data-row-id="' + escapeHtml(r.id) + '" data-worker-idx="' + workerIdx + '" title="배정에서 빼기">✕</button></td>' +
         "</tr>"
       );
     }).join("");
     return (
       '<div class="overflow-x-auto px-5 pb-1">' +
-      '<table class="w-full border-collapse text-left text-xs">' +
+      '<table class="w-full border-collapse text-left text-xs table-fixed">' +
+      colgroupHtml +
       '<thead><tr class="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600">' + headHtml + "</tr></thead>" +
       '<tbody class="divide-y divide-slate-100">' + bodyHtml + "</tbody>" +
       "</table></div>"
@@ -547,7 +554,7 @@
       var zoneList = Array.from(new Set(detailRows.map(function (r) { return r.zone; }).filter(Boolean))).join(", ");
       var isPrinted = !!(cfg.printedWorkerIdx && cfg.printedWorkerIdx[idx]);
       var accent = WORKER_CARD_ACCENTS[idx % WORKER_CARD_ACCENTS.length];
-      var ghostBtn = "inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 font-medium text-xs px-2.5 py-1.5 rounded-md transition-colors";
+      var outlineBtn = "inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
       return (
         '<div class="bg-white border-t border-r border-b border-slate-200 border-l-4 ' + accent.rail + ' rounded-2xl shadow-md overflow-hidden">' +
         '<div class="px-5 py-3 ' + accent.header + ' border-b space-y-2">' +
@@ -557,11 +564,11 @@
         (zoneList ? '<span class="ml-2 text-xs font-normal text-slate-500">담당 존: ' + escapeHtml(zoneList) + "</span>" : "") + "</div>" +
         '<div class="text-sm font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + detailRows.length + "장</div>" +
         "</div>" +
-        '<div class="flex items-center justify-end flex-wrap gap-1">' +
-        '<button type="button" class="assign-add-row-btn ' + ghostBtn + '" data-worker-idx="' + idx + '">할당 추가</button>' +
-        '<button type="button" class="assign-automatch-btn ' + ghostBtn + '" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
-        '<button type="button" class="assign-gt-reset-btn ' + ghostBtn + '" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
-        '<button type="button" class="assign-spare-print-btn ' + ghostBtn + '" data-worker-idx="' + idx + '">여분 출력</button>' +
+        '<div class="flex items-center justify-end flex-wrap gap-2">' +
+        '<button type="button" class="assign-add-row-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">할당 추가</button>' +
+        '<button type="button" class="assign-automatch-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
+        '<button type="button" class="assign-gt-reset-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
+        '<button type="button" class="assign-spare-print-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">여분 출력</button>' +
         '<button type="button" class="assign-print-btn bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all duration-150" data-worker-idx="' + idx + '">출력</button>' +
         (groups.length > 1 ? '<button type="button" class="assign-delete-worker-btn bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">삭제</button>' : "") +
         "</div>" +

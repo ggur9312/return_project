@@ -117,9 +117,17 @@ Clicking the button directly while the panel is collapsed times out
   asserting on card styling, check `WORKER_CARD_ACCENTS[idx % 5]` instead.
   The "✓ 출력됨" badge is a solid `bg-emerald-500 text-white` pill (not a pale
   `emerald-50` tint) specifically so it stays visible after printing. The
-  detail table inside each card no longer uses `table-fixed`/`<colgroup>`
-  percentage widths — columns size to content, with `truncate`+`title`
-  tooltip only on the long free-text columns (그룹번호/마감일시/생성일시/업체명).
+  header's secondary buttons (할당 추가/미사용 GT 자동매칭/GT 바코드 초기화/여분 출력)
+  use the same bordered white `outlineBtn` style as 출력/삭제 (a borderless
+  "ghost" variant was tried and reverted — users couldn't tell they were
+  clickable). The detail table inside each card uses `table-fixed` +
+  `<colgroup>` percentage widths again (`ASSIGN_DETAIL_COLUMN_WIDTHS` in
+  `js/pick/assign-panel.js`, roomier than the original: 10/10/10/12/8/8/8 for
+  the 7 data columns, 18/11/5 for GT바코드/작업자/삭제) — a `table-layout:auto`
+  version was tried and reverted because flexible `<input>`/`<select>` cells
+  soaked up leftover width unevenly, squeezing the first/last columns and
+  making the table look mismatched with the card. `truncate`+`title` tooltip
+  still applies to every column (colgroup width is a hard cap, not a hint).
   Filter/sort candidate values are scoped to whichever workers currently pass
   the "작업자" virtual filter — see `getAssignPanelCandidateValues` in
   `js/pick/assign-panel.js` if a test needs exact candidate-list behavior.
