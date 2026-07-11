@@ -856,8 +856,17 @@
 <script src="js/truck.js"></script>
 <script src="js/shell.js"></script>
 <!-- 집품 현황 화면 로직 — 예전엔 js/app.js 하나(약 3800줄)였다가 여러 파일로 분할됨.
-     ES 모듈이라 defer(파싱 완료 후 실행)되므로, window.confirmModal/showToast를
-     제공하는 shell.js보다 뒤에 둬 항상 그 다음에 실행되게 한다. -->
-<script type="module" src="js/pick/main.js"></script>
+     ES 모듈(<script type="module">)은 file://로 열면 CORS 정책 때문에 import가
+     전면 차단되어 더블클릭 실행이 깨지므로, 대신 window.Pick 공유 네임스페이스
+     객체로 서로 연결되는 일반 스크립트로 로드한다. core.js가 없으면 나머지가
+     동작하지 않으므로 반드시 먼저, main.js는 모든 초기화를 실행하므로 반드시
+     마지막에 온다 — window.confirmModal/showToast를 제공하는 shell.js보다도 뒤에
+     둬 그 다음에 실행되게 한다. -->
+<script src="js/pick/core.js"></script>
+<script src="js/pick/gt-print.js"></script>
+<script src="js/pick/assign-panel.js"></script>
+<script src="js/pick/custom-assign.js"></script>
+<script src="js/pick/home-table.js"></script>
+<script src="js/pick/main.js"></script>
 </body>
 </html>

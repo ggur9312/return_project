@@ -3,19 +3,29 @@ name: verify
 description: Run and drive this app (static HTML/JS picking-allocation dashboard) end-to-end.
 ---
 
-This is a static vanilla-JS app (`index.html` + `js/pick/*.js` [ES modules, entry
-`js/pick/main.js`], `js/truck.js`, `js/shell.js`). No build step, no server-side
-code, no package.json. See `CLAUDE.md` for the `js/pick/` module map.
+This is a static vanilla-JS app (`index.html` + `js/pick/*.js` [classic scripts
+sharing a `window.Pick` namespace object, entry `js/pick/main.js`], `js/truck.js`,
+`js/shell.js`). No build step, no server-side code, no package.json. See
+`CLAUDE.md` for the `js/pick/` file map and the `window.Pick` pattern.
 
-## Launch
+## Launch — test BOTH of these, `file://` is the primary one
+
+Real users open `index.html` by double-clicking it (`file://`), so that is the
+must-pass case — **always include a `file://` run**, not just `http://`. A
+past regression (`<script type="module">` for `js/pick/*.js`) passed every
+`http://`-only Playwright check with 0 JS errors while being completely broken
+under `file://` (ES module `import` is blocked by CORS under `file://`), and
+shipped anyway because nothing tested the real workflow. Don't repeat that.
 
 ```bash
-cd /Users/chimac/return_project
-python3 -m http.server 8934 >/tmp/pickserver.log 2>&1 &
-```
+# file:// — open directly, no server needed:
+# file:///path/to/return_project/index.html
 
-Then open `http://localhost:8934/index.html`. Serve over http (not `file://`) —
-some paths (fonts, vendor scripts) behave better and it matches real usage.
+# http:// — optional extra check, for parity with a real deployment:
+cd /path/to/return_project
+python3 -m http.server 8934 >/tmp/pickserver.log 2>&1 &
+# then open http://localhost:8934/index.html
+```
 
 ## Driving it with Playwright
 
@@ -87,20 +97,23 @@ Clicking the button directly while the panel is collapsed times out
 
 ## Gotchas learned
 
-- No node/npx on this machine — use Python's `playwright` package, not a JS
-  test runner (also true for the ES modules in `js/pick/` — there's no
-  `node --check`-style syntax validation available; a Playwright load with a
-  `page.on("pageerror", ...)` listener is the closest thing to a syntax/wiring
-  check on this machine).
-- `state`/`els`/most functions live inside `js/pick/*.js` ES modules, not
-  exposed on `window` — you cannot `page.evaluate` into internal functions;
-  drive the UI instead.
-- `js/pick/` has real circular imports between files (e.g. `core.js` ↔
-  `main.js`, `core.js` ↔ `assign-panel.js`/`custom-assign.js`) — safe for
-  `function` declarations, but a module's own top-level code must never read
-  `els`/`state` (imported `var`s from `core.js`) unless it's `main.js` itself
-  (the `<script type="module">` entry point, guaranteed to run last). See the
-  "Gotcha" section in `CLAUDE.md` before adding new top-level controller
-  instantiations or event listeners outside `main.js`.
+- If Node is available, `node --input-type=commonjs --check < js/pick/core.js`
+  (repeat per file) is a cheap syntax check that matches how a browser parses
+  a classic (non-module) `<script>` — plain `node --check file.js` is
+  **not** reliable for this: recent Node auto-detects ES module syntax and
+  will silently accept a stray `export`/`import` keyword by treating the file
+  as a module, which is exactly wrong for how the browser actually loads it.
+  Either way, a Playwright load with a `page.on("pageerror", ...)` listener is
+  still the real end-to-end check — the syntax check only catches typos, not
+  wiring/ordering bugs.
+- `state`/`els`/most functions live inside `js/pick/*.js`, attached to
+  `window.Pick` (e.g. `window.Pick.state`, `window.Pick.els`) rather than
+  each file's own module scope — unlike the old ES-module version, you *can*
+  now `page.evaluate(() => window.Pick.state.rows.length)` etc. for quick
+  assertions instead of always driving the UI.
+- `js/pick/*.js` files reference each other through `window.Pick` and some of
+  that is populated lazily (e.g. `Pick.assignFilterBarController`,
+  `Pick.homeMarkedIds`) — see the "Gotcha" section in `CLAUDE.md` before
+  adding new cross-file bindings that get reassigned after their initial load.
 - Always kill the background `http.server` when done (`pkill -f
   "http.server 8934"`) to avoid leaking a stale listener across sessions.

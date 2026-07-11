@@ -1,15 +1,35 @@
-import { renderAssignPanel } from "./assign-panel.js";
-import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, LABEL_MARGIN_BOTTOM_KEY, LABEL_MARGIN_DEFAULT, LABEL_MARGIN_LEFT_KEY, LABEL_MARGIN_LEFT_TOP_DEFAULT, LABEL_MARGIN_RIGHT_KEY, LABEL_MARGIN_TOP_KEY, closeModalWithTransition, els, escapeHtml, openModalWithTransition, parseFlexibleDate, state, trim, uniqueValuesFrom } from "./core.js";
+(function (Pick) {
+  "use strict";
+
+  // --- imported from other js/pick/*.js files via window.Pick ---
+  var GT_ASSIGNMENTS_KEY = Pick.GT_ASSIGNMENTS_KEY;
+  var GT_CODES_KEY = Pick.GT_CODES_KEY;
+  var GT_PRINTED_KEY = Pick.GT_PRINTED_KEY;
+  var LABEL_BARCODE_OPTS = Pick.LABEL_BARCODE_OPTS;
+  var LABEL_MARGIN_BOTTOM_KEY = Pick.LABEL_MARGIN_BOTTOM_KEY;
+  var LABEL_MARGIN_DEFAULT = Pick.LABEL_MARGIN_DEFAULT;
+  var LABEL_MARGIN_LEFT_KEY = Pick.LABEL_MARGIN_LEFT_KEY;
+  var LABEL_MARGIN_LEFT_TOP_DEFAULT = Pick.LABEL_MARGIN_LEFT_TOP_DEFAULT;
+  var LABEL_MARGIN_RIGHT_KEY = Pick.LABEL_MARGIN_RIGHT_KEY;
+  var LABEL_MARGIN_TOP_KEY = Pick.LABEL_MARGIN_TOP_KEY;
+  var closeModalWithTransition = Pick.closeModalWithTransition;
+  var els = Pick.els;
+  var escapeHtml = Pick.escapeHtml;
+  var openModalWithTransition = Pick.openModalWithTransition;
+  var parseFlexibleDate = Pick.parseFlexibleDate;
+  var state = Pick.state;
+  var trim = Pick.trim;
+  var uniqueValuesFrom = Pick.uniqueValuesFrom;
 
   // --- GT 바코드 ---
 
-  export function saveGtState() {
+  function saveGtState() {
     localStorage.setItem(GT_CODES_KEY, JSON.stringify(state.gtCodes));
     localStorage.setItem(GT_ASSIGNMENTS_KEY, JSON.stringify(state.gtAssignments));
     localStorage.setItem(GT_PRINTED_KEY, JSON.stringify(state.gtPrinted));
   }
 
-  export function loadGtState() {
+  function loadGtState() {
     try {
       var codesRaw = localStorage.getItem(GT_CODES_KEY);
       state.gtCodes = codesRaw ? JSON.parse(codesRaw) : [];
@@ -30,21 +50,21 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     }
   }
 
-  export function parseGtTokens(text) {
+  function parseGtTokens(text) {
     return text
       .split(/[\t,\s]+/)
       .map(function (t) { return t.trim(); })
       .filter(function (t) { return t.length > 0; });
   }
 
-  export function getGtUsedSet() {
+  function getGtUsedSet() {
     var used = {};
     Object.keys(state.gtAssignments).forEach(function (k) { used[state.gtAssignments[k]] = true; });
     state.gtPrinted.forEach(function (c) { used[c] = true; });
     return used;
   }
 
-  export function getAvailableGtCodes() {
+  function getAvailableGtCodes() {
     var used = getGtUsedSet();
     return state.gtCodes.filter(function (code) { return !used[code]; });
   }
@@ -60,17 +80,17 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
   // 영역 "안"에 sticky로 두면 헤더의 실제 높이만큼 행의 절대좌표 기준(스크롤
   // 컨테이너 top=0)과 스크롤 가능한 콘텐츠의 실제 시작 위치가 어긋나서,
   // 스크롤 끝부분에서 헤더와 마지막 행들이 서로 겹쳐 보이는 버그가 생긴다.
-  export var GT_LIST_ROW_HEIGHT = 24;
-  export var GT_LIST_BUFFER_ROWS = 5;
-  export var GT_LIST_CONTAINER_CLASS_EMPTY = "overflow-x-auto overflow-y-auto max-h-40 bg-slate-50 border border-slate-100 rounded-lg p-2 min-h-[2.5rem]";
-  export var GT_LIST_CONTAINER_CLASS_FULL = "max-h-40 bg-slate-50 border border-slate-100 rounded-lg p-2 min-h-[2.5rem] flex flex-col";
-  export var gtListMatchOrder = [];
-  export var gtListUsedSet = {};
-  export var gtListRowsEl = null;
-  export var gtListScrollBodyEl = null;
-  export var gtListScrollListenerAttached = false;
+  var GT_LIST_ROW_HEIGHT = 24;
+  var GT_LIST_BUFFER_ROWS = 5;
+  var GT_LIST_CONTAINER_CLASS_EMPTY = "overflow-x-auto overflow-y-auto max-h-40 bg-slate-50 border border-slate-100 rounded-lg p-2 min-h-[2.5rem]";
+  var GT_LIST_CONTAINER_CLASS_FULL = "max-h-40 bg-slate-50 border border-slate-100 rounded-lg p-2 min-h-[2.5rem] flex flex-col";
+  var gtListMatchOrder = [];
+  var gtListUsedSet = {};
+  var gtListRowsEl = null;
+  var gtListScrollBodyEl = null;
+  var gtListScrollListenerAttached = false;
 
-  export function buildGtRowHtml(code, idx, used) {
+  function buildGtRowHtml(code, idx, used) {
     var isUsed = !!used[code];
     var statusHtml = isUsed
       ? '<span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 text-[10px] font-semibold">사용중</span>'
@@ -84,7 +104,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     );
   }
 
-  export function renderGtVisibleRows() {
+  function renderGtVisibleRows() {
     if (!gtListRowsEl || !gtListScrollBodyEl) return;
     var total = gtListMatchOrder.length;
     var scrollTop = gtListScrollBodyEl.scrollTop;
@@ -100,7 +120,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     gtListRowsEl.innerHTML = html;
   }
 
-  export function attachGtListScrollListener() {
+  function attachGtListScrollListener() {
     if (gtListScrollListenerAttached) return;
     gtListScrollListenerAttached = true;
     var ticking = false;
@@ -114,7 +134,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     }, { passive: true });
   }
 
-  export function renderGtAvailableList() {
+  function renderGtAvailableList() {
     var used = getGtUsedSet();
     var availableCount = 0;
     for (var i = 0; i < state.gtCodes.length; i++) {
@@ -159,7 +179,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     renderGtVisibleRows();
   }
 
-  export function setAssignGt(key, code) {
+  function setAssignGt(key, code) {
     if (code) {
       state.gtAssignments[key] = code;
     } else {
@@ -169,10 +189,10 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     renderGtAvailableList();
     // change 이벤트가 이 input의 blur 처리 중일 수 있으므로, 그 처리가 끝난 뒤
     // 다음 틱에 컨테이너를 다시 그려서 "노드가 더 이상 자식이 아님" 오류를 피함.
-    setTimeout(renderAssignPanel, 0);
+    setTimeout(Pick.renderAssignPanel, 0);
   }
 
-  export function autoMatchGtForWorker(cfg, detailRows) {
+  function autoMatchGtForWorker(cfg, detailRows) {
     // 입력된 순서 그대로 저장된 GT 목록을 뒤에서부터(역순으로) 소진
     var available = getAvailableGtCodes().slice().reverse();
     var ai = 0;
@@ -185,23 +205,23 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     });
     saveGtState();
     renderGtAvailableList();
-    renderAssignPanel();
+    Pick.renderAssignPanel();
     if (window.showToast) {
       window.showToast(ai > 0 ? "GT " + ai + "건이 자동매칭되었습니다." : "매칭할 수 있는 GT 코드가 없습니다.", ai > 0 ? "success" : "error");
     }
   }
 
-  export function resetGtForWorker(cfg, detailRows) {
+  function resetGtForWorker(cfg, detailRows) {
     detailRows.forEach(function (r) {
       delete state.gtAssignments[cfg.id + ":" + r.id];
     });
     saveGtState();
     renderGtAvailableList();
-    renderAssignPanel();
+    Pick.renderAssignPanel();
     if (window.showToast) window.showToast("GT 매칭이 초기화되었습니다.", "info");
   }
 
-  export function formatMonthDay(dateStr) {
+  function formatMonthDay(dateStr) {
     var d = parseFlexibleDate(dateStr);
     if (!d) return dateStr || "";
     return String(d.getMonth() + 1).padStart(2, "0") + "/" + String(d.getDate()).padStart(2, "0");
@@ -209,7 +229,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
 
   // 테이블 표시용 — 원본 형식과 무관하게 날짜 부분을 YYYY-MM-DD로 통일하고,
   // 원본에 시:분이 있었다면 그대로 이어붙임
-  export function formatDateDisplay(dateStr) {
+  function formatDateDisplay(dateStr) {
     var d = parseFlexibleDate(dateStr);
     if (!d) return dateStr || "";
     var time = String(dateStr).match(/(\d{1,2}:\d{2})/);
@@ -218,7 +238,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
   }
 
   // 업체 선택 시 마감일시 입력칸에 시간 없이 날짜만 YYYY-MM-DD로 채우는 용도
-  export function formatDateOnly(dateStr) {
+  function formatDateOnly(dateStr) {
     var d = parseFlexibleDate(dateStr);
     if (!d) return dateStr || "";
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
@@ -226,30 +246,30 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
   }
 
   // 값이 없으면 완전히 빈칸(괄호도 표시 안 함)
-  export function bracketPart(val) {
+  function bracketPart(val) {
     return val ? "[" + escapeHtml(val) + "]" : "";
   }
 
   // 출력물 전용 매입유형 표시 매핑(홈/할당 화면 테이블 표시는 원본 값 그대로 유지)
-  export function formatPurchaseTypeLabel(val) {
+  function formatPurchaseTypeLabel(val) {
     if (val === "업체보관상품") return "업체상품";
     if (val === "쿠팡상품") return "일반상품";
     return val;
   }
 
-  export function buildBarcodeHtml(gtCode) {
+  function buildBarcodeHtml(gtCode) {
     return gtCode ? '<svg class="gt-label-barcode-svg" data-code="' + escapeHtml(gtCode) + '"></svg>' : "";
   }
 
   // 라벨 4종이 공유하는 바코드 셀 마크업 — sizingClass로 박스 전체를 채울지
   // (flex-1, buildLabelHtml) 내용 크기만큼만 차지할지(shrink-0, printGtLabels) 결정
-  export function buildBarcodeCellHtml(barcodeHtml, sizingClass) {
+  function buildBarcodeCellHtml(barcodeHtml, sizingClass) {
     return '<div class="' + sizingClass + ' flex flex-col items-center justify-center pt-1 px-1 overflow-hidden">' + barcodeHtml + "</div>";
   }
 
   // 집품 할당/커스텀/여분 라벨이 공유하는 4칸 라벨 마크업 — 값이 없는 필드는
   // bracketPart/빈 문자열을 그대로 넘기면 완전히 빈칸으로 표시됨
-  export function buildLabelHtml(line1, companyText, line3, barcodeHtml) {
+  function buildLabelHtml(line1, companyText, line3, barcodeHtml) {
     // line1/line3이 빈 문자열이면 브라우저가 그 줄의 줄박스를 통째로 생략해버려
     // 아래 구분선(divide-y)이 위로 밀려 붙는다. 일반 스페이스(" ")는 인라인
     // 요소 경계에서 공백 축소(whitespace collapsing) 대상이라 여전히 줄이
@@ -267,7 +287,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     );
   }
 
-  export function renderLabelBarcodes(container, barcodeOpts) {
+  function renderLabelBarcodes(container, barcodeOpts) {
     Array.prototype.forEach.call(container.querySelectorAll(".gt-label-barcode-svg"), function (svg) {
       try {
         JsBarcode(svg, svg.dataset.code, Object.assign({ format: "CODE128", displayValue: true, margin: 0, lineColor: "#000000", fontOptions: "bold", font: "'Noto Sans KR', sans-serif" }, barcodeOpts));
@@ -303,7 +323,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
   // 따라 필요한 여백이 달라질 수 있어 코드에 값을 고정하지 않고, 사용자가 "라벨
   // 여백 설정" 모달에서 mm 단위로 직접 조절해 localStorage에 저장하도록 함.
   // 라벨 콘텐츠 자체(w-[5cm] h-[4cm])는 항상 고정, 4방향 여유 공간만 조절됨.
-  export function loadLabelMargin() {
+  function loadLabelMargin() {
     var right = parseFloat(localStorage.getItem(LABEL_MARGIN_RIGHT_KEY));
     var bottom = parseFloat(localStorage.getItem(LABEL_MARGIN_BOTTOM_KEY));
     var left = parseFloat(localStorage.getItem(LABEL_MARGIN_LEFT_KEY));
@@ -316,7 +336,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     };
   }
 
-  export function applyGtLabelPageStyle(rightMm, bottomMm, leftMm, topMm) {
+  function applyGtLabelPageStyle(rightMm, bottomMm, leftMm, topMm) {
     var styleEl = document.getElementById("gtLabelPageStyleOverride");
     if (!styleEl) return;
     var pageWidthCm = 5 + rightMm / 10 + leftMm / 10;
@@ -327,11 +347,11 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
 
   // innerHTML 갱신 직후 곧바로 print()를 호출하면 브라우저가 레이아웃을 아직
   // 반영하지 않아 이전 인쇄 내용이 나올 수 있음 — 두 번의 rAF로 페인트를 기다린 뒤 인쇄
-  export function triggerPrint(onConfirmed) {
+  function triggerPrint(onConfirmed) {
     window.printWithConfirm(onConfirmed);
   }
 
-  export function printWorkerLabels(cfg, detailRows, onConfirmed) {
+  function printWorkerLabels(cfg, detailRows, onConfirmed) {
     if (!detailRows.length) return;
     var labelsHtml = detailRows.map(function (r) {
       var gtKey = cfg.id + ":" + r.id;
@@ -349,7 +369,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
   // 집품 할당과 무관하게 GT 바코드 자체만 담긴 라벨을 인쇄. 최근 붙여넣은
   // 순서부터(역순) 요청한 수량만큼 뽑아 인쇄하며, 인쇄된 코드는 gtPrintBtn
   // 핸들러에서 state.gtPrinted로 소진 처리되어 재사용/중복 인쇄가 불가능해짐.
-  export function printGtLabels(codes, onConfirmed) {
+  function printGtLabels(codes, onConfirmed) {
     if (!codes.length) return;
     // 빈 문자열을 그대로 넘기면 브라우저가 그 줄의 줄박스를 아예 생략해버려
     // (내용이 있는 다른 라벨보다) 위 3줄이 낮아지고 바코드 행이 더 커져버린다.
@@ -368,7 +388,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
   // 데이터와 무관하게 사용자가 직접 값을 입력해 라벨을 발행. 자동매칭이면 장마다
   // 다른 GT 코드를 순서대로 소진(gtPrinted에 반영), 수동 입력이면 모든 장에 같은
   // 코드를 사용(가용 목록과 무관한 임의 문자열일 수 있어 소진하지 않음).
-  export function printCustomLabels(fields, qty, useAutoMatch, manualCode) {
+  function printCustomLabels(fields, qty, useAutoMatch, manualCode) {
     if (qty < 1) return;
     var autoCodes = useAutoMatch ? getAvailableGtCodes().slice().reverse().slice(0, qty) : [];
     var labelsHtml = "";
@@ -393,14 +413,14 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
 
   // 업로드된 전체 데이터(날짜탭과 무관)에서 업체명 목록을 뽑아 검색어로 필터링 —
   // 홈 화면 필터 드롭다운의 getSearchedValues와 같은 부분일치(대소문자 무시) 방식
-  export function getCustomLabelCompanyMatches(term) {
+  function getCustomLabelCompanyMatches(term) {
     var companies = uniqueValuesFrom(state.rows, function (r) { return r.company; });
     if (!term) return companies;
     var lower = term.toLowerCase();
     return companies.filter(function (c) { return c.toLowerCase().indexOf(lower) !== -1; });
   }
 
-  export function fillCustomLabelFieldsFromCompany(name) {
+  function fillCustomLabelFieldsFromCompany(name) {
     var rep = state.rows.find(function (r) { return r.company === name; });
     if (!rep) return;
     els.customLabelGroupNo.value = rep.groupNo || "";
@@ -410,7 +430,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     els.customLabelTransportType.value = rep.transportType || "";
   }
 
-  export function renderCustomLabelCompanyDropdown(term) {
+  function renderCustomLabelCompanyDropdown(term) {
     var matches = getCustomLabelCompanyMatches(term);
     els.customLabelCompanyDropdown.innerHTML = matches.length
       ? matches.map(function (c) {
@@ -419,18 +439,18 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
       : '<div class="text-xs text-slate-400 px-2 py-1.5">일치하는 업체 없음</div>';
   }
 
-  export function openCustomLabelCompanyDropdown() {
+  function openCustomLabelCompanyDropdown() {
     renderCustomLabelCompanyDropdown(els.customLabelCompanySearch.value);
     els.customLabelCompanyDropdown.classList.remove("hidden");
   }
 
-  export function closeCustomLabelCompanyDropdown() {
+  function closeCustomLabelCompanyDropdown() {
     els.customLabelCompanyDropdown.classList.add("hidden");
   }
 
   // 기본값이 있는 칸은 기본값으로, 없는 칸은 빈 값으로 되돌려 모달을 닫을 때마다
   // 이전 입력이 남아있지 않게 함
-  export function resetCustomLabelModal() {
+  function resetCustomLabelModal() {
     els.customLabelCompanySearch.value = "";
     closeCustomLabelCompanyDropdown();
     els.customLabelCompanyDropdown.innerHTML = "";
@@ -446,7 +466,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
 
   // 작업자에게 배정된 행을 (그룹번호+업체명) 기준 합산해, 임계값 이상인 조합마다
   // 분할 단위로 나눈 만큼 "여분" 라벨을 인쇄 — 대표 행(rows[0])의 전체 데이터로 채움
-  export function computeSpareGroups(detailRows) {
+  function computeSpareGroups(detailRows) {
     var totals = {};
     var order = [];
     detailRows.forEach(function (r) {
@@ -461,21 +481,21 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     return order.map(function (key) { return totals[key]; });
   }
 
-  export function spareGroupKey(g) {
+  function spareGroupKey(g) {
     return g.groupNo + "|" + g.company;
   }
 
-  export function spareGroupCount(g, splitSize, overrides) {
+  function spareGroupCount(g, splitSize, overrides) {
     var override = overrides && overrides[spareGroupKey(g)];
     return override || Math.ceil(g.qty / splitSize);
   }
 
   // 겉 테두리·구분선이 전혀 없는 완전한 백지 한 장(맨 앞 빈 라벨 옵션용)
-  export function buildBlankLabelHtml() {
+  function buildBlankLabelHtml() {
     return '<div class="gt-label break-after-page w-[5cm] h-[4cm] box-border"></div>';
   }
 
-  export function printSpareLabels(detailRows, threshold, splitSize, leadingBlank, overrides) {
+  function printSpareLabels(detailRows, threshold, splitSize, leadingBlank, overrides) {
     var groups = computeSpareGroups(detailRows);
     var qualifying = groups.filter(function (g) { return g.qty >= threshold; });
     var totalNeeded = qualifying.reduce(function (sum, g) { return sum + spareGroupCount(g, splitSize, overrides); }, 0);
@@ -511,21 +531,21 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     });
   }
 
-  export var pendingSparePrintRows = null;
-  export var sparePrintOverrides = {};
+  var pendingSparePrintRows = null;
+  var sparePrintOverrides = {};
 
-  export function getQualifyingSpareGroups(threshold) {
+  function getQualifyingSpareGroups(threshold) {
     if (!pendingSparePrintRows) return [];
     return computeSpareGroups(pendingSparePrintRows).filter(function (g) { return g.qty >= threshold; });
   }
 
-  export function computeSparePreviewTotal(threshold, splitSize) {
+  function computeSparePreviewTotal(threshold, splitSize) {
     return getQualifyingSpareGroups(threshold).reduce(function (sum, g) {
       return sum + spareGroupCount(g, splitSize, sparePrintOverrides);
     }, 0);
   }
 
-  export function renderSparePrintGroupList() {
+  function renderSparePrintGroupList() {
     var threshold = parseInt(els.sparePrintThreshold.value, 10);
     var splitSize = parseInt(els.sparePrintSplitSize.value, 10);
     if (!threshold || threshold < 1 || !splitSize || splitSize < 1) {
@@ -560,7 +580,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     });
   }
 
-  export function updateSparePrintPreview() {
+  function updateSparePrintPreview() {
     if (!pendingSparePrintRows) return;
     var threshold = parseInt(els.sparePrintThreshold.value, 10);
     var splitSize = parseInt(els.sparePrintSplitSize.value, 10);
@@ -572,7 +592,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     els.sparePrintPreview.textContent = total;
   }
 
-  export function handleSparePrintClick(detailRows) {
+  function handleSparePrintClick(detailRows) {
     pendingSparePrintRows = detailRows;
     sparePrintOverrides = {};
     els.sparePrintModalMsg.textContent = "";
@@ -583,7 +603,7 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
 
   // 임계값/분할단위 기본값(40/15)으로 되돌리고 나머지 입력도 초기화 —
   // 취소든 출력이든 모달을 닫을 때마다 호출해 다음에 열었을 때 항상 기본값으로 보이게 함
-  export function resetSparePrintModal() {
+  function resetSparePrintModal() {
     els.sparePrintThreshold.value = "40";
     els.sparePrintSplitSize.value = "15";
     els.sparePrintLeadingBlank.checked = false;
@@ -595,16 +615,16 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
 
 
   // 아래 두 함수는 main.js의 이벤트 와이어링(스페어 출력 모달 취소/출력 버튼)에서
-  // 호출된다 — pendingSparePrintRows는 이 파일(gt-print.js) 소유라 ES 모듈에서는
-  // 다른 파일이 직접 재할당할 수 없어(import한 var는 읽기 전용) 함수로 감쌌다.
+  // 호출된다 — pendingSparePrintRows는 이 파일(gt-print.js) 소유이므로 다른 파일이
+  // 직접 재할당하지 않고(Pick.* 동기화 누락 방지) 함수로 감쌌다.
 
-  export function cancelSparePrintModal() {
+  function cancelSparePrintModal() {
     closeModalWithTransition(els.sparePrintModal, els.sparePrintModalBox);
     pendingSparePrintRows = null;
     resetSparePrintModal();
   }
 
-  export function confirmSparePrintModal() {
+  function confirmSparePrintModal() {
     var threshold = parseInt(els.sparePrintThreshold.value, 10);
     var splitSize = parseInt(els.sparePrintSplitSize.value, 10);
     if (!threshold || threshold < 1 || !splitSize || splitSize < 1) {
@@ -624,3 +644,63 @@ import { GT_ASSIGNMENTS_KEY, GT_CODES_KEY, GT_PRINTED_KEY, LABEL_BARCODE_OPTS, L
     resetSparePrintModal();
     printSpareLabels(rows, threshold, splitSize, leadingBlank, overrides);
   }
+
+  // --- exposed to other js/pick/*.js files via window.Pick ---
+  Pick.saveGtState = saveGtState;
+  Pick.loadGtState = loadGtState;
+  Pick.parseGtTokens = parseGtTokens;
+  Pick.getGtUsedSet = getGtUsedSet;
+  Pick.getAvailableGtCodes = getAvailableGtCodes;
+  Pick.GT_LIST_ROW_HEIGHT = GT_LIST_ROW_HEIGHT;
+  Pick.GT_LIST_BUFFER_ROWS = GT_LIST_BUFFER_ROWS;
+  Pick.GT_LIST_CONTAINER_CLASS_EMPTY = GT_LIST_CONTAINER_CLASS_EMPTY;
+  Pick.GT_LIST_CONTAINER_CLASS_FULL = GT_LIST_CONTAINER_CLASS_FULL;
+  Pick.gtListMatchOrder = gtListMatchOrder;
+  Pick.gtListUsedSet = gtListUsedSet;
+  Pick.gtListRowsEl = gtListRowsEl;
+  Pick.gtListScrollBodyEl = gtListScrollBodyEl;
+  Pick.gtListScrollListenerAttached = gtListScrollListenerAttached;
+  Pick.buildGtRowHtml = buildGtRowHtml;
+  Pick.renderGtVisibleRows = renderGtVisibleRows;
+  Pick.attachGtListScrollListener = attachGtListScrollListener;
+  Pick.renderGtAvailableList = renderGtAvailableList;
+  Pick.setAssignGt = setAssignGt;
+  Pick.autoMatchGtForWorker = autoMatchGtForWorker;
+  Pick.resetGtForWorker = resetGtForWorker;
+  Pick.formatMonthDay = formatMonthDay;
+  Pick.formatDateDisplay = formatDateDisplay;
+  Pick.formatDateOnly = formatDateOnly;
+  Pick.bracketPart = bracketPart;
+  Pick.formatPurchaseTypeLabel = formatPurchaseTypeLabel;
+  Pick.buildBarcodeHtml = buildBarcodeHtml;
+  Pick.buildBarcodeCellHtml = buildBarcodeCellHtml;
+  Pick.buildLabelHtml = buildLabelHtml;
+  Pick.renderLabelBarcodes = renderLabelBarcodes;
+  Pick.loadLabelMargin = loadLabelMargin;
+  Pick.applyGtLabelPageStyle = applyGtLabelPageStyle;
+  Pick.triggerPrint = triggerPrint;
+  Pick.printWorkerLabels = printWorkerLabels;
+  Pick.printGtLabels = printGtLabels;
+  Pick.printCustomLabels = printCustomLabels;
+  Pick.getCustomLabelCompanyMatches = getCustomLabelCompanyMatches;
+  Pick.fillCustomLabelFieldsFromCompany = fillCustomLabelFieldsFromCompany;
+  Pick.renderCustomLabelCompanyDropdown = renderCustomLabelCompanyDropdown;
+  Pick.openCustomLabelCompanyDropdown = openCustomLabelCompanyDropdown;
+  Pick.closeCustomLabelCompanyDropdown = closeCustomLabelCompanyDropdown;
+  Pick.resetCustomLabelModal = resetCustomLabelModal;
+  Pick.computeSpareGroups = computeSpareGroups;
+  Pick.spareGroupKey = spareGroupKey;
+  Pick.spareGroupCount = spareGroupCount;
+  Pick.buildBlankLabelHtml = buildBlankLabelHtml;
+  Pick.printSpareLabels = printSpareLabels;
+  Pick.pendingSparePrintRows = pendingSparePrintRows;
+  Pick.sparePrintOverrides = sparePrintOverrides;
+  Pick.getQualifyingSpareGroups = getQualifyingSpareGroups;
+  Pick.computeSparePreviewTotal = computeSparePreviewTotal;
+  Pick.renderSparePrintGroupList = renderSparePrintGroupList;
+  Pick.updateSparePrintPreview = updateSparePrintPreview;
+  Pick.handleSparePrintClick = handleSparePrintClick;
+  Pick.resetSparePrintModal = resetSparePrintModal;
+  Pick.cancelSparePrintModal = cancelSparePrintModal;
+  Pick.confirmSparePrintModal = confirmSparePrintModal;
+})(window.Pick = window.Pick || {});

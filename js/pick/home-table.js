@@ -1,26 +1,33 @@
-import { COLUMNS, els, escapeHtml, saveToStorage, state } from "./core.js";
-import { getAssignedRowIdSet } from "./custom-assign.js";
-import { formatDateDisplay } from "./gt-print.js";
-import { refreshAll } from "./main.js";
+(function (Pick) {
+  "use strict";
+
+  // --- imported from other js/pick/*.js files via window.Pick ---
+  var COLUMNS = Pick.COLUMNS;
+  var els = Pick.els;
+  var escapeHtml = Pick.escapeHtml;
+  var saveToStorage = Pick.saveToStorage;
+  var state = Pick.state;
+  var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
+  var formatDateDisplay = Pick.formatDateDisplay;
 
   // 홈 테이블 드래그 범위선택 + Ctrl/Cmd+클릭 비연속선택 — 이동/드롭 대상은 없고
   // "몇 행 · 몇 개 선택했는지" 실시간 요약 표시 용도. 커스텀 할당 모달의
   // rowPickerMarkedIds/setupRowPickerDragAndDrop과 동일한 패턴을 이식.
-  export var homeMarkedIds = new Set();
-  export var homeDragAnchorId = null;
-  export var homeDragSelecting = false;
-  export var homeDragAdditive = false; // true = Ctrl/Cmd+드래그 (기존 선택에 합침/뺌)
-  export var homeDragAdditiveMode = "add"; // "add" | "remove" — 드래그 시작 행이 이미 선택돼 있었는지로 결정
-  export var homeDragBaseIds = null; // 드래그 시작 전 선택 스냅샷(추가모드 기준값)
-  export var homeDragRowOrder = null; // 드래그 시작 시점에 실제 렌더링된 행 id 순서 스냅샷
+  var homeMarkedIds = new Set();
+  var homeDragAnchorId = null;
+  var homeDragSelecting = false;
+  var homeDragAdditive = false; // true = Ctrl/Cmd+드래그 (기존 선택에 합침/뺌)
+  var homeDragAdditiveMode = "add"; // "add" | "remove" — 드래그 시작 행이 이미 선택돼 있었는지로 결정
+  var homeDragBaseIds = null; // 드래그 시작 전 선택 스냅샷(추가모드 기준값)
+  var homeDragRowOrder = null; // 드래그 시작 시점에 실제 렌더링된 행 id 순서 스냅샷
 
-  // main.js의 refreshAll()이 매 렌더링마다 선택을 초기화할 때 쓰는 헬퍼 — ES 모듈에서는
-  // var로 import한 값을 외부 파일에서 직접 재할당할 수 없어 함수로 감쌌다.
-  export function resetHomeMarkedIds() {
-    homeMarkedIds = new Set();
+  // main.js의 Pick.refreshAll()이 매 렌더링마다 선택을 초기화할 때 쓰는 헬퍼 — 다른 파일이
+  // homeMarkedIds를 직접 재할당하면 Pick.homeMarkedIds 동기화가 누락되기 쉬워 함수로 감쌌다.
+  function resetHomeMarkedIds() {
+    Pick.homeMarkedIds = homeMarkedIds = new Set();
   }
 
-  export function renderTable(rows) {
+  function renderTable(rows) {
     if (!rows.length) {
       els.table.classList.add("hidden");
       els.emptyState.classList.remove("hidden");
@@ -68,24 +75,24 @@ import { refreshAll } from "./main.js";
     }).join("");
   }
 
-  export function deleteHomeRow(id) {
+  function deleteHomeRow(id) {
     state.rows = state.rows.filter(function (r) { return r.id !== id; });
     homeMarkedIds.delete(id);
     saveToStorage();
-    refreshAll();
+    Pick.refreshAll();
     if (window.showToast) window.showToast("행이 삭제되었습니다.");
   }
 
   // 드래그 도중 필터/정렬을 다시 계산하면 화면에 실제로 그려진 행 순서와
   // 어긋날 수 있어(그러면 anchor~current 범위가 의도보다 훨씬 넓어져 "전체
   // 선택"처럼 보이는 버그로 이어짐) DOM에 그려진 순서를 그대로 스냅샷으로 쓴다.
-  export function snapshotHomeRowOrder() {
+  function snapshotHomeRowOrder() {
     return Array.prototype.map.call(els.tableBody.querySelectorAll(".home-table-row"), function (tr) {
       return tr.dataset.rowId;
     });
   }
 
-  export function applyHomeMarkRange(anchorId, currentId) {
+  function applyHomeMarkRange(anchorId, currentId) {
     var rows = homeDragRowOrder || snapshotHomeRowOrder();
     var anchorIdx = rows.indexOf(anchorId);
     var currentIdx = rows.indexOf(currentId);
@@ -95,13 +102,13 @@ import { refreshAll } from "./main.js";
     var rangeIds = rows.slice(lo, hi + 1);
 
     if (homeDragAdditive && homeDragBaseIds) {
-      homeMarkedIds = new Set(homeDragBaseIds);
+      Pick.homeMarkedIds = homeMarkedIds = new Set(homeDragBaseIds);
       rangeIds.forEach(function (id) {
         if (homeDragAdditiveMode === "remove") homeMarkedIds.delete(id);
         else homeMarkedIds.add(id);
       });
     } else {
-      homeMarkedIds = new Set(rangeIds);
+      Pick.homeMarkedIds = homeMarkedIds = new Set(rangeIds);
     }
 
     Array.prototype.forEach.call(els.tableBody.querySelectorAll(".home-table-row"), function (tr) {
@@ -110,7 +117,7 @@ import { refreshAll } from "./main.js";
     updateHomeSelectionSummary();
   }
 
-  export function updateHomeSelectionSummary() {
+  function updateHomeSelectionSummary() {
     if (!homeMarkedIds.size) {
       els.homeSelectionBar.classList.add("hidden");
       return;
@@ -124,8 +131,8 @@ import { refreshAll } from "./main.js";
     els.homeSelectionBar.classList.remove("hidden");
   }
 
-  export function clearHomeSelection() {
-    homeMarkedIds = new Set();
+  function clearHomeSelection() {
+    Pick.homeMarkedIds = homeMarkedIds = new Set();
     Array.prototype.forEach.call(els.tableBody.querySelectorAll(".home-table-row"), function (tr) {
       tr.classList.remove("bg-indigo-50");
     });
@@ -134,7 +141,7 @@ import { refreshAll } from "./main.js";
 
   // 커스텀 할당 모달의 setupRowPickerDragAndDrop과 동일한 패턴 — 다만 옮길 대상이
   // 없으므로 mousedown/mousemove로 마킹만 갱신하고 mouseup은 드래그 종료만 처리.
-  export function setupHomeRowSelection() {
+  function setupHomeRowSelection() {
     els.tableBody.addEventListener("click", function (e) {
       var btn = e.target.closest(".home-row-delete-btn");
       if (!btn) return;
@@ -193,3 +200,21 @@ import { refreshAll } from "./main.js";
       homeDragRowOrder = null;
     });
   }
+
+  // --- exposed to other js/pick/*.js files via window.Pick ---
+  Pick.homeMarkedIds = homeMarkedIds;
+  Pick.homeDragAnchorId = homeDragAnchorId;
+  Pick.homeDragSelecting = homeDragSelecting;
+  Pick.homeDragAdditive = homeDragAdditive;
+  Pick.homeDragAdditiveMode = homeDragAdditiveMode;
+  Pick.homeDragBaseIds = homeDragBaseIds;
+  Pick.homeDragRowOrder = homeDragRowOrder;
+  Pick.resetHomeMarkedIds = resetHomeMarkedIds;
+  Pick.renderTable = renderTable;
+  Pick.deleteHomeRow = deleteHomeRow;
+  Pick.snapshotHomeRowOrder = snapshotHomeRowOrder;
+  Pick.applyHomeMarkRange = applyHomeMarkRange;
+  Pick.updateHomeSelectionSummary = updateHomeSelectionSummary;
+  Pick.clearHomeSelection = clearHomeSelection;
+  Pick.setupHomeRowSelection = setupHomeRowSelection;
+})(window.Pick = window.Pick || {});

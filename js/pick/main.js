@@ -1,10 +1,99 @@
-import { assignFilterBarController, closeAssignCreateModal, confirmAssignConfig, generateAssignPreview, initAssignPanelControllers, openAssignCreateModal, renderAssignPanel, renderAssignTabs } from "./assign-panel.js";
-import { FILTER_SORT_COLLAPSED_KEY, FLOOR_PANEL_COLLAPSED_KEY, LABEL_MARGIN_BOTTOM_KEY, LABEL_MARGIN_DEFAULT, LABEL_MARGIN_LEFT_KEY, LABEL_MARGIN_LEFT_TOP_DEFAULT, LABEL_MARGIN_RIGHT_KEY, LABEL_MARGIN_TOP_KEY, LABOR_STORAGE_KEY, STORAGE_KEY, UPLOAD_COLLAPSED_KEY, applyCardCollapsed, closeModalWithTransition, debounce, els, getDateScopedRows, getFilteredRows, getSortedRows, handleFile, handleParsedMatrix, hasActiveFilter, homeFilterBarController, homeSortBarController, loadAssignState, loadDateTabState, loadFilterSortCollapsed, loadFloorPanelCollapsed, loadFromStorage, loadSortRules, loadUploadCollapsed, openModalWithTransition, renderDateTabs, renderFilterQtySummary, renderFloorPanel, saveAssignState, saveDateTabState, saveSortRules, setStatusMsg, setupSortLabels, state, switchView, textToMatrix, trim, updateFilterSortBadge, updateSortHeaderClasses, updateStatusBadgeMap } from "./core.js";
-import { clearRowPickerMarks, clearRowPickerState, closeCustomAssignView, confirmRowPicker, createCustomAssignment, deleteAllRowPickerSelected, enableRowPickerZoneOPriority, getAssignedRowIdSet, initRowPickerControllers, moveMarkedRowsToSelected, openCustomAssignView, renderRowPickerAvailableList, renderRowPickerSelectedList, rowPickerFilterBarController, setupRowPickerDragAndDrop } from "./custom-assign.js";
-import { applyGtLabelPageStyle, cancelSparePrintModal, closeCustomLabelCompanyDropdown, confirmSparePrintModal, fillCustomLabelFieldsFromCompany, getAvailableGtCodes, loadGtState, loadLabelMargin, openCustomLabelCompanyDropdown, parseGtTokens, printCustomLabels, printGtLabels, renderCustomLabelCompanyDropdown, renderGtAvailableList, renderSparePrintGroupList, resetCustomLabelModal, saveGtState, updateSparePrintPreview } from "./gt-print.js";
-import { clearHomeSelection, homeMarkedIds, renderTable, resetHomeMarkedIds, setupHomeRowSelection, updateHomeSelectionSummary } from "./home-table.js";
+(function (Pick) {
+  "use strict";
 
-  export function refreshAll() {
+  // --- imported from other js/pick/*.js files via window.Pick ---
+  var closeAssignCreateModal = Pick.closeAssignCreateModal;
+  var confirmAssignConfig = Pick.confirmAssignConfig;
+  var generateAssignPreview = Pick.generateAssignPreview;
+  var initAssignPanelControllers = Pick.initAssignPanelControllers;
+  var openAssignCreateModal = Pick.openAssignCreateModal;
+  var renderAssignPanel = Pick.renderAssignPanel;
+  var renderAssignTabs = Pick.renderAssignTabs;
+  var FILTER_SORT_COLLAPSED_KEY = Pick.FILTER_SORT_COLLAPSED_KEY;
+  var FLOOR_PANEL_COLLAPSED_KEY = Pick.FLOOR_PANEL_COLLAPSED_KEY;
+  var LABEL_MARGIN_BOTTOM_KEY = Pick.LABEL_MARGIN_BOTTOM_KEY;
+  var LABEL_MARGIN_DEFAULT = Pick.LABEL_MARGIN_DEFAULT;
+  var LABEL_MARGIN_LEFT_KEY = Pick.LABEL_MARGIN_LEFT_KEY;
+  var LABEL_MARGIN_LEFT_TOP_DEFAULT = Pick.LABEL_MARGIN_LEFT_TOP_DEFAULT;
+  var LABEL_MARGIN_RIGHT_KEY = Pick.LABEL_MARGIN_RIGHT_KEY;
+  var LABEL_MARGIN_TOP_KEY = Pick.LABEL_MARGIN_TOP_KEY;
+  var LABOR_STORAGE_KEY = Pick.LABOR_STORAGE_KEY;
+  var STORAGE_KEY = Pick.STORAGE_KEY;
+  var UPLOAD_COLLAPSED_KEY = Pick.UPLOAD_COLLAPSED_KEY;
+  var applyCardCollapsed = Pick.applyCardCollapsed;
+  var closeModalWithTransition = Pick.closeModalWithTransition;
+  var debounce = Pick.debounce;
+  var els = Pick.els;
+  var getDateScopedRows = Pick.getDateScopedRows;
+  var getFilteredRows = Pick.getFilteredRows;
+  var getSortedRows = Pick.getSortedRows;
+  var handleFile = Pick.handleFile;
+  var handleParsedMatrix = Pick.handleParsedMatrix;
+  var hasActiveFilter = Pick.hasActiveFilter;
+  var homeFilterBarController = Pick.homeFilterBarController;
+  var homeSortBarController = Pick.homeSortBarController;
+  var loadAssignState = Pick.loadAssignState;
+  var loadDateTabState = Pick.loadDateTabState;
+  var loadFilterSortCollapsed = Pick.loadFilterSortCollapsed;
+  var loadFloorPanelCollapsed = Pick.loadFloorPanelCollapsed;
+  var loadFromStorage = Pick.loadFromStorage;
+  var loadSortRules = Pick.loadSortRules;
+  var loadUploadCollapsed = Pick.loadUploadCollapsed;
+  var openModalWithTransition = Pick.openModalWithTransition;
+  var renderDateTabs = Pick.renderDateTabs;
+  var renderFilterQtySummary = Pick.renderFilterQtySummary;
+  var renderFloorPanel = Pick.renderFloorPanel;
+  var saveAssignState = Pick.saveAssignState;
+  var saveDateTabState = Pick.saveDateTabState;
+  var saveSortRules = Pick.saveSortRules;
+  var setStatusMsg = Pick.setStatusMsg;
+  var setupSortLabels = Pick.setupSortLabels;
+  var state = Pick.state;
+  var switchView = Pick.switchView;
+  var textToMatrix = Pick.textToMatrix;
+  var trim = Pick.trim;
+  var updateFilterSortBadge = Pick.updateFilterSortBadge;
+  var updateSortHeaderClasses = Pick.updateSortHeaderClasses;
+  var updateStatusBadgeMap = Pick.updateStatusBadgeMap;
+  var clearRowPickerMarks = Pick.clearRowPickerMarks;
+  var clearRowPickerState = Pick.clearRowPickerState;
+  var closeCustomAssignView = Pick.closeCustomAssignView;
+  var confirmRowPicker = Pick.confirmRowPicker;
+  var createCustomAssignment = Pick.createCustomAssignment;
+  var deleteAllRowPickerSelected = Pick.deleteAllRowPickerSelected;
+  var enableRowPickerZoneOPriority = Pick.enableRowPickerZoneOPriority;
+  var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
+  var initRowPickerControllers = Pick.initRowPickerControllers;
+  var moveMarkedRowsToSelected = Pick.moveMarkedRowsToSelected;
+  var openCustomAssignView = Pick.openCustomAssignView;
+  var renderRowPickerAvailableList = Pick.renderRowPickerAvailableList;
+  var renderRowPickerSelectedList = Pick.renderRowPickerSelectedList;
+  var setupRowPickerDragAndDrop = Pick.setupRowPickerDragAndDrop;
+  var applyGtLabelPageStyle = Pick.applyGtLabelPageStyle;
+  var cancelSparePrintModal = Pick.cancelSparePrintModal;
+  var closeCustomLabelCompanyDropdown = Pick.closeCustomLabelCompanyDropdown;
+  var confirmSparePrintModal = Pick.confirmSparePrintModal;
+  var fillCustomLabelFieldsFromCompany = Pick.fillCustomLabelFieldsFromCompany;
+  var getAvailableGtCodes = Pick.getAvailableGtCodes;
+  var loadGtState = Pick.loadGtState;
+  var loadLabelMargin = Pick.loadLabelMargin;
+  var openCustomLabelCompanyDropdown = Pick.openCustomLabelCompanyDropdown;
+  var parseGtTokens = Pick.parseGtTokens;
+  var printCustomLabels = Pick.printCustomLabels;
+  var printGtLabels = Pick.printGtLabels;
+  var renderCustomLabelCompanyDropdown = Pick.renderCustomLabelCompanyDropdown;
+  var renderGtAvailableList = Pick.renderGtAvailableList;
+  var renderSparePrintGroupList = Pick.renderSparePrintGroupList;
+  var resetCustomLabelModal = Pick.resetCustomLabelModal;
+  var saveGtState = Pick.saveGtState;
+  var updateSparePrintPreview = Pick.updateSparePrintPreview;
+  var clearHomeSelection = Pick.clearHomeSelection;
+  var renderTable = Pick.renderTable;
+  var resetHomeMarkedIds = Pick.resetHomeMarkedIds;
+  var setupHomeRowSelection = Pick.setupHomeRowSelection;
+  var updateHomeSelectionSummary = Pick.updateHomeSelectionSummary;
+
+  function refreshAll() {
     // 트럭현황의 #activeFileInfo와 동일하게, 데이터가 있으면 상단바에 "데이터
     // 로드됨" 배지를 표시 — 화면 전환과 무관하게 항상 최신 상태를 반영해야 하므로
     // 아래 화면별 분기와 달리 무조건 실행한다.
@@ -109,7 +198,7 @@ import { clearHomeSelection, homeMarkedIds, renderTable, resetHomeMarkedIds, set
     applyCardCollapsed(collapsed, els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
   });
 
-  export var debouncedRenderFloorPanel = debounce(function () {
+  var debouncedRenderFloorPanel = debounce(function () {
     renderFloorPanel(getFilteredRows());
   }, 200);
 
@@ -149,10 +238,10 @@ import { clearHomeSelection, homeMarkedIds, renderTable, resetHomeMarkedIds, set
   els.rowPickerDeleteAllBtn.addEventListener("click", deleteAllRowPickerSelected);
 
   els.homeSelectionAssignBtn.addEventListener("click", async function () {
-    if (!homeMarkedIds.size) return;
+    if (!Pick.homeMarkedIds.size) return;
     // state.rows(원본 업로드 순서)가 아니라 화면에 실제로 보이는 정렬/필터 순서에서
     // 골라야, 홈에서 정렬한 순서 그대로 커스텀 할당에 반영된다.
-    var selectedRows = getSortedRows(getFilteredRows()).filter(function (r) { return homeMarkedIds.has(r.id); });
+    var selectedRows = getSortedRows(getFilteredRows()).filter(function (r) { return Pick.homeMarkedIds.has(r.id); });
     var assignedIds = getAssignedRowIdSet();
     var alreadyAssignedCount = selectedRows.filter(function (r) { return assignedIds.has(r.id); }).length;
     if (alreadyAssignedCount > 0) {
@@ -362,15 +451,15 @@ import { clearHomeSelection, homeMarkedIds, renderTable, resetHomeMarkedIds, set
   });
 
   // --- Init ---
-  // rowPicker/assign 필터·정렬 컨트롤러는 core.js<->custom-assign.js/assign-panel.js
-  // 순환참조 때문에 모듈 최상위에서 바로 만들 수 없어(그 시점엔 core.js의 els가 아직
-  // 초기화 전일 수 있음) 함수로 미뤄뒀다 — 여기(모든 모듈이 로드된 뒤)서 먼저 만든다.
+  // rowPicker/assign 필터·정렬 컨트롤러는 각 파일의 최상위에서 바로 만들지 않고
+  // 함수로 미뤄뒀다 — 초기화 순서를 한곳(main.js)에 모아두기 위해 여기(모든 파일이
+  // 로드된 뒤)서 먼저 만든다.
   initRowPickerControllers();
   initAssignPanelControllers();
   setupSortLabels();
   homeFilterBarController.setup();
-  rowPickerFilterBarController.setup();
-  assignFilterBarController.setup();
+  Pick.rowPickerFilterBarController.setup();
+  Pick.assignFilterBarController.setup();
   setupRowPickerDragAndDrop();
   setupHomeRowSelection();
   loadFromStorage();
@@ -386,3 +475,8 @@ import { clearHomeSelection, homeMarkedIds, renderTable, resetHomeMarkedIds, set
   refreshAll();
   renderAssignTabs();
   renderGtAvailableList();
+
+  // --- exposed to other js/pick/*.js files via window.Pick ---
+  Pick.refreshAll = refreshAll;
+  Pick.debouncedRenderFloorPanel = debouncedRenderFloorPanel;
+})(window.Pick = window.Pick || {});

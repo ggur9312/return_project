@@ -1,31 +1,51 @@
-import { flattenWorkerGroup, renderAssignTabs, splitBalanced } from "./assign-panel.js";
-import { ROW_PICKER_COLUMNS, compareValues, createFilterBarController, createSortBarController, els, escapeHtml, filterRowsExceptKey, getCandidateValues, getCreatedDate, insertRowsSortedByZone, nextCustomAssignSeq, saveAssignState, state, switchView, uniqueValuesFrom } from "./core.js";
-import { formatDateDisplay } from "./gt-print.js";
+(function (Pick) {
+  "use strict";
+
+  // --- imported from other js/pick/*.js files via window.Pick ---
+  var flattenWorkerGroup = Pick.flattenWorkerGroup;
+  var renderAssignTabs = Pick.renderAssignTabs;
+  var splitBalanced = Pick.splitBalanced;
+  var ROW_PICKER_COLUMNS = Pick.ROW_PICKER_COLUMNS;
+  var compareValues = Pick.compareValues;
+  var createFilterBarController = Pick.createFilterBarController;
+  var createSortBarController = Pick.createSortBarController;
+  var els = Pick.els;
+  var escapeHtml = Pick.escapeHtml;
+  var filterRowsExceptKey = Pick.filterRowsExceptKey;
+  var getCandidateValues = Pick.getCandidateValues;
+  var getCreatedDate = Pick.getCreatedDate;
+  var insertRowsSortedByZone = Pick.insertRowsSortedByZone;
+  var nextCustomAssignSeq = Pick.nextCustomAssignSeq;
+  var saveAssignState = Pick.saveAssignState;
+  var state = Pick.state;
+  var switchView = Pick.switchView;
+  var uniqueValuesFrom = Pick.uniqueValuesFrom;
+  var formatDateDisplay = Pick.formatDateDisplay;
 
   // --- 커스텀 할당 화면: 커스텀 할당 생성 / 기존 작업자에 행 추가 (전용 페이지) ---
-  export var rowPickerMode = null; // "create" | "append"
-  export var rowPickerTargetCfgId = null;
-  export var rowPickerTargetWorkerIdx = null;
-  export var rowPickerReturnView = "home"; // 취소/닫기 시 돌아갈 화면 — "home" | "assign"
-  export var rowPickerSelectedRows = []; // 확정 전까지 state에 반영되지 않는 임시 선택 목록
+  var rowPickerMode = null; // "create" | "append"
+  var rowPickerTargetCfgId = null;
+  var rowPickerTargetWorkerIdx = null;
+  var rowPickerReturnView = "home"; // 취소/닫기 시 돌아갈 화면 — "home" | "assign"
+  var rowPickerSelectedRows = []; // 확정 전까지 state에 반영되지 않는 임시 선택 목록
   // "사용 가능한 행"에서 드래그로 범위 선택된(하지만 아직 옮기지 않은) 행 id 집합
-  export var rowPickerMarkedIds = new Set();
-  export var rowPickerDragAnchorId = null; // 드래그 셀렉트 시작 행 id(mousedown 시점)
-  export var rowPickerDragSelecting = false;
-  export var rowPickerDragAdditive = false; // true = Ctrl/Cmd+드래그 (기존 선택에 합침/뺌)
-  export var rowPickerDragAdditiveMode = "add"; // "add" | "remove" — 드래그 시작 행이 이미 선택돼 있었는지로 결정
-  export var rowPickerDragBaseIds = null; // 드래그 시작 전 선택 스냅샷(추가모드 기준값)
-  export var rowPickerAutoScrollRAF = null;
-  export var rowPickerLastMouseY = 0;
+  var rowPickerMarkedIds = new Set();
+  var rowPickerDragAnchorId = null; // 드래그 셀렉트 시작 행 id(mousedown 시점)
+  var rowPickerDragSelecting = false;
+  var rowPickerDragAdditive = false; // true = Ctrl/Cmd+드래그 (기존 선택에 합침/뺌)
+  var rowPickerDragAdditiveMode = "add"; // "add" | "remove" — 드래그 시작 행이 이미 선택돼 있었는지로 결정
+  var rowPickerDragBaseIds = null; // 드래그 시작 전 선택 스냅샷(추가모드 기준값)
+  var rowPickerAutoScrollRAF = null;
+  var rowPickerLastMouseY = 0;
   // 홈 화면의 state.filters/state.sortRules와는 독립적인, 이 화면 전용 필터/정렬 상태
-  export var rowPickerFilters = {};
-  export var rowPickerSortRules = [];
+  var rowPickerFilters = {};
+  var rowPickerSortRules = [];
   // 홈의 state.zoneOPriority와 별개인 이 화면 전용 O존 우선 플래그 — 홈처럼 저장하지
   // 않고 기존대로 1회성(적용 직후 되돌림)으로 유지한다.
-  export var rowPickerZoneOPriority = false;
+  var rowPickerZoneOPriority = false;
 
   // 이미 어떤 assignConfig에도 배정된 행의 id 집합 — 중복 배정 방지용
-  export function getAssignedRowIdSet() {
+  function getAssignedRowIdSet() {
     var ids = new Set();
     state.assignConfigs.forEach(function (cfg) {
       // cfg.workerGroups가 아직 없는(한 번도 결과 화면을 렌더링하지 않은) config도
@@ -40,7 +60,7 @@ import { formatDateDisplay } from "./gt-print.js";
 
   // 이미 배정/선택된 행 제외까지만 적용한, 컬럼 필터 이전 범위 —
   // 필터 드롭다운의 후보값(getRowPickerCandidateValues)도 이 범위를 기준으로 계산
-  export function getRowPickerScopedRows() {
+  function getRowPickerScopedRows() {
     // 이미 다른 assignConfig에 배정된 행은 목록에서 완전히 숨기지 않고 남겨둔 뒤
     // buildRowPickerTable에서 "이미 할당됨" 표시로 구분한다(선택된 행 후보에서만 제외).
     var selectedIds = new Set(rowPickerSelectedRows.map(function (r) { return r.id; }));
@@ -49,7 +69,7 @@ import { formatDateDisplay } from "./gt-print.js";
 
   // key 자신의 필터를 뺀 나머지 필터를 반영해 후보값을 계산 — 엑셀 자동필터처럼
   // 다른 컬럼에 필터가 걸려 있으면 이 컬럼 드롭다운도 그만큼 좁혀진다.
-  export function getRowPickerCandidateValues(key) {
+  function getRowPickerCandidateValues(key) {
     var rows = filterRowsExceptKey(getRowPickerScopedRows(), ROW_PICKER_COLUMNS, rowPickerFilters, key);
     var values = uniqueValuesFrom(rows, function (r) { return r[key]; });
     var col = ROW_PICKER_COLUMNS.find(function (c) { return c.key === key; });
@@ -59,11 +79,11 @@ import { formatDateDisplay } from "./gt-print.js";
     return values;
   }
 
-  export function computeRowPickerFilteredRows(baseRows) {
+  function computeRowPickerFilteredRows(baseRows) {
     return filterRowsExceptKey(baseRows, ROW_PICKER_COLUMNS, rowPickerFilters);
   }
 
-  export function getRowPickerSortedRows(rows) {
+  function getRowPickerSortedRows(rows) {
     var activeRules = rowPickerSortRules
       .map(function (rule) { return { col: ROW_PICKER_COLUMNS.find(function (c) { return c.key === rule.key; }), dir: rule.dir }; })
       .filter(function (r) { return r.col; });
@@ -79,19 +99,18 @@ import { formatDateDisplay } from "./gt-print.js";
     return copy;
   }
 
-  export function getRowPickerAvailableRows() {
+  function getRowPickerAvailableRows() {
     return getRowPickerSortedRows(computeRowPickerFilteredRows(getRowPickerScopedRows()));
   }
 
-  // els/state는 core.js가 소유하는데, ES 모듈 순환참조(core.js <-> custom-assign.js)
-  // 때문에 이 파일의 최상위 코드가 core.js의 최상위 코드보다 먼저 실행될 수 있어
-  // (그 시점엔 core.js의 els가 아직 초기화 전) 컨트롤러 생성을 함수로 미뤄 main.js의
-  // 초기화 단계(모든 모듈이 로드된 뒤)에서 명시적으로 호출하도록 한다.
-  export var rowPickerFilterBarController;
-  export var rowPickerSortBarController;
+  // els/state는 core.js가 소유한다 — 컨트롤러 생성은 다른 화면들과 마찬가지로
+  // 함수로 미뤄, main.js의 초기화 단계(모든 파일이 로드된 뒤)에서 명시적으로
+  // 호출하도록 한다(초기화 순서를 main.js 한 곳에 모아두기 위함).
+  var rowPickerFilterBarController;
+  var rowPickerSortBarController;
 
-  export function initRowPickerControllers() {
-    rowPickerFilterBarController = createFilterBarController({
+  function initRowPickerControllers() {
+    Pick.rowPickerFilterBarController = rowPickerFilterBarController = createFilterBarController({
       columns: ROW_PICKER_COLUMNS,
       containerEl: els.rowPickerFilterButtonsContainer,
       resetBtn: els.rowPickerFilterResetAllBtn,
@@ -101,7 +120,7 @@ import { formatDateDisplay } from "./gt-print.js";
       onApply: function () { renderRowPickerAvailableList(); }
     });
 
-    rowPickerSortBarController = createSortBarController({
+    Pick.rowPickerSortBarController = rowPickerSortBarController = createSortBarController({
       columns: ROW_PICKER_COLUMNS,
       containerEl: els.rowPickerSortRulesContainer,
       addBtn: els.rowPickerSortAddBtn,
@@ -114,7 +133,7 @@ import { formatDateDisplay } from "./gt-print.js";
     });
   }
 
-  export function buildRowPickerTable(rows, btnClass, btnLabel, btnClickAttr, draggableSelect, assignedIds) {
+  function buildRowPickerTable(rows, btnClass, btnLabel, btnClickAttr, draggableSelect, assignedIds) {
     if (!rows.length) {
       return '<div class="px-4 py-6 text-center text-xs text-slate-400">해당하는 행이 없습니다.</div>';
     }
@@ -152,7 +171,7 @@ import { formatDateDisplay } from "./gt-print.js";
     );
   }
 
-  export function renderRowPickerAvailableList() {
+  function renderRowPickerAvailableList() {
     rowPickerFilterBarController.updateButtonStates();
     rowPickerSortBarController.render();
     els.rowPickerAvailableList.innerHTML = buildRowPickerTable(getRowPickerAvailableRows(), "row-picker-add-btn bg-indigo-600 hover:bg-indigo-700 text-white", "추가", "", true, getAssignedRowIdSet());
@@ -168,7 +187,7 @@ import { formatDateDisplay } from "./gt-print.js";
     });
   }
 
-  export function renderRowPickerSelectedList() {
+  function renderRowPickerSelectedList() {
     els.rowPickerSelectedCount.textContent = rowPickerSelectedRows.length;
     var selectedQty = rowPickerSelectedRows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
     els.rowPickerSelectedQty.textContent = selectedQty.toLocaleString("ko-KR");
@@ -186,14 +205,14 @@ import { formatDateDisplay } from "./gt-print.js";
   // 그중 하나를 "선택된 행" 영역으로 드래그앤드롭하면 마킹된 행 전부가 옮겨감.
   // 컨테이너 자체(<div id="rowPickerAvailableList">)는 재렌더링 때마다 내용만
   // 바뀌므로, 이벤트 위임(delegation)으로 한 번만 등록하면 매번 다시 걸 필요가 없다.
-  export function getRowIndexInRows(rows, id) {
+  function getRowIndexInRows(rows, id) {
     for (var i = 0; i < rows.length; i++) {
       if (rows[i].id === id) return i;
     }
     return -1;
   }
 
-  export function applyRowPickerMarkRange(anchorId, currentId) {
+  function applyRowPickerMarkRange(anchorId, currentId) {
     var rows = getRowPickerAvailableRows();
     var anchorIdx = getRowIndexInRows(rows, anchorId);
     var currentIdx = getRowIndexInRows(rows, currentId);
@@ -225,7 +244,7 @@ import { formatDateDisplay } from "./gt-print.js";
   // 홈 화면의 선택바(#homeSelectionBar)와 동일한 패턴 — 드래그가 끝난 뒤에도
   // 마킹이 남아있는 동안(마우스를 뗀 뒤) 몇 행 · 몇 개를 선택했는지 계속 보여주고,
   // 여기서 바로 "선택된 행" 목록으로 옮길 수 있게 한다.
-  export function updateRowPickerSelectionSummary() {
+  function updateRowPickerSelectionSummary() {
     if (!rowPickerMarkedIds.size) {
       els.rowPickerSelectionBar.classList.add("hidden");
       return;
@@ -239,7 +258,7 @@ import { formatDateDisplay } from "./gt-print.js";
     els.rowPickerSelectionBar.classList.remove("hidden");
   }
 
-  export function clearRowPickerMarks() {
+  function clearRowPickerMarks() {
     rowPickerMarkedIds = new Set();
     Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (tr) {
       tr.classList.remove("bg-indigo-50", "opacity-70");
@@ -252,7 +271,7 @@ import { formatDateDisplay } from "./gt-print.js";
   // 안 되므로), 그리고 openCustomAssignView()가 화면에 새로 진입할 때 공통으로 쓴다.
   // #rowPickerSelectionBar는 customAssignView 안이 아니라 DOM상 별도의 fixed
   // 엘리먼트라 화면 전환만으로는 가려지지 않으므로 여기서 직접 숨긴다.
-  export function clearRowPickerState() {
+  function clearRowPickerState() {
     rowPickerMarkedIds = new Set();
     rowPickerSelectedRows = [];
     rowPickerFilters = {};
@@ -262,7 +281,7 @@ import { formatDateDisplay } from "./gt-print.js";
   }
 
   // 드래그 중임을 알기 쉽게 커서를 따라다니며 이동 건수 + 수량 합계를 보여주는 배지
-  export function updateRowPickerDragGhost() {
+  function updateRowPickerDragGhost() {
     if (!rowPickerDragSelecting || !rowPickerMarkedIds.size) {
       els.rowPickerDragGhost.classList.add("hidden");
       return;
@@ -276,12 +295,12 @@ import { formatDateDisplay } from "./gt-print.js";
     els.rowPickerDragGhost.classList.remove("hidden");
   }
 
-  export function positionRowPickerDragGhost(clientX, clientY) {
+  function positionRowPickerDragGhost(clientX, clientY) {
     els.rowPickerDragGhost.style.left = (clientX + 14) + "px";
     els.rowPickerDragGhost.style.top = (clientY + 14) + "px";
   }
 
-  export function clearRowPickerDragVisuals() {
+  function clearRowPickerDragVisuals() {
     els.rowPickerDragGhost.classList.add("hidden");
     Array.prototype.forEach.call(els.rowPickerAvailableList.querySelectorAll(".row-picker-row"), function (tr) {
       tr.classList.remove("opacity-70");
@@ -296,10 +315,10 @@ import { formatDateDisplay } from "./gt-print.js";
   // 드래그 중 마킹된 행이 화면 밖에 있어도 마우스를 뷰포트 위/아래 가장자리
   // 근처로 가져가면 페이지 자체가 자동으로 스크롤되도록 함(전용 페이지로 바뀌면서
   // 스크롤 영역이 하나뿐이라 윈도우 스크롤만 다루면 됨).
-  export var ROW_PICKER_AUTOSCROLL_EDGE = 30;
-  export var ROW_PICKER_AUTOSCROLL_SPEED = 12;
+  var ROW_PICKER_AUTOSCROLL_EDGE = 30;
+  var ROW_PICKER_AUTOSCROLL_SPEED = 12;
 
-  export function rowPickerAutoScrollTick() {
+  function rowPickerAutoScrollTick() {
     if (!rowPickerDragSelecting) {
       rowPickerAutoScrollRAF = null;
       return;
@@ -312,13 +331,13 @@ import { formatDateDisplay } from "./gt-print.js";
     rowPickerAutoScrollRAF = requestAnimationFrame(rowPickerAutoScrollTick);
   }
 
-  export function startRowPickerAutoScroll() {
+  function startRowPickerAutoScroll() {
     if (rowPickerAutoScrollRAF === null) {
       rowPickerAutoScrollRAF = requestAnimationFrame(rowPickerAutoScrollTick);
     }
   }
 
-  export function setupRowPickerDragAndDrop() {
+  function setupRowPickerDragAndDrop() {
     els.rowPickerAvailableList.addEventListener("mousedown", function (e) {
       if (e.target.closest("button")) return;
       var tr = e.target.closest(".row-picker-row");
@@ -403,7 +422,7 @@ import { formatDateDisplay } from "./gt-print.js";
     });
   }
 
-  export function openCustomAssignView(mode, cfgId, workerIdx) {
+  function openCustomAssignView(mode, cfgId, workerIdx) {
     rowPickerMode = mode;
     rowPickerTargetCfgId = cfgId || null;
     rowPickerTargetWorkerIdx = (typeof workerIdx === "number") ? workerIdx : null;
@@ -417,13 +436,13 @@ import { formatDateDisplay } from "./gt-print.js";
     switchView("custom");
   }
 
-  export function closeCustomAssignView() {
+  function closeCustomAssignView() {
     switchView(rowPickerReturnView);
   }
 
   // 선택한 행들을 단일 작업자짜리 커스텀 할당 config로 바로 생성 — 커스텀 할당
   // 화면의 "확정"(create 모드)과 홈 선택바의 "할당" 버튼이 공유하는 로직.
-  export function createCustomAssignment(rows) {
+  function createCustomAssignment(rows) {
     var dates = Array.from(new Set(rows.map(function (r) { return getCreatedDate(r); })));
     var id = Date.now();
     state.assignConfigs.push({
@@ -443,7 +462,7 @@ import { formatDateDisplay } from "./gt-print.js";
     if (window.showToast) window.showToast("커스텀 할당이 생성되었습니다.");
   }
 
-  export async function confirmRowPicker() {
+  async function confirmRowPicker() {
     if (!rowPickerSelectedRows.length) return;
     // 홈 선택바의 "할당"과 동일하게, 선택된 행 중 이미 할당된 게 있으면 확정 전에
     // 재확인한다 — 여기서는 마킹 단계(추가/할당 버튼)에서 막지 않고 확정 시점에
@@ -478,10 +497,10 @@ import { formatDateDisplay } from "./gt-print.js";
 
   // 아래 세 함수는 main.js의 이벤트 와이어링에서 호출된다 — 이 화면(row-picker)의
   // 내부 상태(rowPickerSelectedRows/rowPickerMarkedIds/rowPickerZoneOPriority)를
-  // 직접 재할당하므로, ES 모듈에서는 이 상태를 소유한 파일(custom-assign.js) 안에서만
-  // 재할당할 수 있어(다른 파일이 import한 var 바인딩은 읽기 전용) 함수로 감쌌다.
+  // 직접 재할당하므로, 이 상태를 소유한 파일(custom-assign.js) 안에서만 재할당하도록
+  // 함수로 감쌌다(다른 파일에서 건드리면 Pick.* 동기화가 누락되기 쉬움).
 
-  export async function deleteAllRowPickerSelected() {
+  async function deleteAllRowPickerSelected() {
     if (!rowPickerSelectedRows.length) return;
     if (!(await window.confirmModal("선택된 행을 모두 삭제할까요?"))) return;
     rowPickerSelectedRows = [];
@@ -490,7 +509,7 @@ import { formatDateDisplay } from "./gt-print.js";
     if (window.showToast) window.showToast("선택된 행이 모두 삭제되었습니다.", "info");
   }
 
-  export function moveMarkedRowsToSelected() {
+  function moveMarkedRowsToSelected() {
     if (!rowPickerMarkedIds.size) return;
     var idsToMove = Array.from(rowPickerMarkedIds);
     // state.rows(원본 업로드 순서)가 아니라 이 화면에 실제로 보이는 정렬/필터 순서에서
@@ -505,8 +524,59 @@ import { formatDateDisplay } from "./gt-print.js";
 
   // 홈의 sortZoneOPriorityBtn(core.js 쪽 이벤트 와이어링)과 동일한 패턴 — 누르면 항상
   // 켜지고, "정렬 초기화"(rowPickerSortBarController의 onResetExtra)로만 꺼진다.
-  export function enableRowPickerZoneOPriority() {
+  function enableRowPickerZoneOPriority() {
     rowPickerZoneOPriority = true;
     renderRowPickerAvailableList();
     if (window.showToast) window.showToast("72·73층 O존 우선 정렬이 적용되었습니다.");
   }
+
+  // --- exposed to other js/pick/*.js files via window.Pick ---
+  Pick.rowPickerMode = rowPickerMode;
+  Pick.rowPickerTargetCfgId = rowPickerTargetCfgId;
+  Pick.rowPickerTargetWorkerIdx = rowPickerTargetWorkerIdx;
+  Pick.rowPickerReturnView = rowPickerReturnView;
+  Pick.rowPickerSelectedRows = rowPickerSelectedRows;
+  Pick.rowPickerMarkedIds = rowPickerMarkedIds;
+  Pick.rowPickerDragAnchorId = rowPickerDragAnchorId;
+  Pick.rowPickerDragSelecting = rowPickerDragSelecting;
+  Pick.rowPickerDragAdditive = rowPickerDragAdditive;
+  Pick.rowPickerDragAdditiveMode = rowPickerDragAdditiveMode;
+  Pick.rowPickerDragBaseIds = rowPickerDragBaseIds;
+  Pick.rowPickerAutoScrollRAF = rowPickerAutoScrollRAF;
+  Pick.rowPickerLastMouseY = rowPickerLastMouseY;
+  Pick.rowPickerFilters = rowPickerFilters;
+  Pick.rowPickerSortRules = rowPickerSortRules;
+  Pick.rowPickerZoneOPriority = rowPickerZoneOPriority;
+  Pick.getAssignedRowIdSet = getAssignedRowIdSet;
+  Pick.getRowPickerScopedRows = getRowPickerScopedRows;
+  Pick.getRowPickerCandidateValues = getRowPickerCandidateValues;
+  Pick.computeRowPickerFilteredRows = computeRowPickerFilteredRows;
+  Pick.getRowPickerSortedRows = getRowPickerSortedRows;
+  Pick.getRowPickerAvailableRows = getRowPickerAvailableRows;
+  Pick.rowPickerFilterBarController = rowPickerFilterBarController;
+  Pick.rowPickerSortBarController = rowPickerSortBarController;
+  Pick.initRowPickerControllers = initRowPickerControllers;
+  Pick.buildRowPickerTable = buildRowPickerTable;
+  Pick.renderRowPickerAvailableList = renderRowPickerAvailableList;
+  Pick.renderRowPickerSelectedList = renderRowPickerSelectedList;
+  Pick.getRowIndexInRows = getRowIndexInRows;
+  Pick.applyRowPickerMarkRange = applyRowPickerMarkRange;
+  Pick.updateRowPickerSelectionSummary = updateRowPickerSelectionSummary;
+  Pick.clearRowPickerMarks = clearRowPickerMarks;
+  Pick.clearRowPickerState = clearRowPickerState;
+  Pick.updateRowPickerDragGhost = updateRowPickerDragGhost;
+  Pick.positionRowPickerDragGhost = positionRowPickerDragGhost;
+  Pick.clearRowPickerDragVisuals = clearRowPickerDragVisuals;
+  Pick.ROW_PICKER_AUTOSCROLL_EDGE = ROW_PICKER_AUTOSCROLL_EDGE;
+  Pick.ROW_PICKER_AUTOSCROLL_SPEED = ROW_PICKER_AUTOSCROLL_SPEED;
+  Pick.rowPickerAutoScrollTick = rowPickerAutoScrollTick;
+  Pick.startRowPickerAutoScroll = startRowPickerAutoScroll;
+  Pick.setupRowPickerDragAndDrop = setupRowPickerDragAndDrop;
+  Pick.openCustomAssignView = openCustomAssignView;
+  Pick.closeCustomAssignView = closeCustomAssignView;
+  Pick.createCustomAssignment = createCustomAssignment;
+  Pick.moveMarkedRowsToSelected = moveMarkedRowsToSelected;
+  Pick.enableRowPickerZoneOPriority = enableRowPickerZoneOPriority;
+  Pick.confirmRowPicker = confirmRowPicker;
+  Pick.deleteAllRowPickerSelected = deleteAllRowPickerSelected;
+})(window.Pick = window.Pick || {});
