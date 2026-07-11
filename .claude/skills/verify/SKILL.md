@@ -90,10 +90,13 @@ Clicking the button directly while the panel is collapsed times out
 - O-zone-priority button here is `#assignSortZoneOPriorityBtn` (separate from
   home's `#sortZoneOPriorityBtn` and row-picker's `#rowPickerSortZoneOPriorityBtn`
   — three independent flags, one per screen, all non-persisted).
-- Worker cards: `#assignTableContainer > div.space-y-6 > div` (bg-white,
-  rounded-2xl). Filter/sort candidate values are scoped to whichever workers
-  currently pass the "작업자" virtual filter — see `getAssignPanelCandidateValues`
-  in `js/pick/assign-panel.js` if a test needs exact candidate-list behavior.
+- Worker cards: `#assignTableContainer > div.space-y-8 > div` (bg-white,
+  rounded-2xl, shadow-md — the extra gap/shadow and the `bg-indigo-50/70`
+  card-header tint exist specifically so 2+ cards in "전체" view read as
+  separate blocks instead of blending together). Filter/sort candidate
+  values are scoped to whichever workers currently pass the "작업자" virtual
+  filter — see `getAssignPanelCandidateValues` in `js/pick/assign-panel.js`
+  if a test needs exact candidate-list behavior.
 
 ## Gotchas learned
 

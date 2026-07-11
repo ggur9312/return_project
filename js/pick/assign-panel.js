@@ -537,8 +537,8 @@
       var zoneList = Array.from(new Set(detailRows.map(function (r) { return r.zone; }).filter(Boolean))).join(", ");
       var isPrinted = !!(cfg.printedWorkerIdx && cfg.printedWorkerIdx[idx]);
       return (
-        '<div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">' +
-        '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">' +
+        '<div class="bg-white border border-slate-200 rounded-2xl shadow-md overflow-hidden">' +
+        '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-indigo-50/70 border-b border-indigo-100">' +
         '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) +
         (isPrinted ? ' <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 align-middle">✓ 출력됨</span>' : "") +
         (zoneList ? '<span class="ml-2 text-xs font-normal text-slate-500">담당 존: ' + escapeHtml(zoneList) + "</span>" : "") + "</div>" +
@@ -556,7 +556,7 @@
       );
     }).join("");
 
-    els.assignTableContainer.innerHTML = tabsHtml + '<div class="space-y-6">' + cardsHtml + "</div>";
+    els.assignTableContainer.innerHTML = tabsHtml + '<div class="space-y-8">' + cardsHtml + "</div>";
     assignFilterBarController.updateButtonStates();
     assignSortBarController.render();
 
