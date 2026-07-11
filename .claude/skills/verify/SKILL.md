@@ -3,8 +3,9 @@ name: verify
 description: Run and drive this app (static HTML/JS picking-allocation dashboard) end-to-end.
 ---
 
-This is a static vanilla-JS app (`index.html` + `js/app.js`, `js/truck.js`, `js/shell.js`).
-No build step, no server-side code, no package.json.
+This is a static vanilla-JS app (`index.html` + `js/pick/*.js` [ES modules, entry
+`js/pick/main.js`], `js/truck.js`, `js/shell.js`). No build step, no server-side
+code, no package.json. See `CLAUDE.md` for the `js/pick/` module map.
 
 ## Launch
 
@@ -28,7 +29,7 @@ There is no debug hook / global `state` export. The only way to get rows into
 `state.rows` is the paste-tab-separated-text feature:
 
 1. Fill `#pasteArea` with **tab-separated rows, header row required as the
-   first line**, exact Korean labels (must match `COLUMNS` in `js/app.js`):
+   first line**, exact Korean labels (must match `COLUMNS` in `js/pick/core.js`):
    `그룹번호  마감일시  생성일시  매입유형  업체명  상태  운송타입  존  수량`
    (zone = 존, quantity = 수량, 생성일시 is used for the date-tab / assign
    date filter — format like `2026-07-11 09:00`).
@@ -68,12 +69,38 @@ page.click("#sortZoneOPriorityBtn")  # then toggle O-zone priority
 Clicking the button directly while the panel is collapsed times out
 ("element is not visible").
 
+### Picking-allocation confirmed-result screen (작업자 카드)
+
+- The filter/sort bar is **one shared bar** above all worker cards (static
+  markup `#assignFilterSortBar` in index.html, not rebuilt per card) — same
+  `createFilterBarController`/`createSortBarController` factories as home, so
+  it has a real search box + "적용" button (`.th-filter-search`/`.th-filter-apply`
+  inside `#assignFilterButtonsContainer .th-filter-dropdown`), not the ad-hoc
+  instant-apply checkboxes older versions of this screen used.
+- O-zone-priority button here is `#assignSortZoneOPriorityBtn` (separate from
+  home's `#sortZoneOPriorityBtn` and row-picker's `#rowPickerSortZoneOPriorityBtn`
+  — three independent flags, one per screen, all non-persisted).
+- Worker cards: `#assignTableContainer > div.space-y-6 > div` (bg-white,
+  rounded-2xl). Filter/sort candidate values are scoped to whichever workers
+  currently pass the "작업자" virtual filter — see `getAssignPanelCandidateValues`
+  in `js/pick/assign-panel.js` if a test needs exact candidate-list behavior.
+
 ## Gotchas learned
 
 - No node/npx on this machine — use Python's `playwright` package, not a JS
-  test runner.
-- `state`/functions are inside an IIFE in `js/app.js`, not exposed on
-  `window` — you cannot `page.evaluate` into internal functions; drive the
-  UI instead.
+  test runner (also true for the ES modules in `js/pick/` — there's no
+  `node --check`-style syntax validation available; a Playwright load with a
+  `page.on("pageerror", ...)` listener is the closest thing to a syntax/wiring
+  check on this machine).
+- `state`/`els`/most functions live inside `js/pick/*.js` ES modules, not
+  exposed on `window` — you cannot `page.evaluate` into internal functions;
+  drive the UI instead.
+- `js/pick/` has real circular imports between files (e.g. `core.js` ↔
+  `main.js`, `core.js` ↔ `assign-panel.js`/`custom-assign.js`) — safe for
+  `function` declarations, but a module's own top-level code must never read
+  `els`/`state` (imported `var`s from `core.js`) unless it's `main.js` itself
+  (the `<script type="module">` entry point, guaranteed to run last). See the
+  "Gotcha" section in `CLAUDE.md` before adding new top-level controller
+  instantiations or event listeners outside `main.js`.
 - Always kill the background `http.server` when done (`pkill -f
   "http.server 8934"`) to avoid leaking a stale listener across sessions.

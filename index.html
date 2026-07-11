@@ -853,8 +853,11 @@
 </div>
 
 <script src="js/vendor/xlsx.full.min.js"></script>
-<script src="js/app.js"></script>
 <script src="js/truck.js"></script>
 <script src="js/shell.js"></script>
+<!-- 집품 현황 화면 로직 — 예전엔 js/app.js 하나(약 3800줄)였다가 여러 파일로 분할됨.
+     ES 모듈이라 defer(파싱 완료 후 실행)되므로, window.confirmModal/showToast를
+     제공하는 shell.js보다 뒤에 둬 항상 그 다음에 실행되게 한다. -->
+<script type="module" src="js/pick/main.js"></script>
 </body>
 </html>
