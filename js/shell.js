@@ -146,7 +146,7 @@
 (function () {
   "use strict";
 
-  var AFTERPRINT_FALLBACK_MS = 4000;
+  var AFTERPRINT_FALLBACK_MS = 20000;
 
   window.printWithConfirm = function (onConfirmed) {
     return new Promise(function (resolve) {

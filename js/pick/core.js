@@ -1,10 +1,9 @@
-import { clearRowPickerState, closeCustomAssignView, rowPickerSortRules } from "./custom-assign.js";
-import { formatDateOnly, formatMonthDay } from "./gt-print.js";
-import { clearHomeSelection } from "./home-table.js";
-import { refreshAll } from "./main.js";
+(function (Pick) {
+  "use strict";
 
+  // --- imported from other js/pick/*.js files via window.Pick ---
 
-  export var COLUMNS = [
+  var COLUMNS = [
     { key: "groupNo", label: "그룹번호", type: "string" },
     { key: "deadline", label: "마감일시", type: "date" },
     { key: "createdAt", label: "생성일시", type: "date" },
@@ -16,28 +15,27 @@ import { refreshAll } from "./main.js";
     { key: "quantity", label: "수량", type: "number" }
   ];
 
-  export var AGG_COLUMN = { key: "groupCompanyTotal", label: "업체 총수량", type: "number" };
-  export var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN]);
+  var AGG_COLUMN = { key: "groupCompanyTotal", label: "업체 총수량", type: "number" };
+  // 실제 행 필드가 아니라 Pick.getAssignedRowIdSet()(main.js)으로 렌더링 시점에
+  // 계산되는 파생 컬럼 — groupCompanyTotal과 동일한 패턴으로 ALL_COLUMNS에만 추가한다.
+  var ASSIGNED_COLUMN = { key: "assigned", label: "할당여부", type: "string" };
+  var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN, ASSIGNED_COLUMN]);
 
-  // 커스텀 할당 화면의 "사용 가능한 행" 테이블에 실제로 보이는 컬럼만 대상 —
-  // 생성일자는 이 화면에서 별도로 필터링할 수 있는 컬럼이 아니라서 제외
-  export var ROW_PICKER_COLUMNS = ["groupNo", "deadline", "company", "transportType", "zone", "quantity"]
-    .map(function (key) { return COLUMNS.find(function (c) { return c.key === key; }); });
-
-  export var LABEL_BARCODE_OPTS = { fontSize: 25, height: 42, width: 1.3 };
+  var LABEL_BARCODE_OPTS = { fontSize: 25, height: 42, width: 1.3 };
 
   // 행 고유 id 발급 — 배정(assignConfig)/GT 매칭 키가 배열 위치가 아니라 행 자체를
   // 안정적으로 가리킬 수 있도록 함. loadFromStorage()에서 구버전 데이터에 백필하며
   // 기존 최대 id보다 큰 값에서 시작하도록 rowIdSeq를 보정한다.
-  export var rowIdSeq = 0;
-  export function nextRowId() {
+  var rowIdSeq = 0;
+  function nextRowId() {
     rowIdSeq += 1;
     return "r" + rowIdSeq;
   }
 
-  // customAssignSeq를 다른 파일(custom-assign.js)에서 안전하게 증가시키기 위한 헬퍼 —
-  // ES 모듈에서는 var로 import한 값을 외부에서 직접 재할당할 수 없어 함수로 감쌌다.
-  export function nextCustomAssignSeq() {
+  // customAssignSeq를 다른 파일(main.js)에서 안전하게 증가시키기 위한 헬퍼 —
+  // 소유 파일(core.js) 밖에서 로컬 var를 직접 건드리면 Pick.customAssignSeq
+  // 동기화가 누락되기 쉬워 함수로 감쌌다.
+  function nextCustomAssignSeq() {
     customAssignSeq += 1;
     return customAssignSeq;
   }
@@ -46,46 +44,46 @@ import { refreshAll } from "./main.js";
   // loadAssignState()에서 구버전 데이터(customSeq 없음)에 생성 순서대로 백필하며
   // 기존 최대값보다 큰 값에서 시작하도록 보정한다. 삭제로 인해 번호가 밀려 재배정되지
   // 않도록, 렌더링 시점이 아니라 생성 시점에 한 번만 값을 고정해서 저장한다.
-  export var customAssignSeq = 0;
+  var customAssignSeq = 0;
 
-  export var STORAGE_KEY = "pickListData";
-  export var SORT_RULES_KEY = "pickListSortRules";
-  export var ZONE_O_PRIORITY_KEY = "pickListZoneOPriority";
-  export var LABOR_STORAGE_KEY = "pickListLaborInput";
-  export var ASSIGN_CONFIGS_KEY = "pickListAssignConfigs";
-  export var ASSIGN_ACTIVE_KEY = "pickListAssignActiveId";
-  export var DATE_TAB_KEY = "pickListActiveDateTab";
-  export var GT_CODES_KEY = "pickListGtCodes";
-  export var GT_ASSIGNMENTS_KEY = "pickListGtAssignments";
-  export var GT_PRINTED_KEY = "pickListGtPrinted";
-  export var LABEL_MARGIN_RIGHT_KEY = "pickListLabelMarginRight";
-  export var LABEL_MARGIN_BOTTOM_KEY = "pickListLabelMarginBottom";
-  export var LABEL_MARGIN_LEFT_KEY = "pickListLabelMarginLeft";
-  export var LABEL_MARGIN_TOP_KEY = "pickListLabelMarginTop";
-  export var FLOOR_PANEL_COLLAPSED_KEY = "pickListFloorPanelCollapsed";
-  export var UPLOAD_COLLAPSED_KEY = "pickListUploadCollapsed";
-  export var FILTER_SORT_COLLAPSED_KEY = "pickListFilterSortCollapsed";
-  export var LABEL_MARGIN_DEFAULT = 3;
-  export var LABEL_MARGIN_LEFT_TOP_DEFAULT = 0;
-  export var BADGE_CLASSES = [
+  var STORAGE_KEY = "pickListData";
+  var SORT_RULES_KEY = "pickListSortRules";
+  var ZONE_O_PRIORITY_KEY = "pickListZoneOPriority";
+  var LABOR_STORAGE_KEY = "pickListLaborInput";
+  var ASSIGN_CONFIGS_KEY = "pickListAssignConfigs";
+  var ASSIGN_ACTIVE_KEY = "pickListAssignActiveId";
+  var DATE_TAB_KEY = "pickListActiveDateTab";
+  var GT_CODES_KEY = "pickListGtCodes";
+  var GT_ASSIGNMENTS_KEY = "pickListGtAssignments";
+  var GT_PRINTED_KEY = "pickListGtPrinted";
+  var LABEL_MARGIN_RIGHT_KEY = "pickListLabelMarginRight";
+  var LABEL_MARGIN_BOTTOM_KEY = "pickListLabelMarginBottom";
+  var LABEL_MARGIN_LEFT_KEY = "pickListLabelMarginLeft";
+  var LABEL_MARGIN_TOP_KEY = "pickListLabelMarginTop";
+  var FLOOR_PANEL_COLLAPSED_KEY = "pickListFloorPanelCollapsed";
+  var UPLOAD_COLLAPSED_KEY = "pickListUploadCollapsed";
+  var FILTER_SORT_COLLAPSED_KEY = "pickListFilterSortCollapsed";
+  var LABEL_MARGIN_DEFAULT = 3;
+  var LABEL_MARGIN_LEFT_TOP_DEFAULT = 0;
+  var BADGE_CLASSES = [
     "bg-emerald-50 text-emerald-700 border border-emerald-100",
     "bg-blue-50 text-blue-700 border border-blue-100",
     "bg-amber-50 text-amber-700 border border-amber-100",
     "bg-rose-50 text-rose-700 border border-rose-100"
   ];
-  export var FILTER_BTN_INACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
-  export var FILTER_BTN_ACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-indigo-600 text-white shadow-md shadow-indigo-100 font-medium text-xs px-3 py-1.5 rounded-lg transition-all";
+  var FILTER_BTN_INACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
+  var FILTER_BTN_ACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-indigo-600 text-white shadow-md shadow-indigo-100 font-medium text-xs px-3 py-1.5 rounded-lg transition-all";
 
-  export var NAV_BTN_ACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100";
-  export var NAV_BTN_INACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50";
-  export var ASSIGN_TAB_ACTIVE = "px-4 py-2.5 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100 flex items-center gap-2 transition-all duration-200";
-  export var ASSIGN_TAB_INACTIVE = "px-4 py-2.5 text-sm font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-all duration-200";
+  var NAV_BTN_ACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100";
+  var NAV_BTN_INACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50";
+  var ASSIGN_TAB_ACTIVE = "px-4 py-2.5 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100 flex items-center gap-2 transition-all duration-200";
+  var ASSIGN_TAB_INACTIVE = "px-4 py-2.5 text-sm font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-all duration-200";
 
-  export var initialFilters = {};
+  var initialFilters = {};
   COLUMNS.forEach(function (c) { initialFilters[c.key] = null; }); // null = 전체 허용(필터 없음)
   initialFilters[AGG_COLUMN.key] = null;
 
-  export var state = {
+  var state = {
     rows: [],
     // 정렬 기준 목록(우선순위 순서대로 적용). 기본값: 존 오름차순 -> 수량 내림차순,
     // 새로 업로드/붙여넣기한 데이터도 존별로 묶이고 수량이 많은 순으로 보이게 함.
@@ -100,10 +98,12 @@ import { refreshAll } from "./main.js";
     gtCodes: [],
     gtAssignments: {},
     gtPrinted: [],
-    activeDateTab: null
+    // 활성 날짜 탭(들) — 빈 배열이면 "전체", 아니면 선택된 "YYYY-MM-DD" 문자열 목록
+    // (일반 클릭은 항상 원소 1개짜리 배열로 교체, Ctrl/Cmd+클릭은 배열에 토글 추가/제거)
+    activeDateTabs: []
   };
 
-  export var els = {
+  var els = {
     dropZone: document.getElementById("dropZone"),
     fileInput: document.getElementById("fileInput"),
     fileSelectBtn: document.getElementById("fileSelectBtn"),
@@ -122,10 +122,6 @@ import { refreshAll } from "./main.js";
     homeSelectionSummary: document.getElementById("homeSelectionSummary"),
     homeSelectionAssignBtn: document.getElementById("homeSelectionAssignBtn"),
     homeSelectionClearBtn: document.getElementById("homeSelectionClearBtn"),
-    rowPickerSelectionBar: document.getElementById("rowPickerSelectionBar"),
-    rowPickerSelectionSummary: document.getElementById("rowPickerSelectionSummary"),
-    rowPickerSelectionAssignBtn: document.getElementById("rowPickerSelectionAssignBtn"),
-    rowPickerSelectionClearBtn: document.getElementById("rowPickerSelectionClearBtn"),
     floorBars: document.getElementById("floorBars"),
     floorPanelToggleBtn: document.getElementById("floorPanelToggleBtn"),
     floorPanelToggleLabel: document.getElementById("floorPanelToggleLabel"),
@@ -144,7 +140,6 @@ import { refreshAll } from "./main.js";
     filterSortToggleBtn: document.getElementById("filterSortToggleBtn"),
     filterSortToggleLabel: document.getElementById("filterSortToggleLabel"),
     filterSortToggleIcon: document.getElementById("filterSortToggleIcon"),
-    filterSortSummary: document.getElementById("filterSortSummary"),
     filterSortBody: document.getElementById("filterSortBody"),
     table: document.getElementById("dataTable"),
     emptyState: document.getElementById("emptyState"),
@@ -156,11 +151,9 @@ import { refreshAll } from "./main.js";
     sortZoneOPriorityBtn: document.getElementById("sortZoneOPriorityBtn"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
-    navCustomBtn: document.getElementById("navCustomBtn"),
     mainNavAside: document.getElementById("mainNavAside"),
     homeView: document.getElementById("homeView"),
     assignView: document.getElementById("assignView"),
-    customAssignView: document.getElementById("customAssignView"),
     assignOpenModalBtn: document.getElementById("assignOpenModalBtn"),
     assignCreateModal: document.getElementById("assignCreateModal"),
     assignCreateModalBox: document.getElementById("assignCreateModalBox"),
@@ -183,22 +176,6 @@ import { refreshAll } from "./main.js";
     assignSortZoneOPriorityBtn: document.getElementById("assignSortZoneOPriorityBtn"),
     assignTableContainer: document.getElementById("assignTableContainer"),
     assignDeleteAllBtn: document.getElementById("assignDeleteAllBtn"),
-    assignCustomBtn: document.getElementById("assignCustomBtn"),
-    rowPickerTitle: document.getElementById("rowPickerTitle"),
-    rowPickerFilterButtonsContainer: document.getElementById("rowPickerFilterButtonsContainer"),
-    rowPickerFilterResetAllBtn: document.getElementById("rowPickerFilterResetAllBtn"),
-    rowPickerSortRulesContainer: document.getElementById("rowPickerSortRulesContainer"),
-    rowPickerSortAddBtn: document.getElementById("rowPickerSortAddBtn"),
-    rowPickerSortResetBtn: document.getElementById("rowPickerSortResetBtn"),
-    rowPickerSortZoneOPriorityBtn: document.getElementById("rowPickerSortZoneOPriorityBtn"),
-    rowPickerAvailableList: document.getElementById("rowPickerAvailableList"),
-    rowPickerSelectedList: document.getElementById("rowPickerSelectedList"),
-    rowPickerSelectedCount: document.getElementById("rowPickerSelectedCount"),
-    rowPickerSelectedQty: document.getElementById("rowPickerSelectedQty"),
-    rowPickerDeleteAllBtn: document.getElementById("rowPickerDeleteAllBtn"),
-    rowPickerDragGhost: document.getElementById("rowPickerDragGhost"),
-    rowPickerConfirmBtn: document.getElementById("rowPickerConfirmBtn"),
-    rowPickerCancelBtn: document.getElementById("rowPickerCancelBtn"),
     gtPasteArea: document.getElementById("gtPasteArea"),
     gtSaveBtn: document.getElementById("gtSaveBtn"),
     gtClearBtn: document.getElementById("gtClearBtn"),
@@ -249,16 +226,16 @@ import { refreshAll } from "./main.js";
     printArea: document.getElementById("printArea")
   };
 
-  export function trim(v) {
+  function trim(v) {
     return (v === null || v === undefined ? "" : String(v)).trim();
   }
 
-  export function splitLine(line) {
+  function splitLine(line) {
     var delimiter = line.indexOf("\t") !== -1 ? "\t" : ",";
     return line.split(delimiter).map(trim);
   }
 
-  export function textToMatrix(text) {
+  function textToMatrix(text) {
     return text
       .split(/\r\n|\r|\n/)
       .filter(function (line) { return line.trim().length > 0; })
@@ -268,13 +245,13 @@ import { refreshAll } from "./main.js";
   // 존 원본 값에서 "숫자+글자"(글자 뒤 숫자는 버림, 예: 53L106 → 53L) 또는
   // "글자+숫자"(숫자까지 포함, 예: AGV1-1 → AGV1) 패턴 중 첫 매치만 추출.
   // 매치가 없으면(이미 깨끗하거나 패턴이 없는 값) 원본 그대로 사용.
-  export function normalizeZone(raw) {
+  function normalizeZone(raw) {
     var s = String(raw || "").trim();
     var m = s.match(/\d+[A-Za-z]+|[A-Za-z]+\d+/);
     return m ? m[0] : s;
   }
 
-  export function matrixToRows(matrix) {
+  function matrixToRows(matrix) {
     if (!matrix.length) {
       return { rows: [], error: "데이터가 비어 있습니다." };
     }
@@ -316,7 +293,7 @@ import { refreshAll } from "./main.js";
     return { rows: rows, error: null };
   }
 
-  export function loadFromStorage() {
+  function loadFromStorage() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       state.rows = raw ? JSON.parse(raw) : [];
@@ -338,21 +315,19 @@ import { refreshAll } from "./main.js";
     });
   }
 
-  export function saveToStorage() {
+  function saveToStorage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.rows));
   }
 
   // 정렬 상태(state.sortRules)는 기존엔 저장되지 않아 브라우저가 새로고침되면
   // (모바일에서 다른 앱 갔다 오는 사이 탭이 새로고침되는 경우 포함) 기본 정렬로
   // 되돌아갔다 — 집품 데이터(state.rows)와 마찬가지로 localStorage에 저장/복원한다.
-  // 커스텀 할당 화면 전용 정렬(rowPickerSortRules)은 이 화면(홈)과 무관한 별도
-  // 상태라 대상이 아니다.
-  export function saveSortRules() {
+  function saveSortRules() {
     localStorage.setItem(SORT_RULES_KEY, JSON.stringify(state.sortRules));
     localStorage.setItem(ZONE_O_PRIORITY_KEY, state.zoneOPriority ? "1" : "");
   }
 
-  export function loadSortRules() {
+  function loadSortRules() {
     try {
       var raw = localStorage.getItem(SORT_RULES_KEY);
       if (raw) state.sortRules = JSON.parse(raw);
@@ -362,13 +337,13 @@ import { refreshAll } from "./main.js";
     state.zoneOPriority = localStorage.getItem(ZONE_O_PRIORITY_KEY) === "1";
   }
 
-  export function setStatusMsg(msg, kind) {
+  function setStatusMsg(msg, kind) {
     var color = kind === "error" ? "text-rose-600" : kind === "ok" ? "text-emerald-600" : "text-slate-500";
     els.statusMsg.textContent = msg || "";
     els.statusMsg.className = "text-xs " + color;
   }
 
-  export function applyParsedRows(rows) {
+  function applyParsedRows(rows) {
     var existingKeys = {};
     state.rows.forEach(function (r) { existingKeys[dedupKey(r)] = true; });
     var added = [];
@@ -381,11 +356,11 @@ import { refreshAll } from "./main.js";
     });
     state.rows = state.rows.concat(added);
     saveToStorage();
-    refreshAll();
+    Pick.refreshAll();
     return { added: added.length, skipped: skipped };
   }
 
-  export function handleParsedMatrix(matrix, sourceLabel) {
+  function handleParsedMatrix(matrix, sourceLabel) {
     var result = matrixToRows(matrix);
     if (result.error) {
       setStatusMsg(result.error, "error");
@@ -400,7 +375,7 @@ import { refreshAll } from "./main.js";
       (applyResult.skipped ? " (중복 " + applyResult.skipped + "건 제외)" : ""), "ok");
   }
 
-  export function handleFile(file) {
+  function handleFile(file) {
     if (!file) return;
     els.fileName.textContent = file.name;
     var reader = new FileReader();
@@ -419,7 +394,7 @@ import { refreshAll } from "./main.js";
     reader.readAsArrayBuffer(file);
   }
 
-  export function debounce(fn, wait) {
+  function debounce(fn, wait) {
     var timer = null;
     return function () {
       var args = arguments, ctx = this;
@@ -428,7 +403,7 @@ import { refreshAll } from "./main.js";
     };
   }
 
-  export function escapeHtml(str) {
+  function escapeHtml(str) {
     return String(str)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
@@ -436,7 +411,7 @@ import { refreshAll } from "./main.js";
       .replace(/"/g, "&quot;");
   }
 
-  export function uniqueValuesFrom(rows, getter) {
+  function uniqueValuesFrom(rows, getter) {
     var set = {};
     rows.forEach(function (r) {
       var v = getter(r);
@@ -446,8 +421,8 @@ import { refreshAll } from "./main.js";
   }
 
   // 여러 형식(연-월-일 시:분, 또는 Date가 파싱 가능한 그 외 형식)의 날짜 문자열을
-  // Date 객체로 변환. formatMonthDay/getCreatedDate가 공통으로 사용.
-  export function parseFlexibleDate(str) {
+  // Date 객체로 변환. Pick.formatMonthDay/getCreatedDate가 공통으로 사용.
+  function parseFlexibleDate(str) {
     var raw = String(str || "").trim();
     var m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
@@ -457,24 +432,25 @@ import { refreshAll } from "./main.js";
 
   // 생성일시(createdAt)에서 시간을 뺀 날짜 부분만 "YYYY-MM-DD"로 반환 — 중복제거,
   // 날짜별 탭, 집품 할당의 생성일자 선택에서 공통으로 쓰는 그룹핑 키.
-  export function getCreatedDate(row) {
+  function getCreatedDate(row) {
     var d = parseFlexibleDate(row && row.createdAt);
     if (!d) return String((row && row.createdAt) || "");
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
 
-  // 현재 활성 날짜 탭(state.activeDateTab)으로 좁혀진 행 — null이면 전체
-  export function getDateScopedRows() {
-    if (state.activeDateTab === null) return state.rows;
-    return state.rows.filter(function (r) { return getCreatedDate(r) === state.activeDateTab; });
+  // 현재 활성 날짜 탭(들)(state.activeDateTabs)으로 좁혀진 행 — 빈 배열이면 전체
+  function getDateScopedRows() {
+    if (!state.activeDateTabs.length) return state.rows;
+    var activeSet = new Set(state.activeDateTabs);
+    return state.rows.filter(function (r) { return activeSet.has(getCreatedDate(r)); });
   }
 
   // 업로드 중복 판정 키: 그룹번호 + 생성일자 + 업체명 + 존
-  export function dedupKey(r) {
+  function dedupKey(r) {
     return r.groupNo + "|" + getCreatedDate(r) + "|" + r.company + "|" + r.zone;
   }
 
-  export function uniqueValues(key) {
+  function uniqueValues(key) {
     var values = uniqueValuesFrom(getDateScopedRows(), function (r) { return r[key]; });
     var col = COLUMNS.find(function (c) { return c.key === key; });
     if (col && col.type === "number") {
@@ -486,7 +462,7 @@ import { refreshAll } from "./main.js";
   // rows를 필터링하되 exceptKey 컬럼의 필터는 건너뛴다 — 그 컬럼 자신의 드롭다운
   // 후보값을 "다른 필터가 전부 적용된 상태" 기준으로 계산하기 위함(엑셀 자동필터처럼
   // 캐스케이딩: 다른 필터를 걸면 이 필터에는 이제 나올 수 없는 값이 안 보인다).
-  export function filterRowsExceptKey(rows, columns, filters, exceptKey) {
+  function filterRowsExceptKey(rows, columns, filters, exceptKey) {
     return rows.filter(function (r) {
       for (var i = 0; i < columns.length; i++) {
         var col = columns[i];
@@ -499,11 +475,11 @@ import { refreshAll } from "./main.js";
     });
   }
 
-  export function getPreFilteredRowsFrom(baseRows) {
+  function getPreFilteredRowsFrom(baseRows) {
     return filterRowsExceptKey(baseRows, COLUMNS, state.filters);
   }
 
-  export function computeGroupCompanyTotals(rows) {
+  function computeGroupCompanyTotals(rows) {
     var map = {};
     rows.forEach(function (r) {
       var k = r.groupNo + "" + r.company;
@@ -516,22 +492,31 @@ import { refreshAll } from "./main.js";
   // 나머지 모든 활성 필터(원본 9개 컬럼 + 파생 groupCompanyTotal 컬럼)를 반영해서
   // 계산한다. 그래야 존 필터를 걸면 수량 필터 후보값이 그 존에 실제 존재하는
   // 수량으로만 좁혀지는 식의 캐스케이딩이 된다.
-  export function getCandidateValues(key) {
+  function getCandidateValues(key) {
     var exceptRegular = filterRowsExceptKey(getDateScopedRows(), COLUMNS, state.filters, key);
     var gcMap = computeGroupCompanyTotals(exceptRegular);
+    var assignedRowIds = Pick.getAssignedRowIdSet();
     var withAgg = exceptRegular.map(function (r) {
       var clone = Object.assign({}, r);
       clone.groupCompanyTotal = gcMap[r.groupNo + "" + r.company];
+      clone.assigned = assignedRowIds.has(r.id) ? "할당됨" : "미할당";
       return clone;
     });
     if (key === AGG_COLUMN.key) {
       return uniqueValuesFrom(withAgg, function (r) { return r.groupCompanyTotal; })
         .sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
     }
+    if (key === ASSIGNED_COLUMN.key) {
+      return ["할당됨", "미할당"];
+    }
     var aggFilterSet = state.filters[AGG_COLUMN.key];
     var rowsForKey = (aggFilterSet === null || aggFilterSet === undefined)
       ? withAgg
       : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var assignedFilterSet = state.filters[ASSIGNED_COLUMN.key];
+    if (assignedFilterSet !== null && assignedFilterSet !== undefined) {
+      rowsForKey = rowsForKey.filter(function (r) { return assignedFilterSet.has(r.assigned); });
+    }
     var values = uniqueValuesFrom(rowsForKey, function (r) { return r[key]; });
     var col = COLUMNS.find(function (c) { return c.key === key; });
     if (col && col.type === "number") {
@@ -540,29 +525,37 @@ import { refreshAll } from "./main.js";
     return values;
   }
 
-  // 컬럼 필터 + 집계(groupCompanyTotal) 필터를 baseRows 위에 적용 — 홈 화면
+  // 컬럼 필터 + 집계(groupCompanyTotal)/할당여부 필터를 baseRows 위에 적용 — 홈 화면
   // (날짜 탭으로 스코프된 행)과 집품 할당(날짜 탭과 무관, 자체 생성일자 선택)이
   // 서로 다른 baseRows로 재사용
-  export function computeFilteredRows(baseRows) {
+  function computeFilteredRows(baseRows) {
     var preFiltered = getPreFilteredRowsFrom(baseRows);
     var gcMap = computeGroupCompanyTotals(preFiltered);
+    var assignedRowIds = Pick.getAssignedRowIdSet();
     var withAgg = preFiltered.map(function (r) {
       var clone = Object.assign({}, r);
       clone.groupCompanyTotal = gcMap[r.groupNo + "" + r.company];
+      clone.assigned = assignedRowIds.has(r.id) ? "할당됨" : "미할당";
       return clone;
     });
     var aggFilterSet = state.filters[AGG_COLUMN.key];
-    if (aggFilterSet === null || aggFilterSet === undefined) return withAgg;
-    return withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var filtered = (aggFilterSet === null || aggFilterSet === undefined)
+      ? withAgg
+      : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var assignedFilterSet = state.filters[ASSIGNED_COLUMN.key];
+    if (assignedFilterSet !== null && assignedFilterSet !== undefined) {
+      filtered = filtered.filter(function (r) { return assignedFilterSet.has(r.assigned); });
+    }
+    return filtered;
   }
 
-  export function getFilteredRows() {
+  function getFilteredRows() {
     return computeFilteredRows(getDateScopedRows());
   }
 
   // 집품 할당 전용 — 컬럼/집계 필터는 반영하되 홈 화면의 활성 날짜 탭 스코프는
   // 배제(집품 할당은 자체 생성일자 다중 선택으로 별도 범위를 지정하므로)
-  export function getAssignBaseRows() {
+  function getAssignBaseRows() {
     return computeFilteredRows(state.rows);
   }
 
@@ -571,21 +564,7 @@ import { refreshAll } from "./main.js";
   // 헤더를 클릭하면 그 열 하나만으로 정렬(이미 그 열 단독 정렬 중이면 방향 토글) —
   // 정렬 영역(#sortRulesContainer)에서 여러 기준을 관리하는 것과 같은 state.sortRules를
   // 공유하므로 항상 서로 동기화된다.
-  export function setupSortLabels() {
-    Array.prototype.forEach.call(els.theadRow.querySelectorAll("th[data-key]"), function (th) {
-      var key = th.dataset.key;
-      th.addEventListener("click", function () {
-        if (state.sortRules.length === 1 && state.sortRules[0].key === key) {
-          state.sortRules[0].dir *= -1;
-        } else {
-          state.sortRules = [{ key: key, dir: 1 }];
-        }
-        refreshAll();
-      });
-    });
-  }
-
-  export function updateSortHeaderClasses() {
+  function updateSortHeaderClasses() {
     Array.prototype.forEach.call(els.theadRow.querySelectorAll("th[data-key]"), function (th) {
       var key = th.dataset.key;
       var label = th.querySelector(".th-label");
@@ -609,7 +588,7 @@ import { refreshAll } from "./main.js";
   // 컨트롤러 팩토리 — 홈과 커스텀 할당 모달이 각자의 정렬 규칙 배열/컨테이너로
   // 독립적으로 인스턴스화한다. 홈은 테이블 헤더 클릭(setupSortLabels)과도 같은
   // state.sortRules를 공유해 항상 동기화된다.
-  export function createSortBarController(options) {
+  function createSortBarController(options) {
     // options: { columns, containerEl, addBtn, resetBtn, getSortRules(), setSortRules(rules), onApply() }
     function render() {
       var rules = options.getSortRules();
@@ -672,23 +651,22 @@ import { refreshAll } from "./main.js";
     return { render: render };
   }
 
-  export var homeSortBarController = createSortBarController({
+  var homeSortBarController = createSortBarController({
     columns: ALL_COLUMNS,
     containerEl: els.sortRulesContainer,
     addBtn: els.sortAddBtn,
     resetBtn: els.sortResetBtn,
     getSortRules: function () { return state.sortRules; },
     setSortRules: function (rules) { state.sortRules = rules; },
-    // "정렬 초기화"는 O존 우선 정렬도 함께 끄는 게 자연스러움 — 커스텀 할당 쪽
-    // 컨트롤러는 이 옵션을 넘기지 않아 rowPickerZoneOPriority에는 영향 없음.
+    // "정렬 초기화"는 O존 우선 정렬도 함께 끄는 게 자연스러움.
     onResetExtra: function () { state.zoneOPriority = false; },
-    onApply: function () { refreshAll(); }
+    onApply: function () { Pick.refreshAll(); }
   });
 
   // --- 필터 바 컨트롤러 팩토리 (검색 + 다중 선택, "적용" 버튼을 눌러야 실제 반영) ---
   // 홈 화면과 커스텀 할당 모달이 서로 다른 컬럼/상태/컨테이너로 각각 인스턴스화해서
   // 쓸 수 있도록 일반화됨 — 두 화면의 필터가 서로 독립적으로 동작한다.
-  export function createFilterBarController(options) {
+  function createFilterBarController(options) {
     // options: { columns, containerEl, resetBtn, getFilters(), setFilter(key, valueOrNull), getCandidateValues(key), onApply() }
     var filterEls = {};
     var pendingDrafts = {}; // key -> Set, 드롭다운이 열려있는 동안의 임시 선택 상태(미적용)
@@ -778,7 +756,7 @@ import { refreshAll } from "./main.js";
 
       listEl.innerHTML = visible.map(function (v) {
         var checked = effectiveSet.has(v) ? " checked" : "";
-        var displayText = (col && col.type === "date") ? formatDateOnly(v) : v;
+        var displayText = (col && col.type === "date") ? Pick.formatDateOnly(v) : v;
         return (
           '<label class="th-filter-item flex items-center gap-1.5 text-xs text-slate-700"><input type="checkbox" class="th-filter-item-cb accent-indigo-600" value="' + escapeHtml(v) + '"' + checked + "> " + escapeHtml(displayText) + "</label>"
         );
@@ -890,24 +868,24 @@ import { refreshAll } from "./main.js";
     return { setup: setup, updateButtonStates: updateButtonStates, hasActiveFilter: hasActiveFilterFn };
   }
 
-  export var homeFilterBarController = createFilterBarController({
+  var homeFilterBarController = createFilterBarController({
     columns: ALL_COLUMNS,
     containerEl: els.filterButtonsContainer,
     resetBtn: els.filterResetAllBtn,
     getFilters: function () { return state.filters; },
     setFilter: function (key, value) { state.filters[key] = value; },
     getCandidateValues: getCandidateValues,
-    onApply: function () { refreshAll(); }
+    onApply: function () { Pick.refreshAll(); }
   });
 
   // 정식 집품 할당(층수 입력 방식)은 getAssignBaseRows()가 computeFilteredRows()를
   // 거치므로, 홈 목록에 필터가 걸려 있으면 필터링된 일부 데이터만 할당 대상이 됨 —
   // 이를 모르고 진행하는 실수를 막기 위해 필터 활성 여부를 확인하는 데 사용.
-  export function hasActiveFilter() {
+  function hasActiveFilter() {
     return homeFilterBarController.hasActiveFilter();
   }
 
-  export function updateStatusBadgeMap() {
+  function updateStatusBadgeMap() {
     var statuses = uniqueValues("status");
     var map = {};
     statuses.forEach(function (s, i) {
@@ -918,14 +896,14 @@ import { refreshAll } from "./main.js";
 
   // 존 코드에서 숫자(층코드)를 제거한 알파벳 부분이 정확히 "O"인지 판별 —
   // 존은 "72K", "72A"처럼 층코드+알파벳 형태이고 O존도 "72O", "73O"처럼 층코드가 붙어 있음.
-  export function isOZone(zone) {
+  function isOZone(zone) {
     return String(zone || "").replace(/[0-9]/g, "").trim().toUpperCase() === "O";
   }
 
   // 존 문자열에서 층 번호를 우선 숫자로 비교하고(9 -> 10 -> 72), 층이 같을 때만
   // 문자열로 비교 — 순수 문자열(사전식) 비교로는 "10A"가 "9A"보다 앞서는 등
   // 자릿수가 다른 층 번호에서 사람이 기대하는 순서와 어긋나는 문제를 해결한다.
-  export function compareZoneAscending(za, zb) {
+  function compareZoneAscending(za, zb) {
     var sa = String(za || "").trim();
     var sb = String(zb || "").trim();
     var floorA = getFloor(sa);
@@ -943,7 +921,7 @@ import { refreshAll } from "./main.js";
   // targetArray에 이미 같은 id의 행이 있으면 건너뛴다 — 같은 행이 다른 작업자로
   // "이동"되거나 "할당 추가"될 때, 도착 쪽에 이미 그 행이 있으면(예: 두 작업자에게
   // 같은 행이 각각 배정돼 있던 상태) 중복으로 두 번 표시되는 것을 막는다.
-  export function insertRowsSortedByZone(targetArray, rowsToInsert) {
+  function insertRowsSortedByZone(targetArray, rowsToInsert) {
     var existingIds = new Set(targetArray.map(function (r) { return r.id; }));
     var toInsert = rowsToInsert.filter(function (r) { return !existingIds.has(r.id); });
     targetArray.push.apply(targetArray, toInsert);
@@ -955,7 +933,7 @@ import { refreshAll } from "./main.js";
   // 지나가므로, zoneOPriority 버튼을 누르면 같은 층 안에서 O존(예: 72O, 73O)을
   // 그 층의 다른 존(72K, 72A 등)보다 앞으로 보낸다. 층이 다르면(72층 vs 73층 등)
   // 층끼리의 상대적 순서는 건드리지 않고 숫자 기준 오름차순을 그대로 유지.
-  export function compareZoneWithOPriority(za, zb) {
+  function compareZoneWithOPriority(za, zb) {
     var sa = String(za || "").trim();
     var sb = String(zb || "").trim();
     var floorA = getFloor(sa);
@@ -969,7 +947,7 @@ import { refreshAll } from "./main.js";
     return compareZoneAscending(sa, sb);
   }
 
-  export function compareValues(a, b, col, zoneOPriority) {
+  function compareValues(a, b, col, zoneOPriority) {
     if (col.type === "number") {
       return (a[col.key] || 0) - (b[col.key] || 0);
     }
@@ -986,7 +964,7 @@ import { refreshAll } from "./main.js";
     return String(a[col.key]).localeCompare(String(b[col.key]), "ko");
   }
 
-  export function getSortedRows(rows) {
+  function getSortedRows(rows) {
     var activeRules = state.sortRules
       .map(function (rule) { return { col: ALL_COLUMNS.find(function (c) { return c.key === rule.key; }), dir: rule.dir }; })
       .filter(function (r) { return r.col; });
@@ -1002,7 +980,7 @@ import { refreshAll } from "./main.js";
     return copy;
   }
 
-  export function getFloor(zone) {
+  function getFloor(zone) {
     var s = String(zone || "").trim();
     if (!s) return "(미지정)";
     if (/^[A-Za-z]/.test(s)) return s;
@@ -1010,28 +988,59 @@ import { refreshAll } from "./main.js";
     return f || "(미지정)";
   }
 
-  export function floorSortKey(label) {
+  function floorSortKey(label) {
     var n = parseFloat(label);
     return isNaN(n) ? Infinity : n;
   }
 
-  export function sumQty(rows) {
+  function sumQty(rows) {
     return rows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
   }
 
-  export function renderFilterQtySummary(filteredRows, unfilteredRows) {
+  // 필터 적용 결과 수량 요약 + 필터·정렬 활성 개수(이전엔 별도 #filterSortSummary
+  // 줄에 있었으나, 하나의 강조 박스로 통합)를 함께 보여준다.
+  function renderFilterQtySummary(filteredRows, unfilteredRows) {
+    var filterCount = ALL_COLUMNS.filter(function (c) {
+      return state.filters[c.key] !== null && state.filters[c.key] !== undefined;
+    }).length;
+    var sortCount = state.sortRules.length;
+    var extraParts = [];
+    if (filterCount > 0) extraParts.push("필터 " + filterCount + "개");
+    if (sortCount > 0) extraParts.push("정렬 " + sortCount + "개");
     els.filterQtySummary.textContent =
       "필터 적용: " + filteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(filteredRows).toLocaleString("ko-KR") + "개 · " +
-      "전체: " + unfilteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
+      "전체: " + unfilteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개" +
+      (extraParts.length ? " · " + extraParts.join(" · ") : "");
   }
 
-  export function renderFloorPanel(rows, unfilteredRows) {
+  // 층 코드의 첫 글자가 숫자면 그 숫자를 "층대" 키로 추출(72→"7", 73→"7", 9→"9",
+  // 10→"1") — 72층/73층처럼 첫자리가 같은 여러 층을 묶어 보여주기 위함. 문자로
+  // 시작하는 층 코드나 "(미지정)"은 묶을 대상이 아니므로 null을 반환한다.
+  function getFloorFamily(floor) {
+    var m = String(floor || "").match(/^\d/);
+    return m ? m[0] : null;
+  }
+
+  function renderFloorPanel(rows, unfilteredRows) {
     var byFloor = {};
     rows.forEach(function (r) {
       var floor = getFloor(r.zone);
       byFloor[floor] = (byFloor[floor] || 0) + (r.quantity || 0);
     });
     var floors = Object.keys(byFloor).sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); });
+
+    // 실제로 같은 첫자리를 공유하는 층이 2개 이상일 때만 "층대" 합계를 보여준다 —
+    // 층이 하나뿐이면 "N층대"가 "N층"과 완전히 같은 값이라 중복 표시가 된다.
+    var familyQty = {};
+    var familyMembers = {};
+    floors.forEach(function (f) {
+      var family = getFloorFamily(f);
+      if (!family) return;
+      familyQty[family] = (familyQty[family] || 0) + byFloor[f];
+      familyMembers[family] = familyMembers[family] || [];
+      familyMembers[family].push(f);
+    });
+    var multiFamilies = Object.keys(familyQty).filter(function (fam) { return familyMembers[fam].length > 1; });
 
     var totalQty = floors.reduce(function (sum, f) { return sum + byFloor[f]; }, 0);
     els.floorTotalQty.textContent = totalQty.toLocaleString("ko-KR") + "개";
@@ -1043,18 +1052,34 @@ import { refreshAll } from "./main.js";
     els.floorPerPersonQty.textContent = perPersonText;
     var maxQty = floors.reduce(function (m, f) { return Math.max(m, byFloor[f]); }, 0) || 1;
 
+    var familySummaryText = multiFamilies
+      .sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); })
+      .map(function (fam) { return fam + "층 " + familyQty[fam].toLocaleString("ko-KR") + "개"; })
+      .join(" · ");
+    var floorSummaryText = floors.map(function (f) { return f + "층 " + byFloor[f].toLocaleString("ko-KR") + "개"; }).join(" · ");
     els.floorPanelSummary.textContent = floors.length
-      ? floors.map(function (f) { return f + "층 " + byFloor[f].toLocaleString("ko-KR") + "개"; }).join(" · ")
+      ? (familySummaryText ? familySummaryText + " · " : "") + floorSummaryText
       : "데이터 없음";
 
+    var renderedFamilies = {};
     els.floorBars.innerHTML = floors.map(function (f) {
       var qty = byFloor[f];
       var widthPct = (qty / maxQty) * 100;
+
+      // 이 층이 여러 층을 묶은 "대분류" 강조줄(아래에서 만듦)의 멤버(중분류)인지 —
+      // 멤버라면 인원 수는 대분류 줄과 똑같이 계산해서 보여주되, 굵은 배지 대신
+      // 인당계산과 같은 급의 작고 수수한 텍스트로 축소해 대분류와 중복돼 보이지
+      // 않게 한다(정보 자체를 숨기지는 않음). 수량/막대는 항상 그대로 유지.
+      var family = getFloorFamily(f);
+      var isMultiFamilyMember = !!family && multiFamilies.indexOf(family) !== -1;
+
       var laborHtml;
       var perPersonHtml;
       if (hasLabor) {
         var laborForFloorRaw = labor * (qty / totalQty);
-        laborHtml = '<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 text-sm font-bold px-3 py-1 rounded-full">' + laborForFloorRaw.toFixed(1) + "명</span>";
+        laborHtml = isMultiFamilyMember
+          ? '<span class="text-xs text-slate-500 font-medium">' + laborForFloorRaw.toFixed(1) + "명</span>"
+          : '<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 text-sm font-bold px-3 py-1 rounded-full">' + laborForFloorRaw.toFixed(1) + "명</span>";
         var roundedLabor = Math.round(laborForFloorRaw);
         perPersonHtml = roundedLabor > 0
           ? Math.round(qty / roundedLabor).toLocaleString("ko-KR") + "개/인"
@@ -1063,7 +1088,7 @@ import { refreshAll } from "./main.js";
         laborHtml = '<span class="text-slate-400">-</span>';
         perPersonHtml = '<span class="text-slate-400">-</span>';
       }
-      return (
+      var floorRowHtml = (
         '<div class="grid grid-cols-[60px_1fr_90px_110px_100px] items-center gap-2.5 text-xs">' +
         '<div class="text-slate-500 whitespace-nowrap">' + escapeHtml(f) + "층</div>" +
         '<div class="bg-slate-100 rounded-full overflow-hidden h-[10px]"><div class="bg-indigo-500 h-full rounded-full" style="width:' + widthPct + '%"></div></div>' +
@@ -1072,73 +1097,104 @@ import { refreshAll } from "./main.js";
         '<div class="text-right tabular-nums text-slate-500">' + perPersonHtml + "</div>" +
         "</div>"
       );
+
+      // 이 층이 속한 "층대"를 처음 만나는 시점에, 개별 층 막대들보다 먼저 굵게
+      // 강조된 요약 줄(예: "7층 500개")을 끼워 넣는다. 가운데 칸(막대 자리)에는
+      // 진행바 대신 어느 층들이 합쳐졌는지("72층 + 73층") 보여준다. 인원 배치는
+      // 이 대분류 줄에서만 계산해서 보여주고, 아래 중분류 개별 줄에는 안 보여준다.
+      var familyHeaderHtml = "";
+      if (isMultiFamilyMember && !renderedFamilies[family]) {
+        renderedFamilies[family] = true;
+        var famQty = familyQty[family];
+        var famLaborHtml, famPerPersonHtml;
+        if (hasLabor) {
+          var famLaborRaw = labor * (famQty / totalQty);
+          famLaborHtml = '<span class="inline-block bg-indigo-100 text-indigo-800 border border-indigo-200 text-sm font-bold px-3 py-1 rounded-full">' + famLaborRaw.toFixed(1) + "명</span>";
+          var famRoundedLabor = Math.round(famLaborRaw);
+          famPerPersonHtml = famRoundedLabor > 0
+            ? Math.round(famQty / famRoundedLabor).toLocaleString("ko-KR") + "개/인"
+            : '<span class="text-slate-400">-</span>';
+        } else {
+          famLaborHtml = '<span class="text-slate-400">-</span>';
+          famPerPersonHtml = '<span class="text-slate-400">-</span>';
+        }
+        familyHeaderHtml =
+          '<div class="grid grid-cols-[60px_1fr_90px_110px_100px] items-center gap-2.5 text-xs bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1.5">' +
+          '<div class="text-indigo-700 font-bold whitespace-nowrap">' + escapeHtml(family) + "층</div>" +
+          '<div class="text-[11px] text-indigo-400 font-medium truncate">' + familyMembers[family].map(function (m) { return escapeHtml(m) + "층"; }).join(" + ") + "</div>" +
+          '<div class="text-right tabular-nums font-bold text-indigo-700">' + famQty.toLocaleString("ko-KR") + "개</div>" +
+          '<div class="text-right tabular-nums">' + famLaborHtml + "</div>" +
+          '<div class="text-right tabular-nums text-indigo-500">' + famPerPersonHtml + "</div>" +
+          "</div>";
+      }
+      return familyHeaderHtml + floorRowHtml;
     }).join("");
   }
 
   // 접기/펼치기 카드 공용 헬퍼(층별 카드, 업로드 카드) — 라벨/아이콘/본문(+선택적 요약줄)을
   // collapsed 상태에 맞게 갱신. summaryEl이 있으면 접혔을 때만 보이고, 없으면 본문만 토글.
-  export function applyCardCollapsed(collapsed, toggleLabel, toggleIcon, body, summaryEl) {
+  function applyCardCollapsed(collapsed, toggleLabel, toggleIcon, body, summaryEl) {
     toggleLabel.textContent = collapsed ? "펼치기" : "접기";
     toggleIcon.classList.toggle("-rotate-90", collapsed);
     body.classList.toggle("hidden", collapsed);
     if (summaryEl) summaryEl.classList.toggle("hidden", !collapsed);
   }
 
-  export function loadFloorPanelCollapsed() {
+  function loadFloorPanelCollapsed() {
     return localStorage.getItem(FLOOR_PANEL_COLLAPSED_KEY) === "1";
   }
 
-  export function loadFilterSortCollapsed() {
+  function loadFilterSortCollapsed() {
     var raw = localStorage.getItem(FILTER_SORT_COLLAPSED_KEY);
     return raw === null ? true : raw === "1";
   }
 
-  export function updateFilterSortBadge() {
-    var filterCount = ALL_COLUMNS.filter(function (c) {
-      return state.filters[c.key] !== null && state.filters[c.key] !== undefined;
-    }).length;
-    var sortCount = state.sortRules.length;
-    var parts = [];
-    if (filterCount > 0) parts.push("필터 " + filterCount + "개");
-    if (sortCount > 0) parts.push("정렬 " + sortCount + "개");
-    els.filterSortSummary.textContent = parts.length ? parts.join(" · ") : "필터·정렬 없음";
-  }
 
-  export function loadUploadCollapsed() {
+  function loadUploadCollapsed() {
     return localStorage.getItem(UPLOAD_COLLAPSED_KEY) === "1";
   }
 
   // --- 생성일자별 탭 (홈) ---
 
-  export function saveDateTabState() {
-    localStorage.setItem(DATE_TAB_KEY, state.activeDateTab === null ? "" : state.activeDateTab);
+  function saveDateTabState() {
+    localStorage.setItem(DATE_TAB_KEY, JSON.stringify(state.activeDateTabs));
   }
 
-  export function loadDateTabState() {
+  function loadDateTabState() {
     var raw = localStorage.getItem(DATE_TAB_KEY);
-    state.activeDateTab = raw ? raw : null;
+    if (!raw) {
+      state.activeDateTabs = [];
+      return;
+    }
+    try {
+      var parsed = JSON.parse(raw);
+      state.activeDateTabs = Array.isArray(parsed) ? parsed : [String(parsed)];
+    } catch (e) {
+      // 구버전엔 순수 문자열 하나만(JSON 아님) 저장했음 — 그 값을 배열로 감싸 하위호환.
+      state.activeDateTabs = [raw];
+    }
   }
 
-  export function getAllCreatedDates() {
+  function getAllCreatedDates() {
     return uniqueValuesFrom(state.rows, getCreatedDate).sort();
   }
 
-  export function renderDateTabs() {
+  function renderDateTabs() {
     var dates = getAllCreatedDates();
     els.dateTabsContainer.innerHTML = "";
 
     var allBtn = document.createElement("button");
-    allBtn.className = state.activeDateTab === null ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
+    allBtn.className = !state.activeDateTabs.length ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
     allBtn.innerHTML = "<span>전체</span>";
     allBtn.addEventListener("click", function () {
-      state.activeDateTab = null;
+      state.activeDateTabs = [];
       saveDateTabState();
-      refreshAll();
+      Pick.refreshAll();
     });
     els.dateTabsContainer.appendChild(allBtn);
 
     dates.forEach(function (date) {
-      var isActive = state.activeDateTab === date;
+      var isActive = state.activeDateTabs.indexOf(date) !== -1;
       var tabBtn = document.createElement("button");
       tabBtn.className = isActive ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
       tabBtn.innerHTML =
@@ -1147,61 +1203,63 @@ import { refreshAll } from "./main.js";
       tabBtn.addEventListener("click", function (e) {
         if (e.target.closest(".date-tab-close")) {
           removeRowsByDate(date);
-        } else {
-          state.activeDateTab = date;
-          saveDateTabState();
-          refreshAll();
+          return;
         }
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd+클릭: 이 날짜를 다중선택에 토글(있으면 빼고, 없으면 더함)
+          var idx = state.activeDateTabs.indexOf(date);
+          state.activeDateTabs = idx !== -1
+            ? state.activeDateTabs.slice(0, idx).concat(state.activeDateTabs.slice(idx + 1))
+            : state.activeDateTabs.concat([date]);
+        } else {
+          // 일반 클릭: 기존과 동일하게 이 날짜 하나만 선택
+          state.activeDateTabs = [date];
+        }
+        saveDateTabState();
+        Pick.refreshAll();
       });
       els.dateTabsContainer.appendChild(tabBtn);
     });
   }
 
-  export async function removeRowsByDate(date) {
+  async function removeRowsByDate(date) {
     var count = state.rows.filter(function (r) { return getCreatedDate(r) === date; }).length;
     if (!(await window.confirmModal("생성일자 '" + date + "' 데이터 " + count + "건을 모두 삭제할까요?"))) return;
     state.rows = state.rows.filter(function (r) { return getCreatedDate(r) !== date; });
-    if (state.activeDateTab === date) state.activeDateTab = null;
+    state.activeDateTabs = state.activeDateTabs.filter(function (d) { return d !== date; });
     saveToStorage();
     saveDateTabState();
-    refreshAll();
+    Pick.refreshAll();
     if (window.showToast) window.showToast("생성일자 '" + date + "' 데이터 " + count + "건이 삭제되었습니다.", "info");
   }
 
   // --- 뷰 전환 (홈 / 집품 할당) ---
 
-  export function switchView(view) {
+  function switchView(view) {
     if (window.flashPageLoading) window.flashPageLoading();
     // 홈 화면의 드래그/Ctrl 선택 상태는 홈 화면에서만 유효해야 하므로, 다른
-    // 화면으로 이동할 때는 항상 명시적으로 해제한다(refreshAll()의 암묵적
+    // 화면으로 이동할 때는 항상 명시적으로 해제한다(Pick.refreshAll()의 암묵적
     // 초기화는 홈이 보일 때만 실행되어 이 경우를 놓친다).
-    if (view !== "home") clearHomeSelection();
-    // 커스텀 할당 화면(row-picker)의 마킹/선택 상태도 홈과 마찬가지로 그 화면에서만
-    // 유효해야 한다 — 좌측 네비 버튼은 closeCustomAssignView()를 거치지 않고 이
-    // 함수를 직접 호출하므로, 여기서 처리하지 않으면 선택이 다른 화면까지 남는다.
-    if (view !== "custom") clearRowPickerState();
+    if (view !== "home") Pick.clearHomeSelection();
     els.homeView.classList.toggle("hidden", view !== "home");
     els.assignView.classList.toggle("hidden", view !== "assign");
-    els.customAssignView.classList.toggle("hidden", view !== "custom");
     if (view === "home") els.homeView.classList.add("animate-fadeIn");
     if (view === "assign") els.assignView.classList.add("animate-fadeIn");
-    if (view === "custom") els.customAssignView.classList.add("animate-fadeIn");
     els.navHomeBtn.className = view === "home" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     els.navAssignBtn.className = view === "assign" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
-    els.navCustomBtn.className = view === "custom" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
-    // refreshAll()은 숨겨진 화면의 렌더링을 건너뛰므로, 방금 보이게 된 화면이
+    // Pick.refreshAll()은 숨겨진 화면의 렌더링을 건너뛰므로, 방금 보이게 된 화면이
     // 숨겨져 있는 동안 놓쳤을 수 있는 갱신을 따라잡도록 전환 직후 한 번 그려준다.
-    refreshAll();
+    Pick.refreshAll();
   }
 
   // --- 집품 할당 ---
 
-  export function saveAssignState() {
+  function saveAssignState() {
     localStorage.setItem(ASSIGN_CONFIGS_KEY, JSON.stringify(state.assignConfigs));
     localStorage.setItem(ASSIGN_ACTIVE_KEY, state.assignActiveId === null ? "" : String(state.assignActiveId));
   }
 
-  export function loadAssignState() {
+  function loadAssignState() {
     try {
       var raw = localStorage.getItem(ASSIGN_CONFIGS_KEY);
       state.assignConfigs = raw ? JSON.parse(raw) : [];
@@ -1226,7 +1284,7 @@ import { refreshAll } from "./main.js";
   }
 
   // --- 공용 모달 트랜지션 헬퍼 (열기/닫기 시 페이드+스케일) ---
-  export function openModalWithTransition(modalEl, boxEl) {
+  function openModalWithTransition(modalEl, boxEl) {
     modalEl.classList.remove("hidden");
     modalEl.classList.add("flex");
     requestAnimationFrame(function () {
@@ -1235,7 +1293,7 @@ import { refreshAll } from "./main.js";
     });
   }
 
-  export function closeModalWithTransition(modalEl, boxEl) {
+  function closeModalWithTransition(modalEl, boxEl) {
     modalEl.classList.add("opacity-0");
     if (boxEl) boxEl.classList.add("scale-95");
     setTimeout(function () {
@@ -1244,3 +1302,102 @@ import { refreshAll } from "./main.js";
     }, 200);
   }
 
+  // --- exposed to other js/pick/*.js files via window.Pick ---
+  Pick.COLUMNS = COLUMNS;
+  Pick.AGG_COLUMN = AGG_COLUMN;
+  Pick.ALL_COLUMNS = ALL_COLUMNS;
+  Pick.LABEL_BARCODE_OPTS = LABEL_BARCODE_OPTS;
+  Pick.rowIdSeq = rowIdSeq;
+  Pick.nextRowId = nextRowId;
+  Pick.nextCustomAssignSeq = nextCustomAssignSeq;
+  Pick.customAssignSeq = customAssignSeq;
+  Pick.STORAGE_KEY = STORAGE_KEY;
+  Pick.SORT_RULES_KEY = SORT_RULES_KEY;
+  Pick.ZONE_O_PRIORITY_KEY = ZONE_O_PRIORITY_KEY;
+  Pick.LABOR_STORAGE_KEY = LABOR_STORAGE_KEY;
+  Pick.ASSIGN_CONFIGS_KEY = ASSIGN_CONFIGS_KEY;
+  Pick.ASSIGN_ACTIVE_KEY = ASSIGN_ACTIVE_KEY;
+  Pick.DATE_TAB_KEY = DATE_TAB_KEY;
+  Pick.GT_CODES_KEY = GT_CODES_KEY;
+  Pick.GT_ASSIGNMENTS_KEY = GT_ASSIGNMENTS_KEY;
+  Pick.GT_PRINTED_KEY = GT_PRINTED_KEY;
+  Pick.LABEL_MARGIN_RIGHT_KEY = LABEL_MARGIN_RIGHT_KEY;
+  Pick.LABEL_MARGIN_BOTTOM_KEY = LABEL_MARGIN_BOTTOM_KEY;
+  Pick.LABEL_MARGIN_LEFT_KEY = LABEL_MARGIN_LEFT_KEY;
+  Pick.LABEL_MARGIN_TOP_KEY = LABEL_MARGIN_TOP_KEY;
+  Pick.FLOOR_PANEL_COLLAPSED_KEY = FLOOR_PANEL_COLLAPSED_KEY;
+  Pick.UPLOAD_COLLAPSED_KEY = UPLOAD_COLLAPSED_KEY;
+  Pick.FILTER_SORT_COLLAPSED_KEY = FILTER_SORT_COLLAPSED_KEY;
+  Pick.LABEL_MARGIN_DEFAULT = LABEL_MARGIN_DEFAULT;
+  Pick.LABEL_MARGIN_LEFT_TOP_DEFAULT = LABEL_MARGIN_LEFT_TOP_DEFAULT;
+  Pick.BADGE_CLASSES = BADGE_CLASSES;
+  Pick.FILTER_BTN_INACTIVE = FILTER_BTN_INACTIVE;
+  Pick.FILTER_BTN_ACTIVE = FILTER_BTN_ACTIVE;
+  Pick.NAV_BTN_ACTIVE = NAV_BTN_ACTIVE;
+  Pick.NAV_BTN_INACTIVE = NAV_BTN_INACTIVE;
+  Pick.ASSIGN_TAB_ACTIVE = ASSIGN_TAB_ACTIVE;
+  Pick.ASSIGN_TAB_INACTIVE = ASSIGN_TAB_INACTIVE;
+  Pick.initialFilters = initialFilters;
+  Pick.state = state;
+  Pick.els = els;
+  Pick.trim = trim;
+  Pick.splitLine = splitLine;
+  Pick.textToMatrix = textToMatrix;
+  Pick.normalizeZone = normalizeZone;
+  Pick.matrixToRows = matrixToRows;
+  Pick.loadFromStorage = loadFromStorage;
+  Pick.saveToStorage = saveToStorage;
+  Pick.saveSortRules = saveSortRules;
+  Pick.loadSortRules = loadSortRules;
+  Pick.setStatusMsg = setStatusMsg;
+  Pick.applyParsedRows = applyParsedRows;
+  Pick.handleParsedMatrix = handleParsedMatrix;
+  Pick.handleFile = handleFile;
+  Pick.debounce = debounce;
+  Pick.escapeHtml = escapeHtml;
+  Pick.uniqueValuesFrom = uniqueValuesFrom;
+  Pick.parseFlexibleDate = parseFlexibleDate;
+  Pick.getCreatedDate = getCreatedDate;
+  Pick.getDateScopedRows = getDateScopedRows;
+  Pick.dedupKey = dedupKey;
+  Pick.uniqueValues = uniqueValues;
+  Pick.filterRowsExceptKey = filterRowsExceptKey;
+  Pick.getPreFilteredRowsFrom = getPreFilteredRowsFrom;
+  Pick.computeGroupCompanyTotals = computeGroupCompanyTotals;
+  Pick.getCandidateValues = getCandidateValues;
+  Pick.computeFilteredRows = computeFilteredRows;
+  Pick.getFilteredRows = getFilteredRows;
+  Pick.getAssignBaseRows = getAssignBaseRows;
+  Pick.updateSortHeaderClasses = updateSortHeaderClasses;
+  Pick.createSortBarController = createSortBarController;
+  Pick.homeSortBarController = homeSortBarController;
+  Pick.createFilterBarController = createFilterBarController;
+  Pick.homeFilterBarController = homeFilterBarController;
+  Pick.hasActiveFilter = hasActiveFilter;
+  Pick.updateStatusBadgeMap = updateStatusBadgeMap;
+  Pick.isOZone = isOZone;
+  Pick.compareZoneAscending = compareZoneAscending;
+  Pick.insertRowsSortedByZone = insertRowsSortedByZone;
+  Pick.compareZoneWithOPriority = compareZoneWithOPriority;
+  Pick.compareValues = compareValues;
+  Pick.getSortedRows = getSortedRows;
+  Pick.getFloor = getFloor;
+  Pick.floorSortKey = floorSortKey;
+  Pick.sumQty = sumQty;
+  Pick.renderFilterQtySummary = renderFilterQtySummary;
+  Pick.renderFloorPanel = renderFloorPanel;
+  Pick.applyCardCollapsed = applyCardCollapsed;
+  Pick.loadFloorPanelCollapsed = loadFloorPanelCollapsed;
+  Pick.loadFilterSortCollapsed = loadFilterSortCollapsed;
+  Pick.loadUploadCollapsed = loadUploadCollapsed;
+  Pick.saveDateTabState = saveDateTabState;
+  Pick.loadDateTabState = loadDateTabState;
+  Pick.getAllCreatedDates = getAllCreatedDates;
+  Pick.renderDateTabs = renderDateTabs;
+  Pick.switchView = switchView;
+  Pick.saveAssignState = saveAssignState;
+  Pick.loadAssignState = loadAssignState;
+  Pick.openModalWithTransition = openModalWithTransition;
+  Pick.closeModalWithTransition = closeModalWithTransition;
+  Pick.removeRowsByDate = removeRowsByDate;
+})(window.Pick = window.Pick || {});

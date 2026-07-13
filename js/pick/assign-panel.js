@@ -1,14 +1,43 @@
-import { ASSIGN_TAB_ACTIVE, ASSIGN_TAB_INACTIVE, closeModalWithTransition, compareValues, createFilterBarController, createSortBarController, els, escapeHtml, filterRowsExceptKey, getAllCreatedDates, getAssignBaseRows, getCandidateValues, getCreatedDate, getFloor, getSortedRows, insertRowsSortedByZone, openModalWithTransition, saveAssignState, state, switchView, trim, uniqueValuesFrom } from "./core.js";
-import { openCustomAssignView } from "./custom-assign.js";
-import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWorkerLabels, resetGtForWorker, saveGtState, setAssignGt } from "./gt-print.js";
+(function (Pick) {
+  "use strict";
 
+  // --- imported from other js/pick/*.js files via window.Pick ---
+  var ASSIGN_TAB_ACTIVE = Pick.ASSIGN_TAB_ACTIVE;
+  var ASSIGN_TAB_INACTIVE = Pick.ASSIGN_TAB_INACTIVE;
+  var closeModalWithTransition = Pick.closeModalWithTransition;
+  var compareValues = Pick.compareValues;
+  var createFilterBarController = Pick.createFilterBarController;
+  var createSortBarController = Pick.createSortBarController;
+  var els = Pick.els;
+  var escapeHtml = Pick.escapeHtml;
+  var filterRowsExceptKey = Pick.filterRowsExceptKey;
+  var getAllCreatedDates = Pick.getAllCreatedDates;
+  var getAssignBaseRows = Pick.getAssignBaseRows;
+  var getCandidateValues = Pick.getCandidateValues;
+  var getCreatedDate = Pick.getCreatedDate;
+  var getFloor = Pick.getFloor;
+  var getSortedRows = Pick.getSortedRows;
+  var insertRowsSortedByZone = Pick.insertRowsSortedByZone;
+  var openModalWithTransition = Pick.openModalWithTransition;
+  var saveAssignState = Pick.saveAssignState;
+  var state = Pick.state;
+  var switchView = Pick.switchView;
+  var trim = Pick.trim;
+  var uniqueValuesFrom = Pick.uniqueValuesFrom;
+  var autoMatchGtForWorker = Pick.autoMatchGtForWorker;
+  var formatDateDisplay = Pick.formatDateDisplay;
+  var handleSparePrintClick = Pick.handleSparePrintClick;
+  var printWorkerLabels = Pick.printWorkerLabels;
+  var resetGtForWorker = Pick.resetGtForWorker;
+  var saveGtState = Pick.saveGtState;
+  var setAssignGt = Pick.setAssignGt;
 
   // 정렬된 아이템 목록(존 오름차순으로 정렬된 행 단위 아이템)을 n명에게 연속
   // 구간으로, 가장 많이 배정된 사람의 합계를 최소화하는 방식으로 나눔
   // ("Split Array Largest Sum"과 동일한 이진 탐색 분할). 아이템이 행 단위이므로
   // 구간 경계가 존 중간에서 갈릴 수 있는데, 이는 인접한 두 사람 사이에서만
   // 일어나고 전체 순서는 그대로 유지되므로 오름차순 동선은 깨지지 않는다.
-  export function splitBalanced(items, n) {
+  function splitBalanced(items, n) {
     if (!items.length) {
       var emptyGroups = [];
       for (var e = 0; e < n; e++) emptyGroups.push([]);
@@ -95,7 +124,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     return result;
   }
 
-  export function rebalanceContiguousGroups(groups, scoreOf) {
+  function rebalanceContiguousGroups(groups, scoreOf) {
     var sums = groups.map(function (g) {
       return g.reduce(function (s, it) { return s + scoreOf(it); }, 0);
     });
@@ -146,7 +175,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
   // 않기 때문에 splitBalanced가 필요하면 같은 존도 인접한 두 사람 사이에서
   // 나눠 배정할 수 있어(전체 순서는 그대로 유지되므로 오름차순 보장), 존 개수가
   // 인원수 이하라도 수량 균형을 맞출 여지가 생긴다.
-  export function getAssignRowItems(floorInput, selectedDates) {
+  function getAssignRowItems(floorInput, selectedDates) {
     var rows = getSortedRows(getAssignBaseRows());
     var items = [];
     rows.forEach(function (r) {
@@ -158,7 +187,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     return items;
   }
 
-  export function renderAssignTabs() {
+  function renderAssignTabs() {
     els.assignTabsContainer.innerHTML = "";
     if (!state.assignConfigs.length) {
       els.assignTabsContainer.innerHTML = '<span class="text-sm text-slate-400">홈 화면의 "집품 할당" 버튼으로 배정을 생성해주세요.</span>';
@@ -191,7 +220,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     renderAssignPanel();
   }
 
-  export var ASSIGN_DETAIL_COLUMNS = [
+  var ASSIGN_DETAIL_COLUMNS = [
     { key: "groupNo", label: "그룹번호", type: "string" },
     { key: "deadline", label: "마감일시", type: "date" },
     { key: "createdAt", label: "생성일시", type: "date" },
@@ -201,24 +230,16 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     { key: "quantity", label: "수량", type: "number" }
   ];
 
-  // renderAssignDetailTable이 table-layout:fixed로 표를 항상 카드 폭에 딱 맞추기
-  // 위한 컬럼별 퍼센트 폭(합 100% — 나머지 GT바코드/작업자이동/삭제 3칸은 함수 안에서
-  // 직접 지정). 화면 크기와 무관하게 표가 카드를 넘치지 않고, 넘치는 텍스트는
-  // 가로 스크롤 대신 말줄임(truncate)으로 처리한다.
-  export var ASSIGN_DETAIL_COLUMN_WIDTHS = {
-    groupNo: 12, deadline: 12, createdAt: 12, company: 14, transportType: 8, zone: 7, quantity: 7
-  };
-
   // 집품 할당 필터바에서만 쓰는 "작업자" 가상 컬럼(실제 행 필드가 아니라 어느 작업자
   // 카드를 보여줄지 고르는 용도) 포함 목록 — getAssignPanelCandidateValues가 "__worker__"
   // 키를 특별 취급해서 후보값을 만든다.
-  export var ASSIGN_FILTER_COLUMNS = ASSIGN_DETAIL_COLUMNS.concat([{ key: "__worker__", label: "작업자", type: "string" }]);
+  var ASSIGN_FILTER_COLUMNS = ASSIGN_DETAIL_COLUMNS.concat([{ key: "__worker__", label: "작업자", type: "string" }]);
 
   // renderAssignDetailTable의 작업자 이동 select용 — 현재 존재하는 모든 커스텀/집품
   // 할당(cfg)을 optgroup으로 묶고, 각 cfg의 작업자를 option으로 나열한다.
   // option value는 "cfgId:workerIdx" — 같은 cfg 내 이동과 다른 cfg로의 이동을
   // 하나의 select로 처리하기 위함(이동 핸들러에서 다시 split해서 사용).
-  export function buildAssignMoveOptionsHtml(cfgId, workerIdx) {
+  function buildAssignMoveOptionsHtml(cfgId, workerIdx) {
     return state.assignConfigs.map(function (c) {
       var groupCount = (c.workerGroups && c.workerGroups.length) || c.count || 1;
       var label = c.custom ? ("커스텀 " + c.customSeq) : (c.floorInput + "층 · " + c.count + "명");
@@ -232,7 +253,17 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     }).join("");
   }
 
-  export function renderAssignDetailTable(rows, cfgId, workerIdx, workerCount) {
+  // renderAssignDetailTable이 table-layout:fixed로 표를 항상 카드 폭에 딱 맞추기
+  // 위한 컬럼별 퍼센트 폭(합 100% — 나머지 GT바코드/작업자이동/삭제 3칸은 함수 안에서
+  // 직접 지정). table-layout:auto(내용 기반 자연폭)로 해봤더니 <input>/<select>가 든
+  // 유연한 셀이 남는 공간을 과도하게 흡수해 양쪽 끝(그룹번호/작업자) 컬럼이 부자연스럽게
+  // 좁아지고 표가 카드에 고르게 안 맞는 문제가 있어 고정폭으로 되돌렸다 — 원래 퍼센트보다
+  // GT바코드/작업자 칸은 더 넉넉하게 잡음.
+  var ASSIGN_DETAIL_COLUMN_WIDTHS = {
+    groupNo: 10, deadline: 10, createdAt: 10, company: 12, transportType: 8, zone: 8, quantity: 8
+  };
+
+  function renderAssignDetailTable(rows, cfgId, workerIdx, workerCount) {
     if (!rows.length) {
       return '<div class="px-5 py-6 text-center text-sm text-slate-400">배정 없음</div>';
     }
@@ -242,44 +273,45 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
       ASSIGN_DETAIL_COLUMNS.map(function (col) {
         return '<col style="width:' + ASSIGN_DETAIL_COLUMN_WIDTHS[col.key] + '%">';
       }).join("") +
-      '<col style="width:14%"><col style="width:9%"><col style="width:5%">' +
+      '<col style="width:18%"><col style="width:11%"><col style="width:5%">' +
       "</colgroup>";
     var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
       return '<th class="px-3 py-2.5 text-left truncate' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
     }).join("") + '<th class="px-3 py-2.5 text-left">GT 바코드</th><th class="px-3 py-2.5 text-right">작업자</th><th class="px-3 py-2.5"></th>';
     var moveOptionsHtml = buildAssignMoveOptionsHtml(cfgId, workerIdx);
-    var bodyHtml = rows.map(function (r) {
+    var bodyHtml = rows.map(function (r, i) {
       var gtKey = cfgId + ":" + r.id;
       var gtValue = state.gtAssignments[gtKey] || "";
       var moveSelectHtml = (workerCount > 1 || state.assignConfigs.length > 1)
         ? '<select class="assign-result-row-select w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-row-id="' + escapeHtml(r.id) + '" data-from-worker="' + workerIdx + '" data-from-cfg="' + escapeHtml(String(cfgId)) + '">' + moveOptionsHtml + "</select>"
         : "";
+      var rowBg = i % 2 === 1 ? "bg-slate-50/60" : "bg-white";
       return (
-        '<tr class="hover:bg-slate-50/80 transition-colors">' +
+        '<tr class="' + rowBg + ' hover:bg-indigo-50/40 transition-colors">' +
         ASSIGN_DETAIL_COLUMNS.map(function (col) {
           if (col.key === "quantity") {
-            return '<td class="px-3 py-2 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
+            return '<td class="px-3 py-2.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
           }
           if (col.key === "groupNo") {
-            return '<td class="px-3 py-2 font-semibold text-slate-900 truncate" title="' + escapeHtml(r.groupNo) + '">' + escapeHtml(r.groupNo) + "</td>";
+            return '<td class="px-3 py-2.5 font-semibold text-slate-900 truncate" title="' + escapeHtml(r.groupNo) + '">' + escapeHtml(r.groupNo) + "</td>";
           }
           if (col.key === "deadline" || col.key === "createdAt") {
             var displayVal = formatDateDisplay(r[col.key]);
-            return '<td class="px-3 py-2 text-slate-700 truncate" title="' + escapeHtml(displayVal) + '">' + escapeHtml(displayVal) + "</td>";
+            return '<td class="px-3 py-2.5 text-slate-700 truncate" title="' + escapeHtml(displayVal) + '">' + escapeHtml(displayVal) + "</td>";
           }
-          return '<td class="px-3 py-2 text-slate-700 truncate" title="' + escapeHtml(r[col.key]) + '">' + escapeHtml(r[col.key]) + "</td>";
+          return '<td class="px-3 py-2.5 text-slate-700 truncate" title="' + escapeHtml(r[col.key]) + '">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
-        '<td class="px-3 py-2"><input type="text" class="assign-gt-input w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '"></td>' +
-        '<td class="px-3 py-2 text-right">' + moveSelectHtml + "</td>" +
-        '<td class="px-3 py-2 text-right"><button type="button" class="assign-result-row-delete-btn text-slate-300 hover:text-rose-500 transition-colors" data-row-id="' + escapeHtml(r.id) + '" data-worker-idx="' + workerIdx + '" title="배정에서 빼기">✕</button></td>' +
+        '<td class="px-3 py-2.5"><input type="text" class="assign-gt-input w-full bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" data-gt-key="' + escapeHtml(gtKey) + '" value="' + escapeHtml(gtValue) + '"></td>' +
+        '<td class="px-3 py-2.5 text-right">' + moveSelectHtml + "</td>" +
+        '<td class="px-3 py-2.5 text-right"><button type="button" class="assign-result-row-delete-btn inline-flex items-center justify-center w-6 h-6 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" data-row-id="' + escapeHtml(r.id) + '" data-worker-idx="' + workerIdx + '" title="배정에서 빼기">✕</button></td>' +
         "</tr>"
       );
     }).join("");
     return (
-      '<div class="overflow-x-auto px-5">' +
+      '<div class="overflow-x-auto">' +
       '<table class="w-full border-collapse text-left text-xs table-fixed">' +
       colgroupHtml +
-      '<thead><tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">' + headHtml + "</tr></thead>" +
+      '<thead><tr class="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600">' + headHtml + "</tr></thead>" +
       '<tbody class="divide-y divide-slate-100">' + bodyHtml + "</tbody>" +
       "</table></div>"
     );
@@ -287,7 +319,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
 
   // 구버전 저장 데이터 호환용: entries 안에 "존 아이템"(zone/qty/rows)이 섞여 있으면 rows로
   // 펼치고, 이미 원본 데이터 행(zone/qty가 아니라 groupNo 등을 가짐)이면 그대로 둔다.
-  export function flattenWorkerGroup(entries) {
+  function flattenWorkerGroup(entries) {
     var result = [];
     (entries || []).forEach(function (e) {
       if (e && e.rows) {
@@ -297,6 +329,21 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
       }
     });
     return result;
+  }
+
+  // 이미 어떤 assignConfig에도 배정된 행의 id 집합 — 홈 화면 드래그선택 할당(main.js)에서
+  // 중복 배정 방지용으로, core.js/home-table.js에서 "할당여부" 컬럼 계산용으로 쓰인다.
+  function getAssignedRowIdSet() {
+    var ids = new Set();
+    state.assignConfigs.forEach(function (cfg) {
+      // cfg.workerGroups가 아직 없는(한 번도 결과 화면을 렌더링하지 않은) config도
+      // 놓치지 않도록 renderAssignPanel과 동일한 폴백을 사용
+      var groups = cfg.workerGroups || splitBalanced(cfg.items || [], cfg.count);
+      groups.forEach(function (group) {
+        flattenWorkerGroup(group).forEach(function (r) { if (r && r.id) ids.add(r.id); });
+      });
+    });
+    return ids;
   }
 
   // 집품 할당 결과 화면의 필터/정렬 — 홈/row-picker의 전역 상태와 달리 cfg 단위로
@@ -311,32 +358,32 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
   // ASSIGN_DETAIL_COLUMNS(실제 행 렌더링/행 단위 필터링)에는 없어서 자동으로 특별
   // 취급된다. O존 우선 정렬(assignWorkerZoneOPriorityState)도 홈/row-picker처럼
   // 비영속 — 화면을 벗어나거나 새로고침하면 초기화된다.
-  export var assignWorkerSortState = {};        // key cfgId -> [{key,dir}, ...]
-  export var assignWorkerFilterState = {};      // key cfgId -> { colKey: Set|null, __worker__: Set|null }
-  export var assignWorkerZoneOPriorityState = {}; // key cfgId -> boolean
+  var assignWorkerSortState = {};        // key cfgId -> [{key,dir}, ...]
+  var assignWorkerFilterState = {};      // key cfgId -> { colKey: Set|null, __worker__: Set|null }
+  var assignWorkerZoneOPriorityState = {}; // key cfgId -> boolean
 
-  export function getAssignWorkerSortRules(cfgId) {
+  function getAssignWorkerSortRules(cfgId) {
     var key = String(cfgId);
     if (!assignWorkerSortState[key]) assignWorkerSortState[key] = [];
     return assignWorkerSortState[key];
   }
 
-  export function getAssignWorkerFilters(cfgId) {
+  function getAssignWorkerFilters(cfgId) {
     var key = String(cfgId);
     if (!assignWorkerFilterState[key]) assignWorkerFilterState[key] = {};
     return assignWorkerFilterState[key];
   }
 
-  export function getAssignWorkerZoneOPriority(cfgId) {
+  function getAssignWorkerZoneOPriority(cfgId) {
     return !!assignWorkerZoneOPriorityState[String(cfgId)];
   }
 
-  export function computeAssignWorkerFilteredRows(rows, cfgId) {
+  function computeAssignWorkerFilteredRows(rows, cfgId) {
     var filters = getAssignWorkerFilters(cfgId);
     return filterRowsExceptKey(rows, ASSIGN_DETAIL_COLUMNS, filters);
   }
 
-  export function getAssignWorkerSortedRows(rows, cfgId) {
+  function getAssignWorkerSortedRows(rows, cfgId) {
     var rules = getAssignWorkerSortRules(cfgId);
     var activeRules = rules
       .map(function (rule) { return { col: ASSIGN_DETAIL_COLUMNS.find(function (c) { return c.key === rule.key; }), dir: rule.dir }; })
@@ -358,11 +405,11 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
   // getCandidateValues/getFilters 등이 "지금 보고 있는 cfg가 무엇이든" 매번 새로
   // 조회할 수 있도록 헬퍼로 뺐다(컨트롤러는 한 번만 생성되고 이후 계속 재사용되므로,
   // cfg를 클로저에 고정하면 탭을 바꿔도 이전 cfg를 계속 가리키게 됨).
-  export function getActiveAssignConfig() {
+  function getActiveAssignConfig() {
     return state.assignConfigs.find(function (c) { return c.id === state.assignActiveId; });
   }
 
-  export function getActiveAssignGroups() {
+  function getActiveAssignGroups() {
     var cfg = getActiveAssignConfig();
     if (!cfg || !cfg.workerGroups) return [];
     return cfg.workerGroups.map(flattenWorkerGroup);
@@ -371,7 +418,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
   // "작업자" 가상 필터(__worker__, 값: "작업자 N" Set)로 이미 좁혀진 범위의 행들 —
   // exceptKey가 "__worker__"면 그 필터 자체는 건너뛴다(자기 자신의 필터로 자기
   // 후보값을 좁히면 안 되므로, 엑셀 자동필터 캐스케이딩 규칙과 동일).
-  export function getAssignPanelScopedRows(exceptKey) {
+  function getAssignPanelScopedRows(exceptKey) {
     var groups = getActiveAssignGroups();
     var cfg = getActiveAssignConfig();
     if (!cfg) return [];
@@ -386,7 +433,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
 
   // 엑셀 자동필터처럼 key 자신의 필터를 뺀 나머지 필터를 반영해 후보값을 계산 —
   // "__worker__"는 실제 행 필드가 아니라 작업자 카드 수만큼 "작업자 N" 라벨을 만든다.
-  export function getAssignPanelCandidateValues(key) {
+  function getAssignPanelCandidateValues(key) {
     if (key === "__worker__") {
       return getActiveAssignGroups().map(function (g, idx) { return "작업자 " + (idx + 1); });
     }
@@ -403,15 +450,14 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
   // 고정된 필터/정렬 배열을 클로저에 담는 홈과 달리 매번 getActiveAssignConfig()로
   // "지금 보고 있는 cfg"를 다시 찾아 위임한다. 한 번만 생성하고(다른 컨트롤러들과
   // 동일한 위치), 이후 renderAssignPanel()에서 updateButtonStates()/render()만 호출.
-  // els는 core.js가 소유하는데, ES 모듈 순환참조(core.js <-> assign-panel.js) 때문에
-  // 이 파일의 최상위 코드가 core.js의 최상위 코드보다 먼저 실행될 수 있어(그 시점엔
-  // core.js의 els가 아직 초기화 전) 컨트롤러 생성/버튼 이벤트 연결을 함수로 미뤄
-  // main.js의 초기화 단계(모든 모듈이 로드된 뒤)에서 명시적으로 호출하도록 한다.
-  export var assignFilterBarController;
-  export var assignSortBarController;
+  // els는 core.js가 소유한다 — 컨트롤러 생성/버튼 이벤트 연결은 다른 화면들과
+  // 마찬가지로 함수로 미뤄, main.js의 초기화 단계(모든 파일이 로드된 뒤)에서
+  // 명시적으로 호출하도록 한다(초기화 순서를 main.js 한 곳에 모아두기 위함).
+  var assignFilterBarController;
+  var assignSortBarController;
 
-  export function initAssignPanelControllers() {
-    assignFilterBarController = createFilterBarController({
+  function initAssignPanelControllers() {
+    Pick.assignFilterBarController = assignFilterBarController = createFilterBarController({
       columns: ASSIGN_FILTER_COLUMNS,
       containerEl: els.assignFilterButtonsContainer,
       resetBtn: els.assignFilterResetAllBtn,
@@ -427,7 +473,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
       onApply: function () { renderAssignPanel(); }
     });
 
-    assignSortBarController = createSortBarController({
+    Pick.assignSortBarController = assignSortBarController = createSortBarController({
       columns: ASSIGN_DETAIL_COLUMNS,
       containerEl: els.assignSortRulesContainer,
       addBtn: els.assignSortAddBtn,
@@ -457,7 +503,21 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     });
   }
 
-  export function renderAssignPanel() {
+  // 작업자 카드 헤더에 인덱스별로 순환 적용하는 색상 — "전체" 보기에서 카드가 여러 개
+  // 쌓였을 때 전부 같은 색이라 하나로 뭉쳐 보이던 문제(카드마다 구분이 안 됨)를
+  // 해결하기 위해, 카드마다 다른 색으로 즉시 구분되게 한다. rail은 헤더를 지나
+  // 스크롤해도 어느 작업자 구역인지 계속 보이도록 카드 왼쪽에 얇게 붙이는 액센트 바.
+  // 색상 순서는 바로 옆 카드끼리 색상환에서 최대한 멀리 떨어지도록(인디고→앰버→틸→로즈→스카이)
+  // 골라, 인접한 두 카드가 비슷한 색이라 헷갈리는 일이 없게 했다.
+  var WORKER_CARD_ACCENTS = [
+    { header: "bg-indigo-50/80 border-indigo-100", rail: "border-l-indigo-400" },
+    { header: "bg-amber-50/80 border-amber-100", rail: "border-l-amber-400" },
+    { header: "bg-teal-50/80 border-teal-100", rail: "border-l-teal-400" },
+    { header: "bg-rose-50/80 border-rose-100", rail: "border-l-rose-400" },
+    { header: "bg-sky-50/80 border-sky-100", rail: "border-l-sky-400" }
+  ];
+
+  function renderAssignPanel() {
     var cfg = state.assignConfigs.find(function (c) { return c.id === state.assignActiveId; });
     if (!cfg) {
       els.assignTableContainer.innerHTML = "";
@@ -508,27 +568,31 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
       var total = detailRows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
       var zoneList = Array.from(new Set(detailRows.map(function (r) { return r.zone; }).filter(Boolean))).join(", ");
       var isPrinted = !!(cfg.printedWorkerIdx && cfg.printedWorkerIdx[idx]);
+      var accent = WORKER_CARD_ACCENTS[idx % WORKER_CARD_ACCENTS.length];
+      var outlineBtn = "inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
       return (
-        '<div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">' +
-        '<div class="flex items-center justify-between flex-wrap gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">' +
+        '<div class="bg-white border-t border-r border-b border-slate-200 border-l-4 ' + accent.rail + ' rounded-2xl shadow-md overflow-hidden">' +
+        '<div class="px-5 py-3 ' + accent.header + ' border-b space-y-2">' +
+        '<div class="flex items-center justify-between flex-wrap gap-2">' +
         '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) +
-        (isPrinted ? ' <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 align-middle">✓ 출력됨</span>' : "") +
+        (isPrinted ? ' <span class="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white shadow-sm align-middle">✓ 출력됨</span>' : "") +
         (zoneList ? '<span class="ml-2 text-xs font-normal text-slate-500">담당 존: ' + escapeHtml(zoneList) + "</span>" : "") + "</div>" +
-        '<div class="flex items-center gap-3">' +
         '<div class="text-sm font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + detailRows.length + "장</div>" +
-        '<button type="button" class="assign-add-row-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">할당 추가</button>' +
-        '<button type="button" class="assign-automatch-btn inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
-        '<button type="button" class="assign-gt-reset-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
-        '<button type="button" class="assign-spare-print-btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">여분 출력</button>' +
+        "</div>" +
+        '<div class="flex items-center justify-end flex-wrap gap-2">' +
+        '<button type="button" class="assign-automatch-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
+        '<button type="button" class="assign-gt-reset-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
+        '<button type="button" class="assign-spare-print-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">여분 출력</button>' +
         '<button type="button" class="assign-print-btn bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all duration-150" data-worker-idx="' + idx + '">출력</button>' +
         (groups.length > 1 ? '<button type="button" class="assign-delete-worker-btn bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">삭제</button>' : "") +
+        "</div>" +
         "</div>" +
         renderAssignDetailTable(getAssignWorkerSortedRows(computeAssignWorkerFilteredRows(detailRows, cfg.id), cfg.id), cfg.id, idx, groups.length) +
         "</div>"
       );
     }).join("");
 
-    els.assignTableContainer.innerHTML = tabsHtml + '<div class="space-y-6">' + cardsHtml + "</div>";
+    els.assignTableContainer.innerHTML = tabsHtml + '<div class="space-y-8">' + cardsHtml + "</div>";
     assignFilterBarController.updateButtonStates();
     assignSortBarController.render();
 
@@ -561,10 +625,17 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     });
 
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-print-btn"), function (btn) {
-      btn.addEventListener("click", function () {
+      btn.addEventListener("click", async function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
+        if (cfg.printedWorkerIdx && cfg.printedWorkerIdx[workerIdx]) {
+          if (!(await window.confirmModal("이미 출력한 작업자입니다. 다시 출력하시겠습니까?"))) return;
+        }
         printWorkerLabels(cfg, groups[workerIdx], function () {
-          resetGtForWorker(cfg, groups[workerIdx]);
+          groups[workerIdx].forEach(function (r) {
+            var code = state.gtAssignments[cfg.id + ":" + r.id];
+            if (code && state.gtPrinted.indexOf(code) === -1) state.gtPrinted.push(code);
+          });
+          saveGtState();
           cfg.printedWorkerIdx = cfg.printedWorkerIdx || [];
           cfg.printedWorkerIdx[workerIdx] = true;
           saveAssignState();
@@ -583,13 +654,6 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-delete-worker-btn"), function (btn) {
       btn.addEventListener("click", function () {
         removeAssignWorker(cfg);
-      });
-    });
-
-    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-add-row-btn"), function (btn) {
-      btn.addEventListener("click", function () {
-        var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        openCustomAssignView("append", cfg.id, workerIdx);
       });
     });
 
@@ -652,7 +716,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
 
   }
 
-  export function removeAssignWorker(cfg) {
+  function removeAssignWorker(cfg) {
     if (cfg.count <= 1) return;
     // GT 키가 이제 행 id 기준이라(작업자 인덱스 무관) 병합해도 기존 매칭이 그대로 유지됨 —
     // 별도로 GT를 초기화할 필요 없음
@@ -670,20 +734,20 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     renderAssignTabs();
   }
 
-  export function setAssignMsg(msg, kind) {
+  function setAssignMsg(msg, kind) {
     var color = kind === "error" ? "text-rose-600" : "text-slate-500";
     els.assignMsg.textContent = msg || "";
     els.assignMsg.className = "text-xs " + color;
   }
 
-  export function getSelectedAssignDates() {
+  function getSelectedAssignDates() {
     return Array.prototype.map.call(
       els.assignDateCheckboxes.querySelectorAll(".assign-date-cb:checked"),
       function (cb) { return cb.value; }
     );
   }
 
-  export function renderAssignDateCheckboxes() {
+  function renderAssignDateCheckboxes() {
     var dates = getAllCreatedDates();
     if (!dates.length) {
       els.assignDateCheckboxes.innerHTML = '<span class="text-xs text-slate-400">업로드된 데이터가 없습니다.</span>';
@@ -702,11 +766,11 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
   }
 
   // 모달에서 생성 중인 미리보기(작업자별 원본 데이터 행 배열) — 확정 전까지는 state에 반영되지 않음
-  export var assignPreviewGroups = null;
-  export var assignPreviewMeta = null; // { floorInput, count, selectedDates } — 확정 시 config에 함께 저장
-  export var assignPreviewActiveWorkerIdx = null; // 미리보기 탭(전체/작업자 N) 상태
+  var assignPreviewGroups = null;
+  var assignPreviewMeta = null; // { floorInput, count, selectedDates } — 확정 시 config에 함께 저장
+  var assignPreviewActiveWorkerIdx = null; // 미리보기 탭(전체/작업자 N) 상태
 
-  export function generateAssignPreview() {
+  function generateAssignPreview() {
     var floorInput = trim(els.assignFloorInput.value);
     var count = parseInt(els.assignCountInput.value, 10);
     var selectedDates = getSelectedAssignDates();
@@ -736,7 +800,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     renderAssignPreview();
   }
 
-  export function renderAssignPreviewRows(rows, workerIdx, workerCount) {
+  function renderAssignPreviewRows(rows, workerIdx, workerCount) {
     if (!rows.length) {
       return '<div class="px-5 py-4 text-center text-xs text-slate-400">배정 없음</div>';
     }
@@ -779,7 +843,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     );
   }
 
-  export function renderAssignPreview() {
+  function renderAssignPreview() {
     if (!assignPreviewGroups) {
       els.assignPreviewContainer.innerHTML = "";
       return;
@@ -836,7 +900,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     });
   }
 
-  export function confirmAssignConfig() {
+  function confirmAssignConfig() {
     if (!assignPreviewGroups || !assignPreviewMeta) {
       setAssignMsg("먼저 미리보기를 생성해주세요.", "error");
       return;
@@ -858,7 +922,7 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     if (window.showToast) window.showToast("집품 할당이 생성되었습니다.");
   }
 
-  export function resetAssignCreateModal() {
+  function resetAssignCreateModal() {
     els.assignFloorInput.value = "";
     els.assignCountInput.value = "";
     assignPreviewGroups = null;
@@ -868,18 +932,18 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     renderAssignPreview();
   }
 
-  export function openAssignCreateModal() {
+  function openAssignCreateModal() {
     resetAssignCreateModal();
     renderAssignDateCheckboxes();
     openModalWithTransition(els.assignCreateModal, els.assignCreateModalBox);
   }
 
-  export function closeAssignCreateModal() {
+  function closeAssignCreateModal() {
     closeModalWithTransition(els.assignCreateModal, els.assignCreateModalBox);
     resetAssignCreateModal();
   }
 
-  export function removeAssignConfig(id) {
+  function removeAssignConfig(id) {
     state.assignConfigs = state.assignConfigs.filter(function (c) { return c.id !== id; });
     if (state.assignActiveId === id) {
       state.assignActiveId = state.assignConfigs.length ? state.assignConfigs[0].id : null;
@@ -897,3 +961,47 @@ import { autoMatchGtForWorker, formatDateDisplay, handleSparePrintClick, printWo
     saveAssignState();
     renderAssignTabs();
   }
+
+  // --- exposed to other js/pick/*.js files via window.Pick ---
+  Pick.splitBalanced = splitBalanced;
+  Pick.rebalanceContiguousGroups = rebalanceContiguousGroups;
+  Pick.getAssignRowItems = getAssignRowItems;
+  Pick.renderAssignTabs = renderAssignTabs;
+  Pick.ASSIGN_DETAIL_COLUMNS = ASSIGN_DETAIL_COLUMNS;
+  Pick.ASSIGN_FILTER_COLUMNS = ASSIGN_FILTER_COLUMNS;
+  Pick.buildAssignMoveOptionsHtml = buildAssignMoveOptionsHtml;
+  Pick.renderAssignDetailTable = renderAssignDetailTable;
+  Pick.flattenWorkerGroup = flattenWorkerGroup;
+  Pick.getAssignedRowIdSet = getAssignedRowIdSet;
+  Pick.assignWorkerSortState = assignWorkerSortState;
+  Pick.assignWorkerFilterState = assignWorkerFilterState;
+  Pick.assignWorkerZoneOPriorityState = assignWorkerZoneOPriorityState;
+  Pick.getAssignWorkerSortRules = getAssignWorkerSortRules;
+  Pick.getAssignWorkerFilters = getAssignWorkerFilters;
+  Pick.getAssignWorkerZoneOPriority = getAssignWorkerZoneOPriority;
+  Pick.computeAssignWorkerFilteredRows = computeAssignWorkerFilteredRows;
+  Pick.getAssignWorkerSortedRows = getAssignWorkerSortedRows;
+  Pick.getActiveAssignConfig = getActiveAssignConfig;
+  Pick.getActiveAssignGroups = getActiveAssignGroups;
+  Pick.getAssignPanelScopedRows = getAssignPanelScopedRows;
+  Pick.getAssignPanelCandidateValues = getAssignPanelCandidateValues;
+  Pick.assignFilterBarController = assignFilterBarController;
+  Pick.assignSortBarController = assignSortBarController;
+  Pick.initAssignPanelControllers = initAssignPanelControllers;
+  Pick.renderAssignPanel = renderAssignPanel;
+  Pick.removeAssignWorker = removeAssignWorker;
+  Pick.setAssignMsg = setAssignMsg;
+  Pick.getSelectedAssignDates = getSelectedAssignDates;
+  Pick.renderAssignDateCheckboxes = renderAssignDateCheckboxes;
+  Pick.assignPreviewGroups = assignPreviewGroups;
+  Pick.assignPreviewMeta = assignPreviewMeta;
+  Pick.assignPreviewActiveWorkerIdx = assignPreviewActiveWorkerIdx;
+  Pick.generateAssignPreview = generateAssignPreview;
+  Pick.renderAssignPreviewRows = renderAssignPreviewRows;
+  Pick.renderAssignPreview = renderAssignPreview;
+  Pick.confirmAssignConfig = confirmAssignConfig;
+  Pick.resetAssignCreateModal = resetAssignCreateModal;
+  Pick.openAssignCreateModal = openAssignCreateModal;
+  Pick.closeAssignCreateModal = closeAssignCreateModal;
+  Pick.removeAssignConfig = removeAssignConfig;
+})(window.Pick = window.Pick || {});
