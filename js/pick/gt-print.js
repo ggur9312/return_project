@@ -179,8 +179,13 @@
     renderGtVisibleRows();
   }
 
-  function setAssignGt(key, code) {
+  async function setAssignGt(key, code) {
     if (code) {
+      var dupKey = Object.keys(state.gtAssignments).filter(function (k) { return k !== key; }).find(function (k) { return state.gtAssignments[k] === code; });
+      if (dupKey && !(await window.confirmModal("이 GT 코드(" + code + ")는 이미 다른 행에 사용 중입니다. 그래도 사용하시겠습니까?"))) {
+        setTimeout(Pick.renderAssignPanel, 0);
+        return;
+      }
       state.gtAssignments[key] = code;
     } else {
       delete state.gtAssignments[key];

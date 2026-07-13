@@ -611,10 +611,17 @@
     });
 
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-print-btn"), function (btn) {
-      btn.addEventListener("click", function () {
+      btn.addEventListener("click", async function () {
         var workerIdx = parseInt(btn.dataset.workerIdx, 10);
+        if (cfg.printedWorkerIdx && cfg.printedWorkerIdx[workerIdx]) {
+          if (!(await window.confirmModal("이미 출력한 작업자입니다. 다시 출력하시겠습니까?"))) return;
+        }
         printWorkerLabels(cfg, groups[workerIdx], function () {
-          resetGtForWorker(cfg, groups[workerIdx]);
+          groups[workerIdx].forEach(function (r) {
+            var code = state.gtAssignments[cfg.id + ":" + r.id];
+            if (code && state.gtPrinted.indexOf(code) === -1) state.gtPrinted.push(code);
+          });
+          saveGtState();
           cfg.printedWorkerIdx = cfg.printedWorkerIdx || [];
           cfg.printedWorkerIdx[workerIdx] = true;
           saveAssignState();

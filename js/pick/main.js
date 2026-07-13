@@ -221,6 +221,13 @@
   els.assignDeleteAllBtn.addEventListener("click", async function () {
     if (!state.assignConfigs.length) return;
     if (!(await window.confirmModal("생성된 집품 할당을 모두 삭제할까요?"))) return;
+    var deletedPrefixes = state.assignConfigs.map(function (c) { return c.id + ":"; });
+    Object.keys(state.gtAssignments).forEach(function (key) {
+      if (deletedPrefixes.some(function (prefix) { return key.indexOf(prefix) === 0; })) {
+        delete state.gtAssignments[key];
+      }
+    });
+    Pick.saveGtState();
     state.assignConfigs = [];
     state.assignActiveId = null;
     state.assignActiveWorkerIdx = null;
