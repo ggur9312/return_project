@@ -47,12 +47,10 @@
   var saveDateTabState = Pick.saveDateTabState;
   var saveSortRules = Pick.saveSortRules;
   var setStatusMsg = Pick.setStatusMsg;
-  var setupSortLabels = Pick.setupSortLabels;
   var state = Pick.state;
   var switchView = Pick.switchView;
   var textToMatrix = Pick.textToMatrix;
   var trim = Pick.trim;
-  var updateFilterSortBadge = Pick.updateFilterSortBadge;
   var updateSortHeaderClasses = Pick.updateSortHeaderClasses;
   var updateStatusBadgeMap = Pick.updateStatusBadgeMap;
   var clearRowPickerMarks = Pick.clearRowPickerMarks;
@@ -115,7 +113,6 @@
       updateSortHeaderClasses();
       homeFilterBarController.updateButtonStates();
       homeSortBarController.render();
-      updateFilterSortBadge();
       saveSortRules();
     }
     if (!els.assignView.classList.contains("hidden")) {
@@ -456,7 +453,6 @@
   // 로드된 뒤)서 먼저 만든다.
   initRowPickerControllers();
   initAssignPanelControllers();
-  setupSortLabels();
   homeFilterBarController.setup();
   Pick.rowPickerFilterBarController.setup();
   Pick.assignFilterBarController.setup();

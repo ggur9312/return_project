@@ -16,7 +16,10 @@
   ];
 
   var AGG_COLUMN = { key: "groupCompanyTotal", label: "업체 총수량", type: "number" };
-  var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN]);
+  // 실제 행 필드가 아니라 Pick.getAssignedRowIdSet()(custom-assign.js)으로 렌더링 시점에
+  // 계산되는 파생 컬럼 — groupCompanyTotal과 동일한 패턴으로 ALL_COLUMNS에만 추가한다.
+  var ASSIGNED_COLUMN = { key: "assigned", label: "할당여부", type: "string" };
+  var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN, ASSIGNED_COLUMN]);
 
   // 커스텀 할당 화면의 "사용 가능한 행" 테이블에 실제로 보이는 컬럼만 대상 —
   // 생성일자는 이 화면에서 별도로 필터링할 수 있는 컬럼이 아니라서 제외
@@ -146,7 +149,6 @@
     filterSortToggleBtn: document.getElementById("filterSortToggleBtn"),
     filterSortToggleLabel: document.getElementById("filterSortToggleLabel"),
     filterSortToggleIcon: document.getElementById("filterSortToggleIcon"),
-    filterSortSummary: document.getElementById("filterSortSummary"),
     filterSortBody: document.getElementById("filterSortBody"),
     table: document.getElementById("dataTable"),
     emptyState: document.getElementById("emptyState"),
@@ -522,19 +524,28 @@
   function getCandidateValues(key) {
     var exceptRegular = filterRowsExceptKey(getDateScopedRows(), COLUMNS, state.filters, key);
     var gcMap = computeGroupCompanyTotals(exceptRegular);
+    var assignedRowIds = Pick.getAssignedRowIdSet();
     var withAgg = exceptRegular.map(function (r) {
       var clone = Object.assign({}, r);
       clone.groupCompanyTotal = gcMap[r.groupNo + "" + r.company];
+      clone.assigned = assignedRowIds.has(r.id) ? "할당됨" : "미할당";
       return clone;
     });
     if (key === AGG_COLUMN.key) {
       return uniqueValuesFrom(withAgg, function (r) { return r.groupCompanyTotal; })
         .sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
     }
+    if (key === ASSIGNED_COLUMN.key) {
+      return ["할당됨", "미할당"];
+    }
     var aggFilterSet = state.filters[AGG_COLUMN.key];
     var rowsForKey = (aggFilterSet === null || aggFilterSet === undefined)
       ? withAgg
       : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var assignedFilterSet = state.filters[ASSIGNED_COLUMN.key];
+    if (assignedFilterSet !== null && assignedFilterSet !== undefined) {
+      rowsForKey = rowsForKey.filter(function (r) { return assignedFilterSet.has(r.assigned); });
+    }
     var values = uniqueValuesFrom(rowsForKey, function (r) { return r[key]; });
     var col = COLUMNS.find(function (c) { return c.key === key; });
     if (col && col.type === "number") {
@@ -543,20 +554,28 @@
     return values;
   }
 
-  // 컬럼 필터 + 집계(groupCompanyTotal) 필터를 baseRows 위에 적용 — 홈 화면
+  // 컬럼 필터 + 집계(groupCompanyTotal)/할당여부 필터를 baseRows 위에 적용 — 홈 화면
   // (날짜 탭으로 스코프된 행)과 집품 할당(날짜 탭과 무관, 자체 생성일자 선택)이
   // 서로 다른 baseRows로 재사용
   function computeFilteredRows(baseRows) {
     var preFiltered = getPreFilteredRowsFrom(baseRows);
     var gcMap = computeGroupCompanyTotals(preFiltered);
+    var assignedRowIds = Pick.getAssignedRowIdSet();
     var withAgg = preFiltered.map(function (r) {
       var clone = Object.assign({}, r);
       clone.groupCompanyTotal = gcMap[r.groupNo + "" + r.company];
+      clone.assigned = assignedRowIds.has(r.id) ? "할당됨" : "미할당";
       return clone;
     });
     var aggFilterSet = state.filters[AGG_COLUMN.key];
-    if (aggFilterSet === null || aggFilterSet === undefined) return withAgg;
-    return withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var filtered = (aggFilterSet === null || aggFilterSet === undefined)
+      ? withAgg
+      : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var assignedFilterSet = state.filters[ASSIGNED_COLUMN.key];
+    if (assignedFilterSet !== null && assignedFilterSet !== undefined) {
+      filtered = filtered.filter(function (r) { return assignedFilterSet.has(r.assigned); });
+    }
+    return filtered;
   }
 
   function getFilteredRows() {
@@ -574,20 +593,6 @@
   // 헤더를 클릭하면 그 열 하나만으로 정렬(이미 그 열 단독 정렬 중이면 방향 토글) —
   // 정렬 영역(#sortRulesContainer)에서 여러 기준을 관리하는 것과 같은 state.sortRules를
   // 공유하므로 항상 서로 동기화된다.
-  function setupSortLabels() {
-    Array.prototype.forEach.call(els.theadRow.querySelectorAll("th[data-key]"), function (th) {
-      var key = th.dataset.key;
-      th.addEventListener("click", function () {
-        if (state.sortRules.length === 1 && state.sortRules[0].key === key) {
-          state.sortRules[0].dir *= -1;
-        } else {
-          state.sortRules = [{ key: key, dir: 1 }];
-        }
-        Pick.refreshAll();
-      });
-    });
-  }
-
   function updateSortHeaderClasses() {
     Array.prototype.forEach.call(els.theadRow.querySelectorAll("th[data-key]"), function (th) {
       var key = th.dataset.key;
@@ -1022,10 +1027,20 @@
     return rows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
   }
 
+  // 필터 적용 결과 수량 요약 + 필터·정렬 활성 개수(이전엔 별도 #filterSortSummary
+  // 줄에 있었으나, 하나의 강조 박스로 통합)를 함께 보여준다.
   function renderFilterQtySummary(filteredRows, unfilteredRows) {
+    var filterCount = ALL_COLUMNS.filter(function (c) {
+      return state.filters[c.key] !== null && state.filters[c.key] !== undefined;
+    }).length;
+    var sortCount = state.sortRules.length;
+    var extraParts = [];
+    if (filterCount > 0) extraParts.push("필터 " + filterCount + "개");
+    if (sortCount > 0) extraParts.push("정렬 " + sortCount + "개");
     els.filterQtySummary.textContent =
       "필터 적용: " + filteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(filteredRows).toLocaleString("ko-KR") + "개 · " +
-      "전체: " + unfilteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
+      "전체: " + unfilteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개" +
+      (extraParts.length ? " · " + extraParts.join(" · ") : "");
   }
 
   // 층 코드의 첫 글자가 숫자면 그 숫자를 "층대" 키로 추출(72→"7", 73→"7", 9→"9",
@@ -1082,16 +1097,19 @@
       var widthPct = (qty / maxQty) * 100;
 
       // 이 층이 여러 층을 묶은 "대분류" 강조줄(아래에서 만듦)의 멤버(중분류)인지 —
-      // 멤버라면 인원 배지는 대분류 줄에만 표시하고 중분류 개별 줄에서는 뺀다
-      // (둘 다 보여주면 같은 인원 수가 중복돼 보임). 수량/막대는 그대로 유지.
+      // 멤버라면 인원 수는 대분류 줄과 똑같이 계산해서 보여주되, 굵은 배지 대신
+      // 인당계산과 같은 급의 작고 수수한 텍스트로 축소해 대분류와 중복돼 보이지
+      // 않게 한다(정보 자체를 숨기지는 않음). 수량/막대는 항상 그대로 유지.
       var family = getFloorFamily(f);
       var isMultiFamilyMember = !!family && multiFamilies.indexOf(family) !== -1;
 
       var laborHtml;
       var perPersonHtml;
-      if (hasLabor && !isMultiFamilyMember) {
+      if (hasLabor) {
         var laborForFloorRaw = labor * (qty / totalQty);
-        laborHtml = '<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 text-sm font-bold px-3 py-1 rounded-full">' + laborForFloorRaw.toFixed(1) + "명</span>";
+        laborHtml = isMultiFamilyMember
+          ? '<span class="text-xs text-slate-500 font-medium">' + laborForFloorRaw.toFixed(1) + "명</span>"
+          : '<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 text-sm font-bold px-3 py-1 rounded-full">' + laborForFloorRaw.toFixed(1) + "명</span>";
         var roundedLabor = Math.round(laborForFloorRaw);
         perPersonHtml = roundedLabor > 0
           ? Math.round(qty / roundedLabor).toLocaleString("ko-KR") + "개/인"
@@ -1161,16 +1179,6 @@
     return raw === null ? true : raw === "1";
   }
 
-  function updateFilterSortBadge() {
-    var filterCount = ALL_COLUMNS.filter(function (c) {
-      return state.filters[c.key] !== null && state.filters[c.key] !== undefined;
-    }).length;
-    var sortCount = state.sortRules.length;
-    var parts = [];
-    if (filterCount > 0) parts.push("필터 " + filterCount + "개");
-    if (sortCount > 0) parts.push("정렬 " + sortCount + "개");
-    els.filterSortSummary.textContent = parts.length ? parts.join(" · ") : "필터·정렬 없음";
-  }
 
   function loadUploadCollapsed() {
     return localStorage.getItem(UPLOAD_COLLAPSED_KEY) === "1";
@@ -1398,7 +1406,6 @@
   Pick.computeFilteredRows = computeFilteredRows;
   Pick.getFilteredRows = getFilteredRows;
   Pick.getAssignBaseRows = getAssignBaseRows;
-  Pick.setupSortLabels = setupSortLabels;
   Pick.updateSortHeaderClasses = updateSortHeaderClasses;
   Pick.createSortBarController = createSortBarController;
   Pick.homeSortBarController = homeSortBarController;
@@ -1420,7 +1427,6 @@
   Pick.applyCardCollapsed = applyCardCollapsed;
   Pick.loadFloorPanelCollapsed = loadFloorPanelCollapsed;
   Pick.loadFilterSortCollapsed = loadFilterSortCollapsed;
-  Pick.updateFilterSortBadge = updateFilterSortBadge;
   Pick.loadUploadCollapsed = loadUploadCollapsed;
   Pick.saveDateTabState = saveDateTabState;
   Pick.loadDateTabState = loadDateTabState;

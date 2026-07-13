@@ -308,7 +308,7 @@
       );
     }).join("");
     return (
-      '<div class="overflow-x-auto px-5 pb-1">' +
+      '<div class="overflow-x-auto">' +
       '<table class="w-full border-collapse text-left text-xs table-fixed">' +
       colgroupHtml +
       '<thead><tr class="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600">' + headHtml + "</tr></thead>" +

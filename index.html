@@ -227,7 +227,6 @@
         <svg id="filterSortToggleIcon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
       </button>
     </div>
-    <div id="filterSortSummary" class="text-xs text-slate-500 mt-2"></div>
     <div id="filterQtySummary" class="text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mt-3"></div>
     <div id="filterSortBody" class="hidden mt-4 space-y-3">
       <section class="flex items-center gap-2 flex-wrap" id="filterBar">
@@ -250,16 +249,17 @@
     <table id="dataTable" class="w-full border-collapse text-left text-xs min-w-[1050px]">
       <thead>
         <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">
-          <th data-key="groupNo" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">그룹번호</span></th>
-          <th data-key="deadline" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">마감일시</span></th>
-          <th data-key="createdAt" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">생성일시</span></th>
-          <th data-key="purchaseType" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">매입유형</span></th>
-          <th data-key="company" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">업체명</span></th>
-          <th data-key="status" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">상태</span></th>
-          <th data-key="transportType" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">운송타입</span></th>
-          <th data-key="zone" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">존</span></th>
-          <th data-key="quantity" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap"><span class="th-label">수량</span></th>
-          <th data-key="groupCompanyTotal" class="px-4 py-3 cursor-pointer select-none hover:text-indigo-600 whitespace-nowrap bg-indigo-50/50"><span class="th-label">업체 총수량</span></th>
+          <th data-key="groupNo" class="px-4 py-3 whitespace-nowrap"><span class="th-label">그룹번호</span></th>
+          <th data-key="deadline" class="px-4 py-3 whitespace-nowrap"><span class="th-label">마감일시</span></th>
+          <th data-key="createdAt" class="px-4 py-3 whitespace-nowrap"><span class="th-label">생성일시</span></th>
+          <th data-key="purchaseType" class="px-4 py-3 whitespace-nowrap"><span class="th-label">매입유형</span></th>
+          <th data-key="company" class="px-4 py-3 whitespace-nowrap"><span class="th-label">업체명</span></th>
+          <th data-key="status" class="px-4 py-3 whitespace-nowrap"><span class="th-label">상태</span></th>
+          <th data-key="transportType" class="px-4 py-3 whitespace-nowrap"><span class="th-label">운송타입</span></th>
+          <th data-key="zone" class="px-4 py-3 whitespace-nowrap"><span class="th-label">존</span></th>
+          <th data-key="quantity" class="px-4 py-3 whitespace-nowrap"><span class="th-label">수량</span></th>
+          <th data-key="groupCompanyTotal" class="px-4 py-3 whitespace-nowrap bg-indigo-50/50"><span class="th-label">업체 총수량</span></th>
+          <th data-key="assigned" class="px-4 py-3 whitespace-nowrap"><span class="th-label">할당여부</span></th>
           <th class="px-3 py-3 w-12"></th>
         </tr>
       </thead>

@@ -165,8 +165,8 @@
     }).join("");
     return (
       '<table class="w-full text-xs border-collapse">' +
-      '<thead><tr class="bg-slate-50 text-slate-500 font-bold text-left sticky top-0">' +
-      '<th class="px-3 py-1.5 text-center w-10">번호</th><th class="px-3 py-1.5">그룹번호</th><th class="px-3 py-1.5">마감일시</th><th class="px-3 py-1.5">생성일자</th><th class="px-3 py-1.5">업체명</th><th class="px-3 py-1.5">운송타입</th><th class="px-3 py-1.5">존</th><th class="px-3 py-1.5 text-right">수량</th><th class="px-3 py-1.5"></th>' +
+      '<thead><tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 text-left sticky top-0">' +
+      '<th class="px-4 py-3 text-center w-10">번호</th><th class="px-4 py-3">그룹번호</th><th class="px-4 py-3">마감일시</th><th class="px-4 py-3">생성일시</th><th class="px-4 py-3">업체명</th><th class="px-4 py-3">운송타입</th><th class="px-4 py-3">존</th><th class="px-4 py-3 text-right">수량</th><th class="px-4 py-3"></th>' +
       "</tr></thead><tbody>" + bodyHtml + "</tbody></table>"
     );
   }

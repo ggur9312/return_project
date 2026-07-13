@@ -38,21 +38,23 @@
     els.emptyState.classList.add("hidden");
 
     var tdBase = "px-4 py-2.5 whitespace-nowrap";
-    // 커스텀 할당(홈 선택바의 "할당" 버튼 포함)으로 이미 배정된 행은 상태 옆에
-    // "할당됨" 배지를 붙여준다 — 중복 할당을 막지는 않고 표시만 한다.
+    // 커스텀 할당(홈 선택바의 "할당" 버튼 포함)으로 이미 배정된 행인지 — 별도
+    // "할당여부" 컬럼(index.html의 data-key="assigned" 헤더)으로 표시. 중복
+    // 할당을 막지는 않고 표시만 한다.
     var assignedRowIds = getAssignedRowIdSet();
 
     els.tableBody.innerHTML = rows.map(function (r) {
       var marked = homeMarkedIds.has(r.id);
+      var isAssigned = assignedRowIds.has(r.id);
+      var assignedBadge = isAssigned
+        ? '<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">할당됨</span>'
+        : '<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-400 border border-slate-200">미할당</span>';
       return (
         '<tr class="home-table-row hover:bg-slate-50/80 transition-colors' + (marked ? " bg-indigo-50" : "") + '" data-row-id="' + escapeHtml(r.id) + '">' +
         COLUMNS.map(function (col) {
           if (col.key === "status") {
             var cls = state.statusBadgeMap[r.status] || "";
-            var assignedBadge = assignedRowIds.has(r.id)
-              ? ' <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">할당됨</span>'
-              : "";
-            return '<td class="' + tdBase + '"><span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ' + cls + '">' + escapeHtml(r.status) + "</span>" + assignedBadge + "</td>";
+            return '<td class="' + tdBase + '"><span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ' + cls + '">' + escapeHtml(r.status) + "</span></td>";
           }
           if (col.key === "groupNo") {
             return '<td class="' + tdBase + ' font-semibold text-slate-900">' + escapeHtml(r.groupNo) + "</td>";
@@ -69,6 +71,7 @@
           return '<td class="' + tdBase + ' text-slate-700">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
         '<td class="' + tdBase + ' text-right tabular-nums font-bold text-indigo-600 bg-indigo-50/30">' + Number(r.groupCompanyTotal || 0).toLocaleString("ko-KR") + "</td>" +
+        '<td class="' + tdBase + '">' + assignedBadge + "</td>" +
         '<td class="px-3 py-2.5 text-center"><button type="button" class="home-row-delete-btn text-slate-300 hover:text-rose-500" title="삭제" data-row-id="' + escapeHtml(r.id) + '"><svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>' +
         "</tr>"
       );
