@@ -53,20 +53,9 @@
   var trim = Pick.trim;
   var updateSortHeaderClasses = Pick.updateSortHeaderClasses;
   var updateStatusBadgeMap = Pick.updateStatusBadgeMap;
-  var clearRowPickerMarks = Pick.clearRowPickerMarks;
-  var clearRowPickerState = Pick.clearRowPickerState;
-  var closeCustomAssignView = Pick.closeCustomAssignView;
-  var confirmRowPicker = Pick.confirmRowPicker;
-  var createCustomAssignment = Pick.createCustomAssignment;
-  var deleteAllRowPickerSelected = Pick.deleteAllRowPickerSelected;
-  var enableRowPickerZoneOPriority = Pick.enableRowPickerZoneOPriority;
+  var getCreatedDate = Pick.getCreatedDate;
+  var nextCustomAssignSeq = Pick.nextCustomAssignSeq;
   var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
-  var initRowPickerControllers = Pick.initRowPickerControllers;
-  var moveMarkedRowsToSelected = Pick.moveMarkedRowsToSelected;
-  var openCustomAssignView = Pick.openCustomAssignView;
-  var renderRowPickerAvailableList = Pick.renderRowPickerAvailableList;
-  var renderRowPickerSelectedList = Pick.renderRowPickerSelectedList;
-  var setupRowPickerDragAndDrop = Pick.setupRowPickerDragAndDrop;
   var applyGtLabelPageStyle = Pick.applyGtLabelPageStyle;
   var cancelSparePrintModal = Pick.cancelSparePrintModal;
   var closeCustomLabelCompanyDropdown = Pick.closeCustomLabelCompanyDropdown;
@@ -118,10 +107,28 @@
     if (!els.assignView.classList.contains("hidden")) {
       renderAssignPanel();
     }
-    if (!els.customAssignView.classList.contains("hidden")) {
-      renderRowPickerAvailableList();
-      renderRowPickerSelectedList();
-    }
+  }
+
+  // 선택한 행들을 단일 작업자짜리 커스텀 할당 config로 바로 생성 — 홈 선택바의
+  // "할당" 버튼에서 호출된다.
+  function createCustomAssignment(rows) {
+    var dates = Array.from(new Set(rows.map(function (r) { return getCreatedDate(r); })));
+    var id = Date.now();
+    state.assignConfigs.push({
+      id: id,
+      floorInput: null,
+      custom: true,
+      customSeq: nextCustomAssignSeq(),
+      count: 1,
+      workerGroups: [rows.slice()],
+      createdDates: dates
+    });
+    state.assignActiveId = id;
+    state.assignActiveWorkerIdx = null;
+    saveAssignState();
+    switchView("assign");
+    renderAssignTabs();
+    if (window.showToast) window.showToast("커스텀 할당이 생성되었습니다.");
   }
 
   // --- Event wiring ---
@@ -206,7 +213,6 @@
 
   els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
   els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
-  els.navCustomBtn.addEventListener("click", function () { openCustomAssignView("create"); });
   els.assignOpenModalBtn.addEventListener("click", openAssignCreateModal);
   els.assignPreviewBtn.addEventListener("click", async function () {
     if (hasActiveFilter()) {
@@ -236,11 +242,6 @@
     if (window.showToast) window.showToast("집품 할당이 모두 삭제되었습니다.");
   });
 
-  els.assignCustomBtn.addEventListener("click", function () { openCustomAssignView("create"); });
-  els.rowPickerConfirmBtn.addEventListener("click", confirmRowPicker);
-  els.rowPickerCancelBtn.addEventListener("click", closeCustomAssignView);
-  els.rowPickerDeleteAllBtn.addEventListener("click", deleteAllRowPickerSelected);
-
   els.homeSelectionAssignBtn.addEventListener("click", async function () {
     if (!Pick.homeMarkedIds.size) return;
     // state.rows(원본 업로드 순서)가 아니라 화면에 실제로 보이는 정렬/필터 순서에서
@@ -260,13 +261,6 @@
 
   els.homeSelectionClearBtn.addEventListener("click", clearHomeSelection);
 
-  // 커스텀 할당 화면에서는 홈과 달리 "할당"을 눌러도 바로 할당이 생성되지 않고,
-  // 드래그로 선택 영역에 끌어놓은 것과 동일하게 "선택된 행" 목록으로만 옮긴다 —
-  // 중복 할당 여부는 실제로 확정할 때(rowPickerConfirmBtn) 한 번에 확인한다.
-  els.rowPickerSelectionAssignBtn.addEventListener("click", moveMarkedRowsToSelected);
-
-  els.rowPickerSelectionClearBtn.addEventListener("click", clearRowPickerMarks);
-
   // 체크박스가 아니라 1회성 버튼 — 누른 순간에만 O존 우선 정렬을 적용하고,
   // 이후 다른 조작으로 인한 재렌더링에는 영향을 주지 않도록 곧바로 플래그를 되돌린다.
   // 홈에서는 다른 페이지를 갔다 와도 유지돼야 하므로(정렬과 동일하게) 되돌리지 않는다 —
@@ -276,13 +270,6 @@
     refreshAll();
     if (window.showToast) window.showToast("72·73층 O존 우선 정렬이 적용되었습니다.");
   });
-
-  // 홈의 state.zoneOPriority와 마찬가지로, 화면을 나가기 전까지는 계속 켜진 상태를
-  // 유지한다(clearRowPickerState()가 화면 진입/이탈 시, onResetExtra가 "정렬 초기화"
-  // 클릭 시 끈다) — 이전엔 렌더링 직후 바로 꺼버려서, 드래그 중 다시 계산되는 정렬
-  // 순서(꺼진 상태)가 화면에 이미 그려진 순서(켜진 상태)와 어긋나 드래그 범위선택이
-  // 엉뚱한 인덱스로 계산되는 버그(다른 존으로 넘어가는 순간 전체선택됨)가 있었다.
-  els.rowPickerSortZoneOPriorityBtn.addEventListener("click", enableRowPickerZoneOPriority);
 
   els.gtSaveBtn.addEventListener("click", function () {
     var tokens = parseGtTokens(els.gtPasteArea.value);
@@ -455,15 +442,12 @@
   });
 
   // --- Init ---
-  // rowPicker/assign 필터·정렬 컨트롤러는 각 파일의 최상위에서 바로 만들지 않고
-  // 함수로 미뤄뒀다 — 초기화 순서를 한곳(main.js)에 모아두기 위해 여기(모든 파일이
+  // assign 필터·정렬 컨트롤러는 각 파일의 최상위에서 바로 만들지 않고 함수로
+  // 미뤄뒀다 — 초기화 순서를 한곳(main.js)에 모아두기 위해 여기(모든 파일이
   // 로드된 뒤)서 먼저 만든다.
-  initRowPickerControllers();
   initAssignPanelControllers();
   homeFilterBarController.setup();
-  Pick.rowPickerFilterBarController.setup();
   Pick.assignFilterBarController.setup();
-  setupRowPickerDragAndDrop();
   setupHomeRowSelection();
   loadFromStorage();
   loadSortRules();

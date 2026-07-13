@@ -16,15 +16,10 @@
   ];
 
   var AGG_COLUMN = { key: "groupCompanyTotal", label: "업체 총수량", type: "number" };
-  // 실제 행 필드가 아니라 Pick.getAssignedRowIdSet()(custom-assign.js)으로 렌더링 시점에
+  // 실제 행 필드가 아니라 Pick.getAssignedRowIdSet()(main.js)으로 렌더링 시점에
   // 계산되는 파생 컬럼 — groupCompanyTotal과 동일한 패턴으로 ALL_COLUMNS에만 추가한다.
   var ASSIGNED_COLUMN = { key: "assigned", label: "할당여부", type: "string" };
   var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN, ASSIGNED_COLUMN]);
-
-  // 커스텀 할당 화면의 "사용 가능한 행" 테이블에 실제로 보이는 컬럼만 대상 —
-  // 생성일자는 이 화면에서 별도로 필터링할 수 있는 컬럼이 아니라서 제외
-  var ROW_PICKER_COLUMNS = ["groupNo", "deadline", "company", "transportType", "zone", "quantity"]
-    .map(function (key) { return COLUMNS.find(function (c) { return c.key === key; }); });
 
   var LABEL_BARCODE_OPTS = { fontSize: 25, height: 42, width: 1.3 };
 
@@ -37,7 +32,7 @@
     return "r" + rowIdSeq;
   }
 
-  // customAssignSeq를 다른 파일(custom-assign.js)에서 안전하게 증가시키기 위한 헬퍼 —
+  // customAssignSeq를 다른 파일(main.js)에서 안전하게 증가시키기 위한 헬퍼 —
   // 소유 파일(core.js) 밖에서 로컬 var를 직접 건드리면 Pick.customAssignSeq
   // 동기화가 누락되기 쉬워 함수로 감쌌다.
   function nextCustomAssignSeq() {
@@ -127,10 +122,6 @@
     homeSelectionSummary: document.getElementById("homeSelectionSummary"),
     homeSelectionAssignBtn: document.getElementById("homeSelectionAssignBtn"),
     homeSelectionClearBtn: document.getElementById("homeSelectionClearBtn"),
-    rowPickerSelectionBar: document.getElementById("rowPickerSelectionBar"),
-    rowPickerSelectionSummary: document.getElementById("rowPickerSelectionSummary"),
-    rowPickerSelectionAssignBtn: document.getElementById("rowPickerSelectionAssignBtn"),
-    rowPickerSelectionClearBtn: document.getElementById("rowPickerSelectionClearBtn"),
     floorBars: document.getElementById("floorBars"),
     floorPanelToggleBtn: document.getElementById("floorPanelToggleBtn"),
     floorPanelToggleLabel: document.getElementById("floorPanelToggleLabel"),
@@ -160,11 +151,9 @@
     sortZoneOPriorityBtn: document.getElementById("sortZoneOPriorityBtn"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
-    navCustomBtn: document.getElementById("navCustomBtn"),
     mainNavAside: document.getElementById("mainNavAside"),
     homeView: document.getElementById("homeView"),
     assignView: document.getElementById("assignView"),
-    customAssignView: document.getElementById("customAssignView"),
     assignOpenModalBtn: document.getElementById("assignOpenModalBtn"),
     assignCreateModal: document.getElementById("assignCreateModal"),
     assignCreateModalBox: document.getElementById("assignCreateModalBox"),
@@ -187,22 +176,6 @@
     assignSortZoneOPriorityBtn: document.getElementById("assignSortZoneOPriorityBtn"),
     assignTableContainer: document.getElementById("assignTableContainer"),
     assignDeleteAllBtn: document.getElementById("assignDeleteAllBtn"),
-    assignCustomBtn: document.getElementById("assignCustomBtn"),
-    rowPickerTitle: document.getElementById("rowPickerTitle"),
-    rowPickerFilterButtonsContainer: document.getElementById("rowPickerFilterButtonsContainer"),
-    rowPickerFilterResetAllBtn: document.getElementById("rowPickerFilterResetAllBtn"),
-    rowPickerSortRulesContainer: document.getElementById("rowPickerSortRulesContainer"),
-    rowPickerSortAddBtn: document.getElementById("rowPickerSortAddBtn"),
-    rowPickerSortResetBtn: document.getElementById("rowPickerSortResetBtn"),
-    rowPickerSortZoneOPriorityBtn: document.getElementById("rowPickerSortZoneOPriorityBtn"),
-    rowPickerAvailableList: document.getElementById("rowPickerAvailableList"),
-    rowPickerSelectedList: document.getElementById("rowPickerSelectedList"),
-    rowPickerSelectedCount: document.getElementById("rowPickerSelectedCount"),
-    rowPickerSelectedQty: document.getElementById("rowPickerSelectedQty"),
-    rowPickerDeleteAllBtn: document.getElementById("rowPickerDeleteAllBtn"),
-    rowPickerDragGhost: document.getElementById("rowPickerDragGhost"),
-    rowPickerConfirmBtn: document.getElementById("rowPickerConfirmBtn"),
-    rowPickerCancelBtn: document.getElementById("rowPickerCancelBtn"),
     gtPasteArea: document.getElementById("gtPasteArea"),
     gtSaveBtn: document.getElementById("gtSaveBtn"),
     gtClearBtn: document.getElementById("gtClearBtn"),
@@ -349,8 +322,6 @@
   // 정렬 상태(state.sortRules)는 기존엔 저장되지 않아 브라우저가 새로고침되면
   // (모바일에서 다른 앱 갔다 오는 사이 탭이 새로고침되는 경우 포함) 기본 정렬로
   // 되돌아갔다 — 집품 데이터(state.rows)와 마찬가지로 localStorage에 저장/복원한다.
-  // 커스텀 할당 화면 전용 정렬(rowPickerSortRules)은 이 화면(홈)과 무관한 별도
-  // 상태라 대상이 아니다.
   function saveSortRules() {
     localStorage.setItem(SORT_RULES_KEY, JSON.stringify(state.sortRules));
     localStorage.setItem(ZONE_O_PRIORITY_KEY, state.zoneOPriority ? "1" : "");
@@ -687,8 +658,7 @@
     resetBtn: els.sortResetBtn,
     getSortRules: function () { return state.sortRules; },
     setSortRules: function (rules) { state.sortRules = rules; },
-    // "정렬 초기화"는 O존 우선 정렬도 함께 끄는 게 자연스러움 — 커스텀 할당 쪽
-    // 컨트롤러는 이 옵션을 넘기지 않아 rowPickerZoneOPriority에는 영향 없음.
+    // "정렬 초기화"는 O존 우선 정렬도 함께 끄는 게 자연스러움.
     onResetExtra: function () { state.zoneOPriority = false; },
     onApply: function () { Pick.refreshAll(); }
   });
@@ -1271,19 +1241,12 @@
     // 화면으로 이동할 때는 항상 명시적으로 해제한다(Pick.refreshAll()의 암묵적
     // 초기화는 홈이 보일 때만 실행되어 이 경우를 놓친다).
     if (view !== "home") Pick.clearHomeSelection();
-    // 커스텀 할당 화면(row-picker)의 마킹/선택 상태도 홈과 마찬가지로 그 화면에서만
-    // 유효해야 한다 — 좌측 네비 버튼은 Pick.closeCustomAssignView()를 거치지 않고 이
-    // 함수를 직접 호출하므로, 여기서 처리하지 않으면 선택이 다른 화면까지 남는다.
-    if (view !== "custom") Pick.clearRowPickerState();
     els.homeView.classList.toggle("hidden", view !== "home");
     els.assignView.classList.toggle("hidden", view !== "assign");
-    els.customAssignView.classList.toggle("hidden", view !== "custom");
     if (view === "home") els.homeView.classList.add("animate-fadeIn");
     if (view === "assign") els.assignView.classList.add("animate-fadeIn");
-    if (view === "custom") els.customAssignView.classList.add("animate-fadeIn");
     els.navHomeBtn.className = view === "home" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     els.navAssignBtn.className = view === "assign" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
-    els.navCustomBtn.className = view === "custom" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     // Pick.refreshAll()은 숨겨진 화면의 렌더링을 건너뛰므로, 방금 보이게 된 화면이
     // 숨겨져 있는 동안 놓쳤을 수 있는 갱신을 따라잡도록 전환 직후 한 번 그려준다.
     Pick.refreshAll();
@@ -1343,7 +1306,6 @@
   Pick.COLUMNS = COLUMNS;
   Pick.AGG_COLUMN = AGG_COLUMN;
   Pick.ALL_COLUMNS = ALL_COLUMNS;
-  Pick.ROW_PICKER_COLUMNS = ROW_PICKER_COLUMNS;
   Pick.LABEL_BARCODE_OPTS = LABEL_BARCODE_OPTS;
   Pick.rowIdSeq = rowIdSeq;
   Pick.nextRowId = nextRowId;

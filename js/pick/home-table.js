@@ -11,8 +11,7 @@
   var formatDateDisplay = Pick.formatDateDisplay;
 
   // 홈 테이블 드래그 범위선택 + Ctrl/Cmd+클릭 비연속선택 — 이동/드롭 대상은 없고
-  // "몇 행 · 몇 개 선택했는지" 실시간 요약 표시 용도. 커스텀 할당 모달의
-  // rowPickerMarkedIds/setupRowPickerDragAndDrop과 동일한 패턴을 이식.
+  // "몇 행 · 몇 개 선택했는지" 실시간 요약 표시 용도.
   var homeMarkedIds = new Set();
   var homeDragAnchorId = null;
   var homeDragSelecting = false;
@@ -142,8 +141,7 @@
     updateHomeSelectionSummary();
   }
 
-  // 커스텀 할당 모달의 setupRowPickerDragAndDrop과 동일한 패턴 — 다만 옮길 대상이
-  // 없으므로 mousedown/mousemove로 마킹만 갱신하고 mouseup은 드래그 종료만 처리.
+  // mousedown/mousemove로 마킹만 갱신하고 mouseup은 드래그 종료만 처리.
   function setupHomeRowSelection() {
     els.tableBody.addEventListener("click", function (e) {
       var btn = e.target.closest(".home-row-delete-btn");

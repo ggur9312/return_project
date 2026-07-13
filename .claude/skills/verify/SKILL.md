@@ -106,8 +106,8 @@ Clicking the button directly while the panel is collapsed times out
   inside `#assignFilterButtonsContainer .th-filter-dropdown`), not the ad-hoc
   instant-apply checkboxes older versions of this screen used.
 - O-zone-priority button here is `#assignSortZoneOPriorityBtn` (separate from
-  home's `#sortZoneOPriorityBtn` and row-picker's `#rowPickerSortZoneOPriorityBtn`
-  — three independent flags, one per screen, all non-persisted).
+  home's `#sortZoneOPriorityBtn` — two independent flags, one per screen, both
+  non-persisted).
 - Worker cards: `#assignTableContainer > div.space-y-8 > div` (bg-white,
   rounded-2xl, shadow-md, `border-l-4` left accent). Each card's header tint
   and left accent rail cycle through `WORKER_CARD_ACCENTS` in
@@ -117,7 +117,7 @@ Clicking the button directly while the panel is collapsed times out
   asserting on card styling, check `WORKER_CARD_ACCENTS[idx % 5]` instead.
   The "✓ 출력됨" badge is a solid `bg-emerald-500 text-white` pill (not a pale
   `emerald-50` tint) specifically so it stays visible after printing. The
-  header's secondary buttons (할당 추가/미사용 GT 자동매칭/GT 바코드 초기화/여분 출력)
+  header's secondary buttons (미사용 GT 자동매칭/GT 바코드 초기화/여분 출력)
   use the same bordered white `outlineBtn` style as 출력/삭제 (a borderless
   "ghost" variant was tried and reverted — users couldn't tell they were
   clickable). The detail table inside each card uses `table-fixed` +

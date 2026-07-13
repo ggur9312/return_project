@@ -331,6 +331,21 @@
     return result;
   }
 
+  // 이미 어떤 assignConfig에도 배정된 행의 id 집합 — 홈 화면 드래그선택 할당(main.js)에서
+  // 중복 배정 방지용으로, core.js/home-table.js에서 "할당여부" 컬럼 계산용으로 쓰인다.
+  function getAssignedRowIdSet() {
+    var ids = new Set();
+    state.assignConfigs.forEach(function (cfg) {
+      // cfg.workerGroups가 아직 없는(한 번도 결과 화면을 렌더링하지 않은) config도
+      // 놓치지 않도록 renderAssignPanel과 동일한 폴백을 사용
+      var groups = cfg.workerGroups || splitBalanced(cfg.items || [], cfg.count);
+      groups.forEach(function (group) {
+        flattenWorkerGroup(group).forEach(function (r) { if (r && r.id) ids.add(r.id); });
+      });
+    });
+    return ids;
+  }
+
   // 집품 할당 결과 화면의 필터/정렬 — 홈/row-picker의 전역 상태와 달리 cfg 단위로
   // 스코프된다(작업자별로 따로 갖지 않고 "전체"/특정 작업자 탭 모두 이 하나를 공유 —
   // 예전엔 작업자마다 필터바가 따로 있어 "전체"에서 보면 필터바가 여러 번 반복돼
@@ -565,7 +580,6 @@
         '<div class="text-sm font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + detailRows.length + "장</div>" +
         "</div>" +
         '<div class="flex items-center justify-end flex-wrap gap-2">' +
-        '<button type="button" class="assign-add-row-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">할당 추가</button>' +
         '<button type="button" class="assign-automatch-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
         '<button type="button" class="assign-gt-reset-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
         '<button type="button" class="assign-spare-print-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">여분 출력</button>' +
@@ -640,13 +654,6 @@
     Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-delete-worker-btn"), function (btn) {
       btn.addEventListener("click", function () {
         removeAssignWorker(cfg);
-      });
-    });
-
-    Array.prototype.forEach.call(els.assignTableContainer.querySelectorAll(".assign-add-row-btn"), function (btn) {
-      btn.addEventListener("click", function () {
-        var workerIdx = parseInt(btn.dataset.workerIdx, 10);
-        Pick.openCustomAssignView("append", cfg.id, workerIdx);
       });
     });
 
@@ -965,6 +972,7 @@
   Pick.buildAssignMoveOptionsHtml = buildAssignMoveOptionsHtml;
   Pick.renderAssignDetailTable = renderAssignDetailTable;
   Pick.flattenWorkerGroup = flattenWorkerGroup;
+  Pick.getAssignedRowIdSet = getAssignedRowIdSet;
   Pick.assignWorkerSortState = assignWorkerSortState;
   Pick.assignWorkerFilterState = assignWorkerFilterState;
   Pick.assignWorkerZoneOPriorityState = assignWorkerZoneOPriorityState;
