@@ -152,8 +152,17 @@
   "use strict";
 
   var AFTERPRINT_FALLBACK_MS = 20000;
+  // 모든 GT 인쇄 경로(작업자별 출력/GT 단독 출력/커스텀 라벨/여분 출력)가 이
+  // 함수 하나로 모이므로, 여기 한 곳에서만 막아도 어느 버튼을 빠르게 두 번
+  // 눌러도 같은 라벨이 중복 인쇄되지 않는다.
+  var printInProgress = false;
 
   window.printWithConfirm = function (onConfirmed) {
+    if (printInProgress) {
+      if (window.showToast) window.showToast("이미 인쇄가 진행 중입니다.", "info");
+      return Promise.resolve(false);
+    }
+    printInProgress = true;
     return new Promise(function (resolve) {
       requestAnimationFrame(function () {
         requestAnimationFrame(function () {
@@ -181,6 +190,12 @@
         }
         return confirmed;
       });
+    }).then(function (result) {
+      printInProgress = false;
+      return result;
+    }, function (err) {
+      printInProgress = false;
+      throw err;
     });
   };
 })();
