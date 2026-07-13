@@ -36,6 +36,18 @@
     } catch (e) {
       state.gtCodes = [];
     }
+    // 레거시 데이터 등으로 이미 저장된 중복 코드가 있으면 자동매칭이 같은 물리
+    // 바코드를 서로 다른 행에 두 번 배정할 수 있으므로, 불러오는 시점에 정리한다.
+    var seenCodes = {};
+    var dedupedCodes = state.gtCodes.filter(function (c) {
+      if (seenCodes[c]) return false;
+      seenCodes[c] = true;
+      return true;
+    });
+    if (dedupedCodes.length !== state.gtCodes.length) {
+      state.gtCodes = dedupedCodes;
+      localStorage.setItem(GT_CODES_KEY, JSON.stringify(state.gtCodes));
+    }
     try {
       var assignRaw = localStorage.getItem(GT_ASSIGNMENTS_KEY);
       state.gtAssignments = assignRaw ? JSON.parse(assignRaw) : {};
