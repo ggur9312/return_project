@@ -28,6 +28,7 @@
   var formatDateDisplay = Pick.formatDateDisplay;
   var handleSparePrintClick = Pick.handleSparePrintClick;
   var printWorkerLabels = Pick.printWorkerLabels;
+  var renderGtAvailableList = Pick.renderGtAvailableList;
   var resetGtForWorker = Pick.resetGtForWorker;
   var saveGtState = Pick.saveGtState;
   var setAssignGt = Pick.setAssignGt;
@@ -632,10 +633,13 @@
         }
         printWorkerLabels(cfg, groups[workerIdx], function () {
           groups[workerIdx].forEach(function (r) {
-            var code = state.gtAssignments[cfg.id + ":" + r.id];
+            var key = cfg.id + ":" + r.id;
+            var code = state.gtAssignments[key];
             if (code && state.gtPrinted.indexOf(code) === -1) state.gtPrinted.push(code);
+            delete state.gtAssignments[key];
           });
           saveGtState();
+          renderGtAvailableList();
           cfg.printedWorkerIdx = cfg.printedWorkerIdx || [];
           cfg.printedWorkerIdx[workerIdx] = true;
           saveAssignState();
