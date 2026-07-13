@@ -103,9 +103,14 @@
   var msgEl = document.getElementById("uiConfirmModalMsg");
   var okBtn = document.getElementById("uiConfirmModalOkBtn");
   var cancelBtn = document.getElementById("uiConfirmModalCancelBtn");
+  var hideTimeoutId = null;
 
   function showUiModal(message, showCancel) {
     return new Promise(function (resolve) {
+      // 이전 호출의 hide 타이머가 아직 안 지났으면 취소 — 안 그러면 두 확인모달을
+      // 짧은 간격으로 연달아 띄울 때(예: 재출력 확인 → 출력완료 확인) 이전 타이머가
+      // 새로 열린 모달을 도로 숨겨버려 "물어보지 않은 것처럼" 보이는 버그가 있었다.
+      clearTimeout(hideTimeoutId);
       msgEl.textContent = message || "";
       cancelBtn.classList.toggle("hidden", !showCancel);
 
@@ -114,7 +119,7 @@
         cancelBtn.removeEventListener("click", onCancel);
         modal.classList.add("opacity-0");
         box.classList.add("scale-95");
-        setTimeout(function () {
+        hideTimeoutId = setTimeout(function () {
           modal.classList.add("hidden");
           modal.classList.remove("flex");
         }, 200);
