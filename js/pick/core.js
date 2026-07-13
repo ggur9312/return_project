@@ -100,7 +100,9 @@
     gtCodes: [],
     gtAssignments: {},
     gtPrinted: [],
-    activeDateTab: null
+    // 활성 날짜 탭(들) — 빈 배열이면 "전체", 아니면 선택된 "YYYY-MM-DD" 문자열 목록
+    // (일반 클릭은 항상 원소 1개짜리 배열로 교체, Ctrl/Cmd+클릭은 배열에 토글 추가/제거)
+    activeDateTabs: []
   };
 
   var els = {
@@ -463,10 +465,11 @@
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
 
-  // 현재 활성 날짜 탭(state.activeDateTab)으로 좁혀진 행 — null이면 전체
+  // 현재 활성 날짜 탭(들)(state.activeDateTabs)으로 좁혀진 행 — 빈 배열이면 전체
   function getDateScopedRows() {
-    if (state.activeDateTab === null) return state.rows;
-    return state.rows.filter(function (r) { return getCreatedDate(r) === state.activeDateTab; });
+    if (!state.activeDateTabs.length) return state.rows;
+    var activeSet = new Set(state.activeDateTabs);
+    return state.rows.filter(function (r) { return activeSet.has(getCreatedDate(r)); });
   }
 
   // 업로드 중복 판정 키: 그룹번호 + 생성일자 + 업체명 + 존
@@ -1066,7 +1069,7 @@
 
     var familySummaryText = multiFamilies
       .sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); })
-      .map(function (fam) { return fam + "층대 " + familyQty[fam].toLocaleString("ko-KR") + "개"; })
+      .map(function (fam) { return fam + "층 " + familyQty[fam].toLocaleString("ko-KR") + "개"; })
       .join(" · ");
     var floorSummaryText = floors.map(function (f) { return f + "층 " + byFloor[f].toLocaleString("ko-KR") + "개"; }).join(" · ");
     els.floorPanelSummary.textContent = floors.length
@@ -1077,9 +1080,16 @@
     els.floorBars.innerHTML = floors.map(function (f) {
       var qty = byFloor[f];
       var widthPct = (qty / maxQty) * 100;
+
+      // 이 층이 여러 층을 묶은 "대분류" 강조줄(아래에서 만듦)의 멤버(중분류)인지 —
+      // 멤버라면 인원 배지는 대분류 줄에만 표시하고 중분류 개별 줄에서는 뺀다
+      // (둘 다 보여주면 같은 인원 수가 중복돼 보임). 수량/막대는 그대로 유지.
+      var family = getFloorFamily(f);
+      var isMultiFamilyMember = !!family && multiFamilies.indexOf(family) !== -1;
+
       var laborHtml;
       var perPersonHtml;
-      if (hasLabor) {
+      if (hasLabor && !isMultiFamilyMember) {
         var laborForFloorRaw = labor * (qty / totalQty);
         laborHtml = '<span class="inline-block bg-indigo-50 text-indigo-700 border border-indigo-100 text-sm font-bold px-3 py-1 rounded-full">' + laborForFloorRaw.toFixed(1) + "명</span>";
         var roundedLabor = Math.round(laborForFloorRaw);
@@ -1101,11 +1111,11 @@
       );
 
       // 이 층이 속한 "층대"를 처음 만나는 시점에, 개별 층 막대들보다 먼저 굵게
-      // 강조된 요약 줄(예: "7층대 500개")을 끼워 넣는다. 가운데 칸(막대 자리)에는
-      // 진행바 대신 어느 층들이 합쳐졌는지("72층+73층") 보여준다.
-      var family = getFloorFamily(f);
+      // 강조된 요약 줄(예: "7층 500개")을 끼워 넣는다. 가운데 칸(막대 자리)에는
+      // 진행바 대신 어느 층들이 합쳐졌는지("72층 + 73층") 보여준다. 인원 배치는
+      // 이 대분류 줄에서만 계산해서 보여주고, 아래 중분류 개별 줄에는 안 보여준다.
       var familyHeaderHtml = "";
-      if (family && multiFamilies.indexOf(family) !== -1 && !renderedFamilies[family]) {
+      if (isMultiFamilyMember && !renderedFamilies[family]) {
         renderedFamilies[family] = true;
         var famQty = familyQty[family];
         var famLaborHtml, famPerPersonHtml;
@@ -1122,7 +1132,7 @@
         }
         familyHeaderHtml =
           '<div class="grid grid-cols-[60px_1fr_90px_110px_100px] items-center gap-2.5 text-xs bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1.5">' +
-          '<div class="text-indigo-700 font-bold whitespace-nowrap">' + escapeHtml(family) + "층대</div>" +
+          '<div class="text-indigo-700 font-bold whitespace-nowrap">' + escapeHtml(family) + "층</div>" +
           '<div class="text-[11px] text-indigo-400 font-medium truncate">' + familyMembers[family].map(function (m) { return escapeHtml(m) + "층"; }).join(" + ") + "</div>" +
           '<div class="text-right tabular-nums font-bold text-indigo-700">' + famQty.toLocaleString("ko-KR") + "개</div>" +
           '<div class="text-right tabular-nums">' + famLaborHtml + "</div>" +
@@ -1169,12 +1179,22 @@
   // --- 생성일자별 탭 (홈) ---
 
   function saveDateTabState() {
-    localStorage.setItem(DATE_TAB_KEY, state.activeDateTab === null ? "" : state.activeDateTab);
+    localStorage.setItem(DATE_TAB_KEY, JSON.stringify(state.activeDateTabs));
   }
 
   function loadDateTabState() {
     var raw = localStorage.getItem(DATE_TAB_KEY);
-    state.activeDateTab = raw ? raw : null;
+    if (!raw) {
+      state.activeDateTabs = [];
+      return;
+    }
+    try {
+      var parsed = JSON.parse(raw);
+      state.activeDateTabs = Array.isArray(parsed) ? parsed : [String(parsed)];
+    } catch (e) {
+      // 구버전엔 순수 문자열 하나만(JSON 아님) 저장했음 — 그 값을 배열로 감싸 하위호환.
+      state.activeDateTabs = [raw];
+    }
   }
 
   function getAllCreatedDates() {
@@ -1186,17 +1206,17 @@
     els.dateTabsContainer.innerHTML = "";
 
     var allBtn = document.createElement("button");
-    allBtn.className = state.activeDateTab === null ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
+    allBtn.className = !state.activeDateTabs.length ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
     allBtn.innerHTML = "<span>전체</span>";
     allBtn.addEventListener("click", function () {
-      state.activeDateTab = null;
+      state.activeDateTabs = [];
       saveDateTabState();
       Pick.refreshAll();
     });
     els.dateTabsContainer.appendChild(allBtn);
 
     dates.forEach(function (date) {
-      var isActive = state.activeDateTab === date;
+      var isActive = state.activeDateTabs.indexOf(date) !== -1;
       var tabBtn = document.createElement("button");
       tabBtn.className = isActive ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
       tabBtn.innerHTML =
@@ -1205,11 +1225,20 @@
       tabBtn.addEventListener("click", function (e) {
         if (e.target.closest(".date-tab-close")) {
           removeRowsByDate(date);
-        } else {
-          state.activeDateTab = date;
-          saveDateTabState();
-          Pick.refreshAll();
+          return;
         }
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd+클릭: 이 날짜를 다중선택에 토글(있으면 빼고, 없으면 더함)
+          var idx = state.activeDateTabs.indexOf(date);
+          state.activeDateTabs = idx !== -1
+            ? state.activeDateTabs.slice(0, idx).concat(state.activeDateTabs.slice(idx + 1))
+            : state.activeDateTabs.concat([date]);
+        } else {
+          // 일반 클릭: 기존과 동일하게 이 날짜 하나만 선택
+          state.activeDateTabs = [date];
+        }
+        saveDateTabState();
+        Pick.refreshAll();
       });
       els.dateTabsContainer.appendChild(tabBtn);
     });
@@ -1219,7 +1248,7 @@
     var count = state.rows.filter(function (r) { return getCreatedDate(r) === date; }).length;
     if (!(await window.confirmModal("생성일자 '" + date + "' 데이터 " + count + "건을 모두 삭제할까요?"))) return;
     state.rows = state.rows.filter(function (r) { return getCreatedDate(r) !== date; });
-    if (state.activeDateTab === date) state.activeDateTab = null;
+    state.activeDateTabs = state.activeDateTabs.filter(function (d) { return d !== date; });
     saveToStorage();
     saveDateTabState();
     Pick.refreshAll();

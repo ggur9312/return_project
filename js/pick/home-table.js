@@ -45,7 +45,7 @@
     els.tableBody.innerHTML = rows.map(function (r) {
       var marked = homeMarkedIds.has(r.id);
       return (
-        '<tr class="home-table-row select-none hover:bg-slate-50/80 transition-colors' + (marked ? " bg-indigo-50" : "") + '" data-row-id="' + escapeHtml(r.id) + '">' +
+        '<tr class="home-table-row hover:bg-slate-50/80 transition-colors' + (marked ? " bg-indigo-50" : "") + '" data-row-id="' + escapeHtml(r.id) + '">' +
         COLUMNS.map(function (col) {
           if (col.key === "status") {
             var cls = state.statusBadgeMap[r.status] || "";
@@ -146,6 +146,20 @@
       var btn = e.target.closest(".home-row-delete-btn");
       if (!btn) return;
       deleteHomeRow(btn.dataset.rowId);
+    });
+
+    // 행 드래그 다중선택(mousedown에서 preventDefault) 때문에 일반 드래그로는 셀
+    // 텍스트를 선택/복사할 수 없다 — 더블클릭한 셀의 텍스트만 Selection API로
+    // 직접 선택해줘서 바로 Ctrl+C로 복사할 수 있는 별도 통로를 제공한다. 기존
+    // mousedown/mousemove/mouseup 드래그 다중선택 로직은 건드리지 않는다.
+    els.tableBody.addEventListener("dblclick", function (e) {
+      var td = e.target.closest("td");
+      if (!td || !els.tableBody.contains(td)) return;
+      var range = document.createRange();
+      range.selectNodeContents(td);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
     });
 
     els.tableBody.addEventListener("mousedown", function (e) {

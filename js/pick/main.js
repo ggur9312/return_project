@@ -170,7 +170,7 @@
     // 활성 날짜 탭/필터가 남아있으면, 초기화 후 다른 날짜의 데이터를 다시
     // 업로드했을 때 예전 날짜/필터 조건에 걸려 화면에 아무 것도 안 보이는
     // 문제가 있었다 — 전체 데이터가 곧바로 보이도록 "전체" 탭+필터 없음으로 되돌린다.
-    state.activeDateTab = null;
+    state.activeDateTabs = [];
     Object.keys(state.filters).forEach(function (key) { state.filters[key] = null; });
     saveDateTabState();
     els.pasteArea.value = "";
