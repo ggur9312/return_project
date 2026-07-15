@@ -163,6 +163,7 @@
     extractDataTable: document.getElementById("extractDataTable"),
     extractTableBody: document.getElementById("extractTableBody"),
     extractEmptyState: document.getElementById("extractEmptyState"),
+    extractSummary: document.getElementById("extractSummary"),
     extractMergeBtn: document.getElementById("extractMergeBtn"),
     assignOpenModalBtn: document.getElementById("assignOpenModalBtn"),
     assignCreateModal: document.getElementById("assignCreateModal"),

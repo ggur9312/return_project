@@ -28,7 +28,13 @@
     return set;
   }
 
+  function updateExtractSummary(rows) {
+    var totalQty = rows.reduce(function (sum, r) { return sum + Number(r.quantity || 0); }, 0);
+    els.extractSummary.textContent = rows.length ? rows.length + "건 · 총 " + totalQty.toLocaleString("ko-KR") + "개" : "";
+  }
+
   function renderExtractTable(rows) {
+    updateExtractSummary(rows);
     if (!rows.length) {
       els.extractDataTable.classList.add("hidden");
       els.extractEmptyState.classList.remove("hidden");
