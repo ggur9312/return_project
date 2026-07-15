@@ -1544,6 +1544,7 @@ function escapeTruckCyclePrintText(text) {
 }
 
 const CYCLE_PRINT_ALIGN_H_TO_JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' };
+const CYCLE_PRINT_ALIGN_H_TO_TEXT_ALIGN = { left: 'left', center: 'center', right: 'right' };
 const CYCLE_PRINT_ALIGN_V_TO_ITEMS = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
 let truckCyclePrintInProgress = false;
 
@@ -1582,10 +1583,15 @@ function executeTruckCyclePrint() {
     // 고정돼야 해서, 여백값으로 계산한 calc() 크기를 그대로 인라인으로 준다.
     const printArea = document.getElementById('truckPrintArea');
     const justifyContent = CYCLE_PRINT_ALIGN_H_TO_JUSTIFY[settings.alignH] || 'center';
+    const textAlign = CYCLE_PRINT_ALIGN_H_TO_TEXT_ALIGN[settings.alignH] || 'center';
     const alignItems = CYCLE_PRINT_ALIGN_V_TO_ITEMS[settings.alignV] || 'center';
     const contentHeight = `calc(210mm - ${settings.marginTop}mm - ${settings.marginBottom}mm)`;
     const contentWidth = `calc(297mm - ${settings.marginLeft}mm - ${settings.marginRight}mm)`;
-    printArea.innerHTML = `<div class="truck-cycle-print-content" style="justify-content:${justifyContent};align-items:${alignItems};font-size:${settings.fontSize}pt;font-weight:${settings.fontBold ? 'bold' : 'normal'};height:${contentHeight};width:${contentWidth};">${escapeTruckCyclePrintText(text)}</div>`;
+    // justify-content는 여러 줄 텍스트 블록 "전체"의 위치만 잡아줄 뿐, 그
+    // 블록 안에서 줄바꿈된 개별 줄이 어떻게 정렬되는지는 text-align이
+    // 결정한다 — 이걸 빠뜨리면 블록은 가운데에 있어도 짧은 줄이 블록의
+    // 왼쪽 끝에 붙어버린다.
+    printArea.innerHTML = `<div class="truck-cycle-print-content" style="justify-content:${justifyContent};align-items:${alignItems};text-align:${textAlign};font-size:${settings.fontSize}pt;font-weight:${settings.fontBold ? 'bold' : 'normal'};height:${contentHeight};width:${contentWidth};">${escapeTruckCyclePrintText(text)}</div>`;
     printArea.style.page = 'truck-cycle-note';
 
     closeCyclePrintModal();
