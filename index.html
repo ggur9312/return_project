@@ -146,6 +146,10 @@
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-4-4 4 4 0 004 4z"/></svg>
       <span>집품 할당</span>
     </button>
+    <button id="navExtractBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4 4 4-4m-4-12v16M20 8l-4-4-4 4m4-4v16"/></svg>
+      <span>집품리스트 추출</span>
+    </button>
   </aside>
 
   <div class="flex-1 min-w-0">
@@ -316,6 +320,45 @@
     </div>
 
     <div id="assignTableContainer"></div>
+  </div>
+
+  <div id="extractView" class="hidden space-y-6">
+    <div id="extractDropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
+      <h2 class="text-sm font-semibold text-slate-900 mb-1">집품리스트 추출용 엑셀 업로드</h2>
+      <p class="text-xs text-slate-500 mb-3">시트1: 집품리스트(그룹번호~수량, 상태="집품대기"인 행) · 시트2: A~N열 원본 데이터(N열="집품대기"인 행의 H열 업체명과 시트1 업체명을 대조)</p>
+      <input type="file" id="extractFileInput" accept=".xlsx,.xls" hidden>
+      <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="extractFileSelectBtn">파일 선택</button>
+      <span id="extractFileName" class="ml-3 text-xs text-slate-500"></span>
+    </div>
+
+    <div id="extractStatusMsg" class="text-xs text-slate-500"></div>
+
+    <div class="flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-slate-900">추출 결과 미리보기</h2>
+      <button id="extractMergeBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" disabled>홈에 병합</button>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div id="extractEmptyState" class="p-10 text-center text-sm text-slate-400">추출된 데이터가 없습니다. 엑셀 파일을 업로드해주세요.</div>
+      <div class="overflow-x-auto">
+        <table id="extractDataTable" class="hidden w-full border-collapse text-left text-xs min-w-[1050px]">
+          <thead>
+            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">
+              <th class="px-4 py-3 whitespace-nowrap">그룹번호</th>
+              <th class="px-4 py-3 whitespace-nowrap">마감일시</th>
+              <th class="px-4 py-3 whitespace-nowrap">생성일시</th>
+              <th class="px-4 py-3 whitespace-nowrap">매입유형</th>
+              <th class="px-4 py-3 whitespace-nowrap">업체명</th>
+              <th class="px-4 py-3 whitespace-nowrap">상태</th>
+              <th class="px-4 py-3 whitespace-nowrap">운송타입</th>
+              <th class="px-4 py-3 whitespace-nowrap">존</th>
+              <th class="px-4 py-3 whitespace-nowrap">수량</th>
+            </tr>
+          </thead>
+          <tbody id="extractTableBody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   </div>
@@ -892,6 +935,7 @@
 <script src="js/pick/gt-print.js"></script>
 <script src="js/pick/assign-panel.js"></script>
 <script src="js/pick/home-table.js"></script>
+<script src="js/pick/extract.js"></script>
 <script src="js/pick/main.js"></script>
 </body>
 </html>

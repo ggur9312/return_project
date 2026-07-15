@@ -151,9 +151,19 @@
     sortZoneOPriorityBtn: document.getElementById("sortZoneOPriorityBtn"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
+    navExtractBtn: document.getElementById("navExtractBtn"),
     mainNavAside: document.getElementById("mainNavAside"),
     homeView: document.getElementById("homeView"),
     assignView: document.getElementById("assignView"),
+    extractView: document.getElementById("extractView"),
+    extractFileInput: document.getElementById("extractFileInput"),
+    extractFileSelectBtn: document.getElementById("extractFileSelectBtn"),
+    extractFileName: document.getElementById("extractFileName"),
+    extractStatusMsg: document.getElementById("extractStatusMsg"),
+    extractDataTable: document.getElementById("extractDataTable"),
+    extractTableBody: document.getElementById("extractTableBody"),
+    extractEmptyState: document.getElementById("extractEmptyState"),
+    extractMergeBtn: document.getElementById("extractMergeBtn"),
     assignOpenModalBtn: document.getElementById("assignOpenModalBtn"),
     assignCreateModal: document.getElementById("assignCreateModal"),
     assignCreateModalBox: document.getElementById("assignCreateModalBox"),
@@ -1243,10 +1253,13 @@
     if (view !== "home") Pick.clearHomeSelection();
     els.homeView.classList.toggle("hidden", view !== "home");
     els.assignView.classList.toggle("hidden", view !== "assign");
+    els.extractView.classList.toggle("hidden", view !== "extract");
     if (view === "home") els.homeView.classList.add("animate-fadeIn");
     if (view === "assign") els.assignView.classList.add("animate-fadeIn");
+    if (view === "extract") els.extractView.classList.add("animate-fadeIn");
     els.navHomeBtn.className = view === "home" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     els.navAssignBtn.className = view === "assign" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
+    els.navExtractBtn.className = view === "extract" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     // Pick.refreshAll()은 숨겨진 화면의 렌더링을 건너뛰므로, 방금 보이게 된 화면이
     // 숨겨져 있는 동안 놓쳤을 수 있는 갱신을 따라잡도록 전환 직후 한 번 그려준다.
     Pick.refreshAll();
