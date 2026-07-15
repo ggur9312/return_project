@@ -79,7 +79,10 @@
     .p-label-barcode { flex: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 3mm; }
 
     /* --- 트럭주기 커스텀 텍스트 출력(주기출력) --- */
-    .truck-cycle-print-content { width: 100%; height: 100%; display: flex; white-space: pre-wrap; word-break: break-word; }
+    /* width/height는 여백에 맞춰 executeTruckCyclePrint()가 인라인으로
+       calc() 지정 — 가로/세로 정렬(justify-content/align-items)이 부모의
+       height:100% 연쇄에 기대지 않고 항상 정확히 동작하도록 하기 위함. */
+    .truck-cycle-print-content { display: flex; white-space: pre-wrap; word-break: break-word; }
   }
 </style>
 <style id="gtLabelPageStyleOverride"></style>
@@ -646,7 +649,7 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                             <span>출력</span>
                         </button>
-                        <button onclick="openCyclePrintModal()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                        <button onclick="openCyclePrintModal()" class="shrink-0 ml-auto inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                             <span>주기출력</span>
                         </button>
@@ -821,9 +824,6 @@
     </div>
 
     <div id="truckPrintArea" class="hidden print:block">
-    </div>
-
-    <div id="truckCyclePrintArea" class="hidden print:block">
     </div>
 
 </div>

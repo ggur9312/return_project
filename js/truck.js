@@ -828,6 +828,9 @@ function executePrint() {
     }
 
     const printArea = document.getElementById('truckPrintArea');
+    // 주기출력이 #truckPrintArea에 남겨뒀을 수 있는 named page 지정을 정리
+    // (그쪽은 인쇄 완료 후 스스로 되돌리지만, 방어적으로 한 번 더 초기화).
+    printArea.style.page = '';
 
     // Common header (한 번만 출력): 유의사항 + 상차제한
     let html = '';
@@ -1365,6 +1368,8 @@ function executeCyclePrint() {
     }
 
     const printArea = document.getElementById('truckPrintArea');
+    // 주기출력이 남겨뒀을 수 있는 named page 지정을 정리(방어적 초기화).
+    printArea.style.page = '';
 
     // CT 소모/행 초기화는 인쇄창이 닫힌 뒤 자체 확인모달에서 실제 출력을
     // 확인받은 다음에만 반영한다(취소해도 CT가 이미 소모돼버리던 버그 수정) —
@@ -1472,10 +1477,15 @@ function saveCyclePrintSettings(settings) {
 // <style> 요소에 @page 규칙을 동적으로 주입해 인쇄 여백을 반영한다. 다만 이
 // 기능은 5cm×4cm 고정 라벨이 아니라 A4 페이지 전체가 대상이라, "여백만큼
 // 페이지를 키우는" 계산 없이 표준 @page margin을 그대로 쓰면 된다.
+// #truckPrintArea에 이 named page를 매길지는(정적 CSS가 아니라) 인쇄 직전
+// executeTruckCyclePrint()가 인라인 style.page로 직접 지정한다 — 별도
+// div를 새로 만들면 기존 #truckPrintArea(항상 page:truck-a4 고정)와 이름이
+// 다른 페이지가 DOM에서 바로 이웃하게 되어, 그 사이에서 강제 페이지 나눔이
+// 발생해 첫 페이지가 빈 종이로 나오는 문제가 있었다.
 function applyTruckCyclePrintPageStyle(top, right, bottom, left) {
     if (!truckCyclePrintPageStyleOverride) return;
     truckCyclePrintPageStyleOverride.textContent =
-        `@media print { @page truck-cycle-note { size: A4 landscape; margin: ${top}mm ${right}mm ${bottom}mm ${left}mm; } #truckCyclePrintArea { page: truck-cycle-note; } }`;
+        `@media print { @page truck-cycle-note { size: A4 landscape; margin: ${top}mm ${right}mm ${bottom}mm ${left}mm; } }`;
 }
 
 function setCyclePrintAlignActive(groupSelector, attr, value) {
@@ -1535,6 +1545,7 @@ function escapeTruckCyclePrintText(text) {
 
 const CYCLE_PRINT_ALIGN_H_TO_JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' };
 const CYCLE_PRINT_ALIGN_V_TO_ITEMS = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+let truckCyclePrintInProgress = false;
 
 function executeTruckCyclePrint() {
     const text = document.getElementById('cyclePrintTextInput').value;
@@ -1542,6 +1553,7 @@ function executeTruckCyclePrint() {
         showToast('출력할 내용을 입력해주세요.', 'error');
         return;
     }
+    if (truckCyclePrintInProgress) return;
 
     const settings = {
         marginTop: parseFloat(document.getElementById('cyclePrintMarginTopInput').value),
@@ -1562,15 +1574,43 @@ function executeTruckCyclePrint() {
     saveCyclePrintSettings(settings);
     applyTruckCyclePrintPageStyle(settings.marginTop, settings.marginRight, settings.marginBottom, settings.marginLeft);
 
-    const printArea = document.getElementById('truckCyclePrintArea');
+    // 기존 출력(executeCyclePrint)/트럭 홈 출력(executePrint)과 #truckPrintArea를
+    // 공유하므로, 이번 인쇄에만 쓸 named page를 인라인 style로 지정한다(정적
+    // CSS로 고정하면 서로 다른 이름의 페이지가 이웃해 빈 페이지가 끼는 문제가
+    // 있었다). 세로/가로 정렬이 실제로 동작하려면 컨텐츠 박스 높이가 부모의
+    // height:100% 연쇄에 의존하지 않고 A4 인쇄 영역(여백 제외) 크기로 직접
+    // 고정돼야 해서, 여백값으로 계산한 calc() 크기를 그대로 인라인으로 준다.
+    const printArea = document.getElementById('truckPrintArea');
     const justifyContent = CYCLE_PRINT_ALIGN_H_TO_JUSTIFY[settings.alignH] || 'center';
     const alignItems = CYCLE_PRINT_ALIGN_V_TO_ITEMS[settings.alignV] || 'center';
-    printArea.innerHTML = `<div class="truck-cycle-print-content" style="justify-content:${justifyContent};align-items:${alignItems};font-size:${settings.fontSize}pt;font-weight:${settings.fontBold ? 'bold' : 'normal'};">${escapeTruckCyclePrintText(text)}</div>`;
+    const contentHeight = `calc(210mm - ${settings.marginTop}mm - ${settings.marginBottom}mm)`;
+    const contentWidth = `calc(297mm - ${settings.marginLeft}mm - ${settings.marginRight}mm)`;
+    printArea.innerHTML = `<div class="truck-cycle-print-content" style="justify-content:${justifyContent};align-items:${alignItems};font-size:${settings.fontSize}pt;font-weight:${settings.fontBold ? 'bold' : 'normal'};height:${contentHeight};width:${contentWidth};">${escapeTruckCyclePrintText(text)}</div>`;
+    printArea.style.page = 'truck-cycle-note';
 
     closeCyclePrintModal();
-    setTimeout(() => {
-        window.printWithConfirm();
-    }, 300);
+
+    // 이 기능은 출력 후 되돌려야 할 상태(GT 소모 등)가 없으므로, 다른 인쇄
+    // 경로와 달리 "출력을 완료하셨나요?" 확인 없이 바로 인쇄한다(요청사항).
+    // printInProgress 가드만 로컬로 둬 더블클릭으로 인쇄 대화상자가 중복
+    // 뜨는 것만 막는다.
+    truckCyclePrintInProgress = true;
+    let settled = false;
+    function finishTruckCyclePrint() {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('afterprint', finishTruckCyclePrint);
+        truckCyclePrintInProgress = false;
+        printArea.style.page = '';
+    }
+    window.addEventListener('afterprint', finishTruckCyclePrint);
+    setTimeout(finishTruckCyclePrint, 20000);
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            window.print();
+        });
+    });
 }
 
 /* ================================================================
