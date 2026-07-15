@@ -1418,6 +1418,162 @@ function executeCyclePrint() {
 }
 
 /* ================================================================
+   SECTION 20B: 주기출력 (자유 텍스트 A4 가로 출력, 여백/글씨크기/굵기/정렬 설정)
+   ================================================================ */
+const TRUCK_CYCLE_PRINT_MARGIN_TOP_KEY = 'truckDashboardCyclePrintMarginTop';
+const TRUCK_CYCLE_PRINT_MARGIN_RIGHT_KEY = 'truckDashboardCyclePrintMarginRight';
+const TRUCK_CYCLE_PRINT_MARGIN_BOTTOM_KEY = 'truckDashboardCyclePrintMarginBottom';
+const TRUCK_CYCLE_PRINT_MARGIN_LEFT_KEY = 'truckDashboardCyclePrintMarginLeft';
+const TRUCK_CYCLE_PRINT_FONT_SIZE_KEY = 'truckDashboardCyclePrintFontSize';
+const TRUCK_CYCLE_PRINT_FONT_BOLD_KEY = 'truckDashboardCyclePrintFontBold';
+const TRUCK_CYCLE_PRINT_ALIGN_H_KEY = 'truckDashboardCyclePrintAlignH';
+const TRUCK_CYCLE_PRINT_ALIGN_V_KEY = 'truckDashboardCyclePrintAlignV';
+// 기본값: 여백은 기존 truck-a4 페이지(15mm)와 동일 감각, 글씨 크기/굵기는
+// 트럭주기 라벨의 업체명 서식(.p-label-company: 64pt bold)을 그대로 따른다.
+const TRUCK_CYCLE_PRINT_DEFAULTS = { margin: 15, fontSize: 64, fontBold: true, alignH: 'center', alignV: 'middle' };
+
+const cyclePrintModal = document.getElementById('cyclePrintModal');
+const cyclePrintModalBox = document.getElementById('cyclePrintModalBox');
+const truckCyclePrintPageStyleOverride = document.getElementById('truckCyclePrintPageStyleOverride');
+
+function loadCyclePrintSettings() {
+    const marginTop = parseFloat(localStorage.getItem(TRUCK_CYCLE_PRINT_MARGIN_TOP_KEY));
+    const marginRight = parseFloat(localStorage.getItem(TRUCK_CYCLE_PRINT_MARGIN_RIGHT_KEY));
+    const marginBottom = parseFloat(localStorage.getItem(TRUCK_CYCLE_PRINT_MARGIN_BOTTOM_KEY));
+    const marginLeft = parseFloat(localStorage.getItem(TRUCK_CYCLE_PRINT_MARGIN_LEFT_KEY));
+    const fontSize = parseFloat(localStorage.getItem(TRUCK_CYCLE_PRINT_FONT_SIZE_KEY));
+    const fontBoldRaw = localStorage.getItem(TRUCK_CYCLE_PRINT_FONT_BOLD_KEY);
+    const alignH = localStorage.getItem(TRUCK_CYCLE_PRINT_ALIGN_H_KEY);
+    const alignV = localStorage.getItem(TRUCK_CYCLE_PRINT_ALIGN_V_KEY);
+    return {
+        marginTop: isNaN(marginTop) ? TRUCK_CYCLE_PRINT_DEFAULTS.margin : marginTop,
+        marginRight: isNaN(marginRight) ? TRUCK_CYCLE_PRINT_DEFAULTS.margin : marginRight,
+        marginBottom: isNaN(marginBottom) ? TRUCK_CYCLE_PRINT_DEFAULTS.margin : marginBottom,
+        marginLeft: isNaN(marginLeft) ? TRUCK_CYCLE_PRINT_DEFAULTS.margin : marginLeft,
+        fontSize: isNaN(fontSize) ? TRUCK_CYCLE_PRINT_DEFAULTS.fontSize : fontSize,
+        fontBold: fontBoldRaw === null ? TRUCK_CYCLE_PRINT_DEFAULTS.fontBold : fontBoldRaw === '1',
+        alignH: alignH || TRUCK_CYCLE_PRINT_DEFAULTS.alignH,
+        alignV: alignV || TRUCK_CYCLE_PRINT_DEFAULTS.alignV
+    };
+}
+
+function saveCyclePrintSettings(settings) {
+    localStorage.setItem(TRUCK_CYCLE_PRINT_MARGIN_TOP_KEY, String(settings.marginTop));
+    localStorage.setItem(TRUCK_CYCLE_PRINT_MARGIN_RIGHT_KEY, String(settings.marginRight));
+    localStorage.setItem(TRUCK_CYCLE_PRINT_MARGIN_BOTTOM_KEY, String(settings.marginBottom));
+    localStorage.setItem(TRUCK_CYCLE_PRINT_MARGIN_LEFT_KEY, String(settings.marginLeft));
+    localStorage.setItem(TRUCK_CYCLE_PRINT_FONT_SIZE_KEY, String(settings.fontSize));
+    localStorage.setItem(TRUCK_CYCLE_PRINT_FONT_BOLD_KEY, settings.fontBold ? '1' : '0');
+    localStorage.setItem(TRUCK_CYCLE_PRINT_ALIGN_H_KEY, settings.alignH);
+    localStorage.setItem(TRUCK_CYCLE_PRINT_ALIGN_V_KEY, settings.alignV);
+}
+
+// GT 라벨 출력의 applyGtLabelPageStyle(js/pick/gt-print.js)과 동일한 방식 —
+// <style> 요소에 @page 규칙을 동적으로 주입해 인쇄 여백을 반영한다. 다만 이
+// 기능은 5cm×4cm 고정 라벨이 아니라 A4 페이지 전체가 대상이라, "여백만큼
+// 페이지를 키우는" 계산 없이 표준 @page margin을 그대로 쓰면 된다.
+function applyTruckCyclePrintPageStyle(top, right, bottom, left) {
+    if (!truckCyclePrintPageStyleOverride) return;
+    truckCyclePrintPageStyleOverride.textContent =
+        `@media print { @page truck-cycle-note { size: A4 landscape; margin: ${top}mm ${right}mm ${bottom}mm ${left}mm; } #truckCyclePrintArea { page: truck-cycle-note; } }`;
+}
+
+function setCyclePrintAlignActive(groupSelector, attr, value) {
+    document.querySelectorAll(groupSelector).forEach(btn => {
+        const active = btn.dataset[attr] === value;
+        btn.classList.toggle('bg-indigo-600', active);
+        btn.classList.toggle('text-white', active);
+        btn.classList.toggle('border-indigo-600', active);
+        btn.classList.toggle('bg-white', !active);
+        btn.classList.toggle('text-slate-700', !active);
+        btn.classList.toggle('border-slate-200', !active);
+        btn.classList.toggle('hover:bg-slate-50', !active);
+    });
+}
+
+document.querySelectorAll('.cycle-print-align-h-btn').forEach(btn => {
+    btn.addEventListener('click', () => setCyclePrintAlignActive('.cycle-print-align-h-btn', 'alignH', btn.dataset.alignH));
+});
+document.querySelectorAll('.cycle-print-align-v-btn').forEach(btn => {
+    btn.addEventListener('click', () => setCyclePrintAlignActive('.cycle-print-align-v-btn', 'alignV', btn.dataset.alignV));
+});
+
+function openCyclePrintModal() {
+    const settings = loadCyclePrintSettings();
+    document.getElementById('cyclePrintTextInput').value = '';
+    document.getElementById('cyclePrintMarginTopInput').value = settings.marginTop;
+    document.getElementById('cyclePrintMarginRightInput').value = settings.marginRight;
+    document.getElementById('cyclePrintMarginBottomInput').value = settings.marginBottom;
+    document.getElementById('cyclePrintMarginLeftInput').value = settings.marginLeft;
+    document.getElementById('cyclePrintFontSizeInput').value = settings.fontSize;
+    document.getElementById('cyclePrintFontBoldCheckbox').checked = settings.fontBold;
+    setCyclePrintAlignActive('.cycle-print-align-h-btn', 'alignH', settings.alignH);
+    setCyclePrintAlignActive('.cycle-print-align-v-btn', 'alignV', settings.alignV);
+
+    cyclePrintModal.classList.remove('hidden');
+    cyclePrintModal.classList.add('flex');
+    setTimeout(() => {
+        cyclePrintModal.classList.remove('opacity-0');
+        cyclePrintModalBox.classList.remove('scale-95');
+    }, 10);
+}
+
+function closeCyclePrintModal() {
+    cyclePrintModal.classList.add('opacity-0');
+    cyclePrintModalBox.classList.add('scale-95');
+    setTimeout(() => {
+        cyclePrintModal.classList.remove('flex');
+        cyclePrintModal.classList.add('hidden');
+    }, 200);
+}
+
+function escapeTruckCyclePrintText(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+const CYCLE_PRINT_ALIGN_H_TO_JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' };
+const CYCLE_PRINT_ALIGN_V_TO_ITEMS = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+
+function executeTruckCyclePrint() {
+    const text = document.getElementById('cyclePrintTextInput').value;
+    if (!text.trim()) {
+        showToast('출력할 내용을 입력해주세요.', 'error');
+        return;
+    }
+
+    const settings = {
+        marginTop: parseFloat(document.getElementById('cyclePrintMarginTopInput').value),
+        marginRight: parseFloat(document.getElementById('cyclePrintMarginRightInput').value),
+        marginBottom: parseFloat(document.getElementById('cyclePrintMarginBottomInput').value),
+        marginLeft: parseFloat(document.getElementById('cyclePrintMarginLeftInput').value),
+        fontSize: parseFloat(document.getElementById('cyclePrintFontSizeInput').value),
+        fontBold: document.getElementById('cyclePrintFontBoldCheckbox').checked,
+        alignH: document.querySelector('.cycle-print-align-h-btn.bg-indigo-600')?.dataset.alignH || TRUCK_CYCLE_PRINT_DEFAULTS.alignH,
+        alignV: document.querySelector('.cycle-print-align-v-btn.bg-indigo-600')?.dataset.alignV || TRUCK_CYCLE_PRINT_DEFAULTS.alignV
+    };
+    if (isNaN(settings.marginTop)) settings.marginTop = TRUCK_CYCLE_PRINT_DEFAULTS.margin;
+    if (isNaN(settings.marginRight)) settings.marginRight = TRUCK_CYCLE_PRINT_DEFAULTS.margin;
+    if (isNaN(settings.marginBottom)) settings.marginBottom = TRUCK_CYCLE_PRINT_DEFAULTS.margin;
+    if (isNaN(settings.marginLeft)) settings.marginLeft = TRUCK_CYCLE_PRINT_DEFAULTS.margin;
+    if (isNaN(settings.fontSize) || settings.fontSize <= 0) settings.fontSize = TRUCK_CYCLE_PRINT_DEFAULTS.fontSize;
+
+    saveCyclePrintSettings(settings);
+    applyTruckCyclePrintPageStyle(settings.marginTop, settings.marginRight, settings.marginBottom, settings.marginLeft);
+
+    const printArea = document.getElementById('truckCyclePrintArea');
+    const justifyContent = CYCLE_PRINT_ALIGN_H_TO_JUSTIFY[settings.alignH] || 'center';
+    const alignItems = CYCLE_PRINT_ALIGN_V_TO_ITEMS[settings.alignV] || 'center';
+    printArea.innerHTML = `<div class="truck-cycle-print-content" style="justify-content:${justifyContent};align-items:${alignItems};font-size:${settings.fontSize}pt;font-weight:${settings.fontBold ? 'bold' : 'normal'};">${escapeTruckCyclePrintText(text)}</div>`;
+
+    closeCyclePrintModal();
+    setTimeout(() => {
+        window.printWithConfirm();
+    }, 300);
+}
+
+/* ================================================================
    SECTION 21: LOCAL STORAGE PERSISTENCE (새로고침/재접속 시 데이터 유지)
    ================================================================ */
 const STORAGE_KEY = 'truckDashboardState_v1';
@@ -1461,3 +1617,9 @@ function loadState() {
 // but call it unconditionally too in case there was no home data to restore)
 loadState();
 renderCycleDateTabs();
+
+// 주기출력 여백 설정도 새로고침 후 바로 반영되도록 초기화 시점에 한 번 적용
+(function () {
+    const settings = loadCyclePrintSettings();
+    applyTruckCyclePrintPageStyle(settings.marginTop, settings.marginRight, settings.marginBottom, settings.marginLeft);
+})();

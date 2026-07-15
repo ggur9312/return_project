@@ -77,9 +77,13 @@
     .p-label-company { flex: 1.2; display: flex; align-items: flex-start; justify-content: center; padding-top: 3mm; font-size: 64pt; font-weight: bold; word-break: break-all; white-space: pre-wrap; }
     .p-label-seq { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 68pt; font-weight: bold; }
     .p-label-barcode { flex: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 3mm; }
+
+    /* --- 트럭주기 커스텀 텍스트 출력(주기출력) --- */
+    .truck-cycle-print-content { width: 100%; height: 100%; display: flex; white-space: pre-wrap; word-break: break-word; }
   }
 </style>
 <style id="gtLabelPageStyleOverride"></style>
+<style id="truckCyclePrintPageStyleOverride"></style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 
@@ -642,6 +646,10 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                             <span>출력</span>
                         </button>
+                        <button onclick="openCyclePrintModal()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                            <span>주기출력</span>
+                        </button>
                     </div>
                 </div>
 
@@ -746,7 +754,76 @@
         </div>
     </div>
 
+    <div id="cyclePrintModal" class="print:hidden fixed inset-0 bg-slate-900/60 z-[100] hidden items-center justify-center opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-200" id="cyclePrintModalBox">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="text-lg font-bold text-slate-800">주기출력</h3>
+                <button onclick="closeCyclePrintModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">출력 내용</label>
+                    <textarea id="cyclePrintTextInput" rows="4" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="입력한 내용이 그대로 인쇄됩니다."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">여백(mm)</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="flex flex-col gap-1 text-sm text-slate-600">위쪽
+                            <input type="number" id="cyclePrintMarginTopInput" min="0" step="0.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </label>
+                        <label class="flex flex-col gap-1 text-sm text-slate-600">오른쪽
+                            <input type="number" id="cyclePrintMarginRightInput" min="0" step="0.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </label>
+                        <label class="flex flex-col gap-1 text-sm text-slate-600">아래쪽
+                            <input type="number" id="cyclePrintMarginBottomInput" min="0" step="0.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </label>
+                        <label class="flex flex-col gap-1 text-sm text-slate-600">왼쪽
+                            <input type="number" id="cyclePrintMarginLeftInput" min="0" step="0.5" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </label>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="flex flex-col gap-1 text-sm text-slate-600">글씨 크기(pt)
+                        <input type="number" id="cyclePrintFontSizeInput" min="1" step="1" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-slate-600 mt-6">
+                        <input type="checkbox" id="cyclePrintFontBoldCheckbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                        굵게
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">가로 정렬</label>
+                    <div id="cyclePrintAlignHGroup" class="flex gap-2">
+                        <button type="button" data-align-h="left" class="cycle-print-align-h-btn flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-3 py-1.5 rounded-lg transition-colors">왼쪽</button>
+                        <button type="button" data-align-h="center" class="cycle-print-align-h-btn flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-3 py-1.5 rounded-lg transition-colors">가운데</button>
+                        <button type="button" data-align-h="right" class="cycle-print-align-h-btn flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-3 py-1.5 rounded-lg transition-colors">오른쪽</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">세로 정렬</label>
+                    <div id="cyclePrintAlignVGroup" class="flex gap-2">
+                        <button type="button" data-align-v="top" class="cycle-print-align-v-btn flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-3 py-1.5 rounded-lg transition-colors">위</button>
+                        <button type="button" data-align-v="middle" class="cycle-print-align-v-btn flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-3 py-1.5 rounded-lg transition-colors">가운데</button>
+                        <button type="button" data-align-v="bottom" class="cycle-print-align-v-btn flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-3 py-1.5 rounded-lg transition-colors">아래</button>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end space-x-2">
+                <button onclick="closeCyclePrintModal()" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">취소</button>
+                <button onclick="executeTruckCyclePrint()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 flex items-center space-x-1.5 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    <span>출력</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="truckPrintArea" class="hidden print:block">
+    </div>
+
+    <div id="truckCyclePrintArea" class="hidden print:block">
     </div>
 
 </div>
