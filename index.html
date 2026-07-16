@@ -137,9 +137,13 @@
 <div class="print:hidden max-w-[1600px] mx-auto flex gap-6 px-8 py-8">
 
   <aside id="mainNavAside" class="w-48 shrink-0 space-y-2 sticky top-28 self-start">
-    <button id="navHomeBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100">
+    <button id="navDashboardBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
       <span>홈</span>
+    </button>
+    <button id="navHomeBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <span>집품리스트 현황</span>
     </button>
     <button id="navAssignBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-4-4 4 4 0 004 4z"/></svg>
@@ -153,7 +157,116 @@
 
   <div class="flex-1 min-w-0">
 
-  <div id="homeView">
+  <div id="dashboardView" class="space-y-6">
+
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h1 class="text-xl font-bold text-slate-900 tracking-tight">홈 대시보드</h1>
+        <p class="text-xs text-slate-500 mt-0.5">집품·상차 진행 현황을 한눈에 확인하세요.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div id="dashboardActiveFileInfo" class="hidden text-sm bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 font-medium max-w-xs truncate flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>데이터 로드됨</span>
+        </div>
+        <button id="dashboardUploadBtn" type="button" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+          <span>엑셀 업로드</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="dashboardEmptyState" class="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+      <div class="max-w-md mx-auto flex flex-col items-center">
+        <div class="text-slate-300 mb-4">
+          <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+        </div>
+        <h3 class="text-lg font-medium text-slate-900">대시보드 데이터가 없습니다</h3>
+        <p class="text-sm text-slate-500 mt-2">우측 상단의 "엑셀 업로드" 버튼으로 집품·상차 현황 데이터를 등록하세요.</p>
+      </div>
+    </div>
+
+    <div id="dashboardContent" class="hidden space-y-6">
+
+      <div class="border-b border-slate-200 pb-1">
+        <div id="dashboardDateTabsContainer" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div class="p-3 bg-amber-50 rounded-xl text-amber-600 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 font-medium">집품대기</p>
+            <p id="dashboardCardPendingValue" class="text-2xl font-bold text-slate-900 tabular-nums">0</p>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div class="p-3 bg-sky-50 rounded-xl text-sky-600 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 font-medium">집품중</p>
+            <p id="dashboardCardPickingValue" class="text-2xl font-bold text-slate-900 tabular-nums">0</p>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div class="p-3 bg-indigo-50 rounded-xl text-indigo-600 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 font-medium">남은 집품 수량</p>
+            <p id="dashboardCardRemainingValue" class="text-2xl font-bold text-slate-900 tabular-nums">0</p>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+          <div class="p-3 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 font-medium">상차완료·반출완료</p>
+            <p id="dashboardCardShippedValue" class="text-2xl font-bold text-slate-900 tabular-nums">0</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h3 class="text-sm font-semibold text-slate-900 mb-4">집품 현황</h3>
+          <div class="relative h-64">
+            <canvas id="dashboardPickChart"></canvas>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <p class="text-xs text-slate-500">남은 집품 수량</p>
+              <p id="dashboardPickRemainingLabel" class="text-xl font-bold text-slate-900 tabular-nums">0</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h3 class="text-sm font-semibold text-slate-900 mb-4">상차 현황</h3>
+          <div class="relative h-64">
+            <canvas id="dashboardLoadChart"></canvas>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <p class="text-xs text-slate-500">남은 상차 수량</p>
+              <p id="dashboardLoadRemainingLabel" class="text-xl font-bold text-slate-900 tabular-nums">0</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <h3 class="text-sm font-semibold text-slate-900 mb-4">존별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품리스트 현황 데이터 기준)</span></h3>
+      <div id="dashboardZoneEmptyState" class="p-10 text-center text-sm text-slate-400">집품리스트 현황에 데이터를 등록하면 존별 수량이 표시됩니다.</div>
+      <div id="dashboardZoneChartWrap" class="hidden h-72">
+        <canvas id="dashboardZoneChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="homeView" class="hidden">
 
   <div class="space-y-3">
     <div id="uploadCard" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -925,6 +1038,26 @@
     </div>
 </div>
 
+<div id="dashboardUploadModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
+  <div id="dashboardUploadModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-lg transform scale-95 transition-transform duration-200">
+    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
+      <h3 class="text-sm font-semibold text-slate-900">대시보드 데이터 업로드</h3>
+      <button id="dashboardUploadCloseBtn" type="button" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <p class="text-xs text-slate-500">A~N열 원본 데이터 엑셀 파일을 업로드하세요. (D열: 생성일시, N열: 상태값, J/K/L열: 수량)</p>
+      <div class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200 text-center">
+        <input type="file" id="dashboardFileInput" accept=".xlsx,.xls" hidden>
+        <button type="button" id="dashboardFileSelectBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">파일 선택</button>
+        <p id="dashboardFileName" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+      <div id="dashboardUploadStatusMsg" class="text-xs text-slate-500"></div>
+    </div>
+  </div>
+</div>
+
 <div id="uiConfirmModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-[300] items-center justify-center p-4 opacity-0 transition-opacity duration-200">
   <div id="uiConfirmModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 transform scale-95 transition-transform duration-200">
     <p id="uiConfirmModalMsg" class="text-sm text-slate-700 whitespace-pre-wrap"></p>
@@ -936,6 +1069,7 @@
 </div>
 
 <script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/vendor/chart.umd.js"></script>
 <script src="js/truck.js"></script>
 <script src="js/shell.js"></script>
 <!-- 집품 현황 화면 로직 — 예전엔 js/app.js 하나(약 3800줄)였다가 여러 파일로 분할됨.
@@ -950,6 +1084,7 @@
 <script src="js/pick/assign-panel.js"></script>
 <script src="js/pick/home-table.js"></script>
 <script src="js/pick/extract.js"></script>
+<script src="js/pick/dashboard.js"></script>
 <script src="js/pick/main.js"></script>
 </body>
 </html>

@@ -59,6 +59,11 @@
   var handleExtractFile = Pick.handleExtractFile;
   var mergeExtractedIntoHome = Pick.mergeExtractedIntoHome;
   var resetExtractPreview = Pick.resetExtractPreview;
+  var loadDashboardState = Pick.loadDashboardState;
+  var renderDashboard = Pick.renderDashboard;
+  var handleDashboardFile = Pick.handleDashboardFile;
+  var openDashboardUploadModal = Pick.openDashboardUploadModal;
+  var closeDashboardUploadModal = Pick.closeDashboardUploadModal;
   var applyGtLabelPageStyle = Pick.applyGtLabelPageStyle;
   var cancelSparePrintModal = Pick.cancelSparePrintModal;
   var closeCustomLabelCompanyDropdown = Pick.closeCustomLabelCompanyDropdown;
@@ -111,6 +116,9 @@
     if (!els.assignView.classList.contains("hidden")) {
       renderAssignPanel();
     }
+    if (!els.dashboardView.classList.contains("hidden")) {
+      renderDashboard();
+    }
   }
 
   // 선택한 행들을 단일 작업자짜리 커스텀 할당 config로 바로 생성 — 홈 선택바의
@@ -136,6 +144,13 @@
   }
 
   // --- Event wiring ---
+
+  els.dashboardUploadBtn.addEventListener("click", openDashboardUploadModal);
+  els.dashboardUploadCloseBtn.addEventListener("click", closeDashboardUploadModal);
+  els.dashboardFileSelectBtn.addEventListener("click", function () { els.dashboardFileInput.click(); });
+  els.dashboardFileInput.addEventListener("change", function (e) {
+    handleDashboardFile(e.target.files[0]);
+  });
 
   els.fileSelectBtn.addEventListener("click", function () { els.fileInput.click(); });
   els.fileInput.addEventListener("change", function (e) {
@@ -222,6 +237,7 @@
     debouncedRenderFloorPanel();
   });
 
+  els.navDashboardBtn.addEventListener("click", function () { switchView("dashboard"); });
   els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
   els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
   els.navExtractBtn.addEventListener("click", function () { switchView("extract"); });
@@ -464,6 +480,7 @@
   loadFromStorage();
   loadSortRules();
   loadDateTabState();
+  loadDashboardState();
   loadAssignState();
   loadGtState();
   (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom, margin.left, margin.top); })();
@@ -471,6 +488,10 @@
   applyCardCollapsed(loadUploadCollapsed(), els.uploadToggleLabel, els.uploadToggleIcon, els.uploadCardBody, null);
   applyCardCollapsed(loadFilterSortCollapsed(), els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
   els.laborInput.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
+  // switchView()는 내부에서 Pick.refreshAll()을 호출하는데, 그 export(아래)는
+  // 초기화 시퀀스보다 뒤에 실행되므로 init 중에는 switchView를 호출하지 않고
+  // (기존 관례) 로컬 refreshAll()을 직접 호출한다 — 기본 진입 화면은
+  // index.html의 정적 hidden 클래스(dashboardView 노출·homeView 숨김)로 결정.
   refreshAll();
   renderAssignTabs();
   renderGtAvailableList();

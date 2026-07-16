@@ -150,13 +150,38 @@
     sortAddBtn: document.getElementById("sortAddBtn"),
     sortResetBtn: document.getElementById("sortResetBtn"),
     sortZoneOPriorityBtn: document.getElementById("sortZoneOPriorityBtn"),
+    navDashboardBtn: document.getElementById("navDashboardBtn"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
     navExtractBtn: document.getElementById("navExtractBtn"),
     mainNavAside: document.getElementById("mainNavAside"),
+    dashboardView: document.getElementById("dashboardView"),
     homeView: document.getElementById("homeView"),
     assignView: document.getElementById("assignView"),
     extractView: document.getElementById("extractView"),
+    dashboardActiveFileInfo: document.getElementById("dashboardActiveFileInfo"),
+    dashboardUploadBtn: document.getElementById("dashboardUploadBtn"),
+    dashboardUploadModal: document.getElementById("dashboardUploadModal"),
+    dashboardUploadModalBox: document.getElementById("dashboardUploadModalBox"),
+    dashboardUploadCloseBtn: document.getElementById("dashboardUploadCloseBtn"),
+    dashboardFileInput: document.getElementById("dashboardFileInput"),
+    dashboardFileSelectBtn: document.getElementById("dashboardFileSelectBtn"),
+    dashboardFileName: document.getElementById("dashboardFileName"),
+    dashboardUploadStatusMsg: document.getElementById("dashboardUploadStatusMsg"),
+    dashboardEmptyState: document.getElementById("dashboardEmptyState"),
+    dashboardContent: document.getElementById("dashboardContent"),
+    dashboardDateTabsContainer: document.getElementById("dashboardDateTabsContainer"),
+    dashboardCardPendingValue: document.getElementById("dashboardCardPendingValue"),
+    dashboardCardPickingValue: document.getElementById("dashboardCardPickingValue"),
+    dashboardCardRemainingValue: document.getElementById("dashboardCardRemainingValue"),
+    dashboardCardShippedValue: document.getElementById("dashboardCardShippedValue"),
+    dashboardPickChart: document.getElementById("dashboardPickChart"),
+    dashboardPickRemainingLabel: document.getElementById("dashboardPickRemainingLabel"),
+    dashboardLoadChart: document.getElementById("dashboardLoadChart"),
+    dashboardLoadRemainingLabel: document.getElementById("dashboardLoadRemainingLabel"),
+    dashboardZoneEmptyState: document.getElementById("dashboardZoneEmptyState"),
+    dashboardZoneChartWrap: document.getElementById("dashboardZoneChartWrap"),
+    dashboardZoneChart: document.getElementById("dashboardZoneChart"),
     extractFileInput: document.getElementById("extractFileInput"),
     extractFileSelectBtn: document.getElementById("extractFileSelectBtn"),
     extractFileName: document.getElementById("extractFileName"),
@@ -1254,12 +1279,15 @@
     // 화면으로 이동할 때는 항상 명시적으로 해제한다(Pick.refreshAll()의 암묵적
     // 초기화는 홈이 보일 때만 실행되어 이 경우를 놓친다).
     if (view !== "home") Pick.clearHomeSelection();
+    els.dashboardView.classList.toggle("hidden", view !== "dashboard");
     els.homeView.classList.toggle("hidden", view !== "home");
     els.assignView.classList.toggle("hidden", view !== "assign");
     els.extractView.classList.toggle("hidden", view !== "extract");
+    if (view === "dashboard") els.dashboardView.classList.add("animate-fadeIn");
     if (view === "home") els.homeView.classList.add("animate-fadeIn");
     if (view === "assign") els.assignView.classList.add("animate-fadeIn");
     if (view === "extract") els.extractView.classList.add("animate-fadeIn");
+    els.navDashboardBtn.className = view === "dashboard" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     els.navHomeBtn.className = view === "home" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     els.navAssignBtn.className = view === "assign" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     els.navExtractBtn.className = view === "extract" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;

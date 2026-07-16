@@ -151,6 +151,44 @@ groupNo+생성일자+company+zone) and then switches to the home view.
 file name, status message) — it does not touch `state.rows`/localStorage,
 so it fires instantly with no `confirmModal` gate (unlike home's `#resetBtn`).
 
+### 홈 대시보드 (`#dashboardView`, `js/pick/dashboard.js`) — now the default landing view
+
+Sidebar order is now 홈(dashboard, default)/집품리스트 현황(old home,
+`#homeView`, same id/logic, just relabeled)/집품 할당/집품리스트 추출.
+The dashboard has its **own independent dataset** (`dashboardRows`,
+localStorage key `pickListDashboardData`) uploaded via `#dashboardUploadBtn`
+→ opens `#dashboardUploadModal` → `#dashboardFileSelectBtn` triggers
+`#dashboardFileInput` (single-sheet `.xlsx`, no paste alternative). The
+sheet is read **positionally** (no header-label matching, unlike home's
+`matrixToRows`): column D (index 3) = 생성일시, N (index 13) = 상태값,
+J/K/L (index 9/10/11) = quantity at each of 3 stages (total/picked/loaded).
+Row 1 is assumed to be a header row and skipped. To seed a test file with
+Playwright, build a 14-column-wide `aoa_to_sheet` matrix the same way as
+extract.js's test fixtures above, filling only indices 3/9/10/11/13 per row
+(other columns can stay empty strings).
+
+Once uploaded, `#dashboardContent` shows 4 KPI cards
+(`#dashboardCardPendingValue`/`PickingValue`/`RemainingValue`/`ShippedValue`)
+and two Chart.js `doughnut` canvases (`#dashboardPickChart`/`#dashboardLoadChart`,
+center-overlay labels `#dashboardPickRemainingLabel`/`#dashboardLoadRemainingLabel`).
+For assertions on exact chart data (not just the DOM label text), Chart.js
+exposes `Chart.getChart(canvasElement)` — e.g.
+`page.evaluate(() => Chart.getChart(document.getElementById('dashboardPickChart')).data.datasets[0].data)`
+returns `[remaining, completed]` directly, far more reliable than reading
+pixels. A date-tab bar above the cards (`#dashboardDateTabsContainer`,
+same single/Ctrl-click multi-select pattern as home's date tabs but a
+fully separate implementation scoped to `dashboardRows`) filters the cards
++ donuts only.
+
+**The bottom zone bar-chart card (`#dashboardZoneChart`) is the one place
+on this screen that reads the *other*, unrelated dataset** —
+it aggregates `state.rows` (집품리스트 현황 data, which already has a 존
+column) by exact zone string, not `dashboardRows`, and is unaffected by
+the dashboard's own date-tab selection. It renders (and its empty state
+`#dashboardZoneEmptyState` toggles) purely based on whether 집품리스트
+현황 has any rows at all, independent of whether a dashboard excel has
+ever been uploaded.
+
 ## Gotchas learned
 
 - If Node is available, `node --input-type=commonjs --check < js/pick/core.js`
