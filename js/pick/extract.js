@@ -124,7 +124,17 @@
     switchView("home");
   }
 
+  function resetExtractPreview() {
+    extractedRows = [];
+    els.extractFileInput.value = "";
+    els.extractFileName.textContent = "";
+    setExtractStatusMsg("", "");
+    renderExtractTable(extractedRows);
+    updateExtractMergeBtnState();
+  }
+
   // --- exposed to other js/pick/*.js files via window.Pick ---
   Pick.handleExtractFile = handleExtractFile;
   Pick.mergeExtractedIntoHome = mergeExtractedIntoHome;
+  Pick.resetExtractPreview = resetExtractPreview;
 })(window.Pick = window.Pick || {});

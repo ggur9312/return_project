@@ -147,6 +147,9 @@ rows only land in `#extractTableBody` (a simple read-only preview, no
 filter/sort) until `#extractMergeBtn` is clicked, which calls the same
 `applyParsedRows` home upload uses (dedupes against `state.rows` by
 groupNo+생성일자+company+zone) and then switches to the home view.
+`#extractResetBtn` clears the in-memory preview only (`extractedRows`,
+file name, status message) — it does not touch `state.rows`/localStorage,
+so it fires instantly with no `confirmModal` gate (unlike home's `#resetBtn`).
 
 ## Gotchas learned
 
