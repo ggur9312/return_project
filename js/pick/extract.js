@@ -8,6 +8,7 @@
   var matrixToRows = Pick.matrixToRows;
   var applyParsedRows = Pick.applyParsedRows;
   var switchView = Pick.switchView;
+  var formatDateOnly = Pick.formatDateOnly;
 
   // 확정 전까지는 state.rows에 반영하지 않는 임시 추출 결과 — "홈에 병합" 버튼을
   // 눌러야만 applyParsedRows()를 통해 실제로 합쳐진다.
@@ -51,6 +52,9 @@
         COLUMNS.map(function (col) {
           if (col.key === "quantity") {
             return '<td class="' + tdBase + ' text-right tabular-nums">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
+          }
+          if (col.key === "deadline" || col.key === "createdAt") {
+            return '<td class="' + tdBase + '">' + escapeHtml(formatDateOnly(r[col.key])) + "</td>";
           }
           return '<td class="' + tdBase + '">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
