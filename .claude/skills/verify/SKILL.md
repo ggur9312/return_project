@@ -132,6 +132,22 @@ Clicking the button directly while the panel is collapsed times out
   the "작업자" virtual filter — see `getAssignPanelCandidateValues` in
   `js/pick/assign-panel.js` if a test needs exact candidate-list behavior.
 
+### 집품리스트 추출 screen (`#extractView`, `js/pick/extract.js`)
+
+Only takes a real `.xlsx` file upload (`#extractFileInput`, no paste-text
+alternative) — a 2-sheet workbook: sheet1 in the exact home-upload format
+(headers must match `COLUMNS`), sheet2 a positional A-N layout with no
+header matching (H=index7 company, N=index13 status). To seed a test file
+with Playwright/Node, build it with SheetJS (`xlsx` npm package or the
+vendor build): `XLSX.utils.aoa_to_sheet([[...header], [...row], ...])` per
+sheet, `XLSX.utils.book_append_sheet(wb, ws, name)` for both sheets, then
+`XLSX.write(wb, {type:"buffer", bookType:"xlsx"})` written to a temp file
+and uploaded via `page.setInputFiles("#extractFileInput", path)`. Extracted
+rows only land in `#extractTableBody` (a simple read-only preview, no
+filter/sort) until `#extractMergeBtn` is clicked, which calls the same
+`applyParsedRows` home upload uses (dedupes against `state.rows` by
+groupNo+생성일자+company+zone) and then switches to the home view.
+
 ## Gotchas learned
 
 - If Node is available, `node --input-type=commonjs --check < js/pick/core.js`

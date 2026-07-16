@@ -56,6 +56,8 @@
   var getCreatedDate = Pick.getCreatedDate;
   var nextCustomAssignSeq = Pick.nextCustomAssignSeq;
   var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
+  var handleExtractFile = Pick.handleExtractFile;
+  var mergeExtractedIntoHome = Pick.mergeExtractedIntoHome;
   var applyGtLabelPageStyle = Pick.applyGtLabelPageStyle;
   var cancelSparePrintModal = Pick.cancelSparePrintModal;
   var closeCustomLabelCompanyDropdown = Pick.closeCustomLabelCompanyDropdown;
@@ -138,6 +140,12 @@
     handleFile(e.target.files[0]);
   });
 
+  els.extractFileSelectBtn.addEventListener("click", function () { els.extractFileInput.click(); });
+  els.extractFileInput.addEventListener("change", function (e) {
+    handleExtractFile(e.target.files[0]);
+  });
+  els.extractMergeBtn.addEventListener("click", mergeExtractedIntoHome);
+
   ["dragenter", "dragover"].forEach(function (evt) {
     els.dropZone.addEventListener(evt, function (e) {
       e.preventDefault();
@@ -213,6 +221,7 @@
 
   els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
   els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
+  els.navExtractBtn.addEventListener("click", function () { switchView("extract"); });
   els.assignOpenModalBtn.addEventListener("click", openAssignCreateModal);
   els.assignPreviewBtn.addEventListener("click", async function () {
     if (hasActiveFilter()) {
