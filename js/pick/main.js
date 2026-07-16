@@ -58,6 +58,7 @@
   var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
   var handleExtractFile = Pick.handleExtractFile;
   var mergeExtractedIntoHome = Pick.mergeExtractedIntoHome;
+  var resetExtractPreview = Pick.resetExtractPreview;
   var applyGtLabelPageStyle = Pick.applyGtLabelPageStyle;
   var cancelSparePrintModal = Pick.cancelSparePrintModal;
   var closeCustomLabelCompanyDropdown = Pick.closeCustomLabelCompanyDropdown;
@@ -87,6 +88,7 @@
     // 로드됨" 배지를 표시 — 화면 전환과 무관하게 항상 최신 상태를 반영해야 하므로
     // 아래 화면별 분기와 달리 무조건 실행한다.
     els.pickActiveFileInfo.classList.toggle("hidden", state.rows.length === 0);
+    els.pickDataStatusCard.classList.toggle("hidden", state.rows.length === 0);
     // 보이지 않는 화면까지 매번 통째로 다시 그리는 낭비를 막기 위해, 현재
     // 화면(hidden 클래스 여부)에 맞는 렌더링만 실행 — switchView()가 두
     // 화면의 hidden 클래스만 토글하므로 그 상태를 그대로 기준으로 삼는다.
@@ -145,6 +147,7 @@
     handleExtractFile(e.target.files[0]);
   });
   els.extractMergeBtn.addEventListener("click", mergeExtractedIntoHome);
+  els.extractResetBtn.addEventListener("click", resetExtractPreview);
 
   ["dragenter", "dragover"].forEach(function (evt) {
     els.dropZone.addEventListener(evt, function (e) {
