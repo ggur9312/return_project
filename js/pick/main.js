@@ -116,7 +116,7 @@
     if (!els.assignView.classList.contains("hidden")) {
       renderAssignPanel();
     }
-    if (!els.dashboardView.classList.contains("hidden")) {
+    if (!els.dashboardApp.classList.contains("hidden")) {
       renderDashboard();
     }
   }
@@ -242,7 +242,6 @@
     debouncedRenderFloorPanel();
   });
 
-  els.navDashboardBtn.addEventListener("click", function () { switchView("dashboard"); });
   els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
   els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
   els.navExtractBtn.addEventListener("click", function () { switchView("extract"); });
@@ -495,7 +494,8 @@
   // switchView()는 내부에서 Pick.refreshAll()을 호출하는데, 그 export(아래)는
   // 초기화 시퀀스보다 뒤에 실행되므로 init 중에는 switchView를 호출하지 않고
   // (기존 관례) 로컬 refreshAll()을 직접 호출한다 — 기본 진입 화면은
-  // index.html의 정적 hidden 클래스(dashboardView 노출·homeView 숨김)로 결정.
+  // index.html의 정적 hidden 클래스(dashboardApp 노출·pickApp 숨김, 집품현황
+  // 진입 시엔 그 안의 homeView가 기본 노출)로 결정.
   refreshAll();
   renderAssignTabs();
   renderGtAvailableList();
