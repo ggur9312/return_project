@@ -67,8 +67,10 @@
   "use strict";
 
   var STORAGE_KEY = "activeAppView";
+  var dashboardApp = document.getElementById("dashboardApp");
   var pickApp = document.getElementById("pickApp");
   var truckApp = document.getElementById("truckApp");
+  var dashboardBtn = document.getElementById("switchToDashboardBtn");
   var pickBtn = document.getElementById("switchToPickBtn");
   var truckBtn = document.getElementById("switchToTruckBtn");
   var BASE = "px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ";
@@ -76,20 +78,26 @@
   var INACTIVE = "bg-indigo-500/40 text-white hover:bg-indigo-500/60";
 
   function apply(view) {
-    var toTruck = view === "truck";
-    truckApp.classList.toggle("hidden", !toTruck);
-    pickApp.classList.toggle("hidden", toTruck);
-    truckBtn.className = BASE + (toTruck ? ACTIVE : INACTIVE);
-    pickBtn.className = BASE + (toTruck ? INACTIVE : ACTIVE);
+    dashboardApp.classList.toggle("hidden", view !== "dashboard");
+    pickApp.classList.toggle("hidden", view !== "pick");
+    truckApp.classList.toggle("hidden", view !== "truck");
+    dashboardBtn.className = BASE + (view === "dashboard" ? ACTIVE : INACTIVE);
+    pickBtn.className = BASE + (view === "pick" ? ACTIVE : INACTIVE);
+    truckBtn.className = BASE + (view === "truck" ? ACTIVE : INACTIVE);
     try { localStorage.setItem(STORAGE_KEY, view); } catch (e) {}
+    // 대시보드의 존/층 막대그래프는 집품현황의 state.rows를 사용하는데, 대시보드가
+    // 숨겨진 동안은 refreshAll()이 렌더를 건너뛰므로 돌아올 때 다시 그려 따라잡는다.
+    // window.Pick이 아직 없는 최초 parse-time apply() 호출에는 안전하게 무시된다.
+    if (view === "dashboard" && window.Pick && window.Pick.refreshAll) window.Pick.refreshAll();
   }
 
+  dashboardBtn.addEventListener("click", function () { window.flashPageLoading && window.flashPageLoading(); apply("dashboard"); });
   pickBtn.addEventListener("click", function () { window.flashPageLoading && window.flashPageLoading(); apply("pick"); });
   truckBtn.addEventListener("click", function () { window.flashPageLoading && window.flashPageLoading(); apply("truck"); });
 
   var saved = null;
   try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) {}
-  apply(saved === "truck" ? "truck" : "pick");
+  apply(saved === "truck" ? "truck" : saved === "pick" ? "pick" : "dashboard");
 })();
 
 // 두 앱(집품현황/트럭현황) 공용 확인·알림 모달 — 네이티브 confirm()/alert() 대체.

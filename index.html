@@ -93,7 +93,8 @@
 <header id="appSwitcherBar" class="print:hidden bg-indigo-600 sticky top-0 z-50 shadow-sm">
   <div class="max-w-[1600px] mx-auto px-8 h-12 flex items-center justify-between gap-2">
     <div class="flex items-center gap-2">
-      <button id="switchToPickBtn" type="button" class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors bg-white text-indigo-700 shadow-sm">집품 현황</button>
+      <button id="switchToDashboardBtn" type="button" class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors bg-white text-indigo-700 shadow-sm">대시보드</button>
+      <button id="switchToPickBtn" type="button" class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors bg-indigo-500/40 text-white hover:bg-indigo-500/60">집품 현황</button>
       <button id="switchToTruckBtn" type="button" class="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors bg-indigo-500/40 text-white hover:bg-indigo-500/60">트럭 현황</button>
     </div>
     <button id="calcOpenBtn" type="button" class="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white font-medium text-sm px-4 py-1.5 rounded-full transition-colors">
@@ -112,45 +113,8 @@
   </svg>
 </div>
 
-<div id="pickApp">
-
-<header class="print:hidden bg-white border-b border-slate-200 sticky top-12 z-40 shadow-sm">
-  <div class="max-w-[1600px] mx-auto px-8 h-16 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-md shadow-indigo-100">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-      </div>
-      <div>
-        <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품 현황</h1>
-        <p class="text-xs text-slate-500 font-medium">엑셀 업로드·붙여넣기 기반 집품 데이터 관리</p>
-      </div>
-    </div>
-  </div>
-</header>
-
-<div class="print:hidden max-w-[1600px] mx-auto flex gap-6 px-8 py-8">
-
-  <aside id="mainNavAside" class="w-48 shrink-0 space-y-2 sticky top-28 self-start">
-    <button id="navDashboardBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-      <span>홈</span>
-    </button>
-    <button id="navHomeBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-      <span>집품리스트 현황</span>
-    </button>
-    <button id="navAssignBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-4-4 4 4 0 004 4z"/></svg>
-      <span>집품 할당</span>
-    </button>
-    <button id="navExtractBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4 4 4-4m-4-12v16M20 8l-4-4-4 4m4-4v16"/></svg>
-      <span>집품리스트 추출</span>
-    </button>
-  </aside>
-
-  <div class="flex-1 min-w-0">
-
+<div id="dashboardApp">
+  <div class="print:hidden max-w-[1600px] mx-auto px-8 py-8">
   <div id="dashboardView" class="space-y-6">
 
     <div class="flex items-center justify-between flex-wrap gap-3">
@@ -323,8 +287,46 @@
     </div>
 
   </div>
+  </div>
+</div>
 
-  <div id="homeView" class="hidden">
+<div id="pickApp" class="hidden">
+
+<header class="print:hidden bg-white border-b border-slate-200 sticky top-12 z-40 shadow-sm">
+  <div class="max-w-[1600px] mx-auto px-8 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-md shadow-indigo-100">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품 현황</h1>
+        <p class="text-xs text-slate-500 font-medium">엑셀 업로드·붙여넣기 기반 집품 데이터 관리</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="print:hidden max-w-[1600px] mx-auto flex gap-6 px-8 py-8">
+
+  <aside id="mainNavAside" class="w-48 shrink-0 space-y-2 sticky top-28 self-start">
+    <button id="navHomeBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <span>집품리스트 현황</span>
+    </button>
+    <button id="navAssignBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-4-4 4 4 0 004 4z"/></svg>
+      <span>집품 할당</span>
+    </button>
+    <button id="navExtractBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4 4 4-4m-4-12v16M20 8l-4-4-4 4m4-4v16"/></svg>
+      <span>집품리스트 추출</span>
+    </button>
+  </aside>
+
+  <div class="flex-1 min-w-0">
+
+
+  <div id="homeView">
 
   <div class="space-y-3">
     <div class="flex items-center justify-between flex-wrap gap-3">
@@ -704,7 +706,7 @@
         <aside class="w-48 shrink-0 space-y-2 sticky top-28 self-start">
             <button id="truckNavHomeBtn" onclick="truckSwitchView('home')" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center space-x-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                <span>홈</span>
+                <span>트럭리스트 현황</span>
             </button>
             <button id="navCycleBtn" onclick="truckSwitchView('cycle')" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center space-x-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -718,7 +720,7 @@
 
         <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
-                <h2 class="text-lg font-bold text-slate-900">트럭현황 홈</h2>
+                <h2 class="text-lg font-bold text-slate-900">트럭리스트 현황</h2>
                 <p class="text-xs text-slate-500 mt-0.5">트럭 운송 데이터를 업로드하고 날짜별로 관리합니다.</p>
             </div>
             <div class="flex items-center gap-2">
@@ -802,7 +804,7 @@
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <h3 class="text-lg font-bold text-slate-900">업체별 트럭 주기</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">홈에서 업로드한 생성일시별로 업체를 선택해 주기(수량)를 생성하고, CT 바코드를 매칭합니다.</p>
+                        <p class="text-xs text-slate-500 mt-0.5">트럭리스트 현황에서 업로드한 생성일시별로 업체를 선택해 주기(수량)를 생성하고, CT 바코드를 매칭합니다.</p>
                     </div>
                     <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
                         <button onclick="clearCycleData()" class="shrink-0 inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
