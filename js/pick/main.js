@@ -60,6 +60,7 @@
   var loadDashboardState = Pick.loadDashboardState;
   var renderDashboard = Pick.renderDashboard;
   var handleDashboardFile = Pick.handleDashboardFile;
+  var resetDashboardData = Pick.resetDashboardData;
   var handleDashboardPaste = Pick.handleDashboardPaste;
   var openDashboardUploadModal = Pick.openDashboardUploadModal;
   var closeDashboardUploadModal = Pick.closeDashboardUploadModal;
@@ -144,6 +145,7 @@
 
   // --- Event wiring ---
 
+  els.dashboardResetBtn.addEventListener("click", resetDashboardData);
   els.dashboardUploadBtn.addEventListener("click", openDashboardUploadModal);
   els.dashboardUploadCloseBtn.addEventListener("click", closeDashboardUploadModal);
   els.dashboardFileSelectBtn.addEventListener("click", function () { els.dashboardFileInput.click(); });

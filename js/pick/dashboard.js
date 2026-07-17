@@ -159,6 +159,16 @@
     if (window.showToast) window.showToast("생성일자 '" + date + "' 데이터 " + count + "건이 삭제되었습니다.", "info");
   }
 
+  async function resetDashboardData() {
+    if (!(await window.confirmModal("저장된 반출 대시보드 데이터를 모두 삭제할까요?"))) return;
+    dashboardRows = [];
+    dashboardActiveDateTabs = [];
+    saveDashboardData();
+    saveDashboardDateTabState();
+    renderDashboard();
+    if (window.showToast) window.showToast("반출 대시보드 데이터가 초기화되었습니다.", "info");
+  }
+
   function openDashboardUploadModal() {
     els.dashboardFileInput.value = "";
     els.dashboardFileName.textContent = "";
@@ -329,7 +339,7 @@
   function renderCompanyList(containerEl, countEl, companies) {
     countEl.textContent = companies.length + "개";
     if (!companies.length) {
-      containerEl.innerHTML = '<p class="text-xs text-slate-400 py-2">해당 업체 없음</p>';
+      containerEl.innerHTML = '<div class="h-24 flex items-center justify-center"><p class="text-xs text-slate-400">해당 업체 없음</p></div>';
       return;
     }
     containerEl.innerHTML = companies.map(function (name) {
@@ -386,6 +396,7 @@
   Pick.loadDashboardState = loadDashboardState;
   Pick.renderDashboard = renderDashboard;
   Pick.handleDashboardFile = handleDashboardFile;
+  Pick.resetDashboardData = resetDashboardData;
   Pick.handleDashboardPaste = handleDashboardPaste;
   Pick.openDashboardUploadModal = openDashboardUploadModal;
   Pick.closeDashboardUploadModal = closeDashboardUploadModal;

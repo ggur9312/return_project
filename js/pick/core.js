@@ -158,6 +158,7 @@
     assignView: document.getElementById("assignView"),
     extractView: document.getElementById("extractView"),
     dashboardActiveFileInfo: document.getElementById("dashboardActiveFileInfo"),
+    dashboardResetBtn: document.getElementById("dashboardResetBtn"),
     dashboardUploadBtn: document.getElementById("dashboardUploadBtn"),
     dashboardUploadModal: document.getElementById("dashboardUploadModal"),
     dashboardUploadModalBox: document.getElementById("dashboardUploadModalBox"),

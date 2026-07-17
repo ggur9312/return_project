@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A static, no-build, no-framework warehouse operations dashboard ("집품·트럭 현황 데이터 관리") for a single site (`index.html`) with two independent screens sharing one page: **집품 현황** (picking allocation) and **트럭 현황** (truck/CT cycle management). There is no server, no bundler, no package manager (no `package.json`), no test suite. Data lives entirely in the browser via `localStorage`; there is no backend API.
+A static, no-build, no-framework warehouse operations dashboard ("집품·트럭 현황 대시보드") for a single site (`index.html`) with two independent screens sharing one page: **집품 현황** (picking allocation) and **트럭 현황** (truck/CT cycle management). There is no server, no bundler, no package manager (no `package.json`), no test suite. Data lives entirely in the browser via `localStorage`; there is no backend API.
 
 ## Running it
 

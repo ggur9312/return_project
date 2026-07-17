@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>집품·트럭 현황 데이터 관리</title>
+<title>집품·트럭 현황 대시보드</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%234f46e5'/%3E%3Cpath d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%234f46e5'/%3E%3Cpath d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -163,6 +163,10 @@
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span>데이터 로드됨</span>
         </div>
+        <button id="dashboardResetBtn" class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          <span>초기화</span>
+        </button>
         <button id="dashboardUploadBtn" type="button" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           <span>엑셀 업로드</span>
@@ -913,8 +917,8 @@
 
                 <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                     <h2 class="text-sm font-semibold text-slate-900 mb-1">직접 붙여넣기</h2>
-                    <p class="text-xs text-slate-500 mb-3">엑셀에서 머리글 포함 영역을 복사해 붙여넣으세요</p>
-                    <textarea id="truckPasteArea" rows="4" class="w-full resize-y bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="그룹번호&#9;생성일시&#9;업체명&#9;운송타입"></textarea>
+                    <p class="text-xs text-slate-500 mb-3">엑셀에서 머리글 포함 A~I열 영역을 복사해 붙여넣으세요</p>
+                    <textarea id="truckPasteArea" rows="4" class="w-full resize-y bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                     <button type="button" id="truckPasteApplyBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">붙여넣기 적용</button>
                 </div>
             </div>
