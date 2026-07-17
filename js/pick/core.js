@@ -172,6 +172,7 @@
     dashboardEmptyState: document.getElementById("dashboardEmptyState"),
     dashboardContent: document.getElementById("dashboardContent"),
     dashboardDateTabsContainer: document.getElementById("dashboardDateTabsContainer"),
+    dashboardCardAssignWaitingValue: document.getElementById("dashboardCardAssignWaitingValue"),
     dashboardCardPendingValue: document.getElementById("dashboardCardPendingValue"),
     dashboardCardPickingValue: document.getElementById("dashboardCardPickingValue"),
     dashboardCardLoadReadyValue: document.getElementById("dashboardCardLoadReadyValue"),
@@ -191,6 +192,9 @@
     dashboardLoadReadyCompanyCount: document.getElementById("dashboardLoadReadyCompanyCount"),
     dashboardLoadingCompanyList: document.getElementById("dashboardLoadingCompanyList"),
     dashboardLoadingCompanyCount: document.getElementById("dashboardLoadingCompanyCount"),
+    dashboardFloorEmptyState: document.getElementById("dashboardFloorEmptyState"),
+    dashboardFloorChartWrap: document.getElementById("dashboardFloorChartWrap"),
+    dashboardFloorChart: document.getElementById("dashboardFloorChart"),
     dashboardZoneEmptyState: document.getElementById("dashboardZoneEmptyState"),
     dashboardZoneChartWrap: document.getElementById("dashboardZoneChartWrap"),
     dashboardZoneChart: document.getElementById("dashboardZoneChart"),
@@ -1433,6 +1437,7 @@
   Pick.compareValues = compareValues;
   Pick.getSortedRows = getSortedRows;
   Pick.getFloor = getFloor;
+  Pick.getFloorFamily = getFloorFamily;
   Pick.floorSortKey = floorSortKey;
   Pick.sumQty = sumQty;
   Pick.renderFilterQtySummary = renderFilterQtySummary;

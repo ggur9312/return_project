@@ -201,39 +201,45 @@ of that date is gone), which is intentional (avoids stale/duplicate
 tracking without needing a stable per-row key). `#dashboardUploadStatusMsg`
 reports how many dates were refreshed.
 
-Once uploaded, `#dashboardContent` shows **5 KPI cards**
-(`#dashboardCardPendingValue`/`PickingValue`/`LoadReadyValue`/`LoadingValue`/`ShippedValue`
-— 집품대기/집품중/상차준비완료/상차중/상차완료·반출완료; there is no
-"남은 집품 수량" card anymore, that number now only lives in the donut's
-center label) and two Chart.js `doughnut` canvases
+Once uploaded, `#dashboardContent` shows **6 KPI cards**
+(`#dashboardCardAssignWaitingValue`/`PendingValue`/`PickingValue`/`LoadReadyValue`/`LoadingValue`/`ShippedValue`
+— 할당대기/집품대기/집품중/상차준비완료/상차중/상차완료·반출완료; there is
+no "남은 집품 수량" card, that number only lives in the donut's center
+label) and two Chart.js `doughnut` canvases
 (`#dashboardPickChart`/`#dashboardLoadChart`, center-overlay labels
 `#dashboardPickRemainingLabel`/`#dashboardLoadRemainingLabel` plus a
 percentage sub-label `#dashboardPickRemainingPct`/`#dashboardLoadRemainingPct`,
-e.g. "전체 40개 중 88% 남음"). Below the donuts, 4 scrollable "남은 OO 업체"
+e.g. "전체 40개 중 88% 남음"). Below the donuts, 4 scrollable "OO 업체"
 cards (`#dashboardPendingCompanyList`/`PickingCompanyList`/`LoadReadyCompanyList`/`LoadingCompanyList`,
 each `max-h-48 overflow-y-auto`, with a count badge
-`#dashboardPendingCompanyCount` etc.) list deduped H열 company names per
-status, scoped to the current date-tab selection like the KPI cards.
-For assertions on exact chart data (not just the DOM label text), Chart.js
-exposes `Chart.getChart(canvasElement)` — e.g.
+`#dashboardPendingCompanyCount` etc. — titles have no "남은" prefix) list
+deduped H열 company names per status, scoped to the current date-tab
+selection like the KPI cards. For assertions on exact chart data (not just
+the DOM label text), Chart.js exposes `Chart.getChart(canvasElement)` — e.g.
 `page.evaluate(() => Chart.getChart(document.getElementById('dashboardPickChart')).data.datasets[0].data)`
 returns `[remaining, completed]` directly, far more reliable than reading
 pixels. A date-tab bar above the cards (`#dashboardDateTabsContainer`,
 same single/Ctrl-click multi-select pattern as home's date tabs but a
 fully separate implementation scoped to `dashboardRows`) filters the cards
-+ donuts + company lists only (not the zone chart, see below). Each date
-tab also has a `.date-tab-close` "✕" that calls `removeDashboardRowsByDate`
-(same `window.confirmModal` gate as core.js's `removeRowsByDate`) to delete
-that date's rows entirely.
++ donuts + company lists + the zone/floor charts below (see next
+paragraph). Each date tab also has a `.date-tab-close` "✕" that calls
+`removeDashboardRowsByDate` (same `window.confirmModal` gate as core.js's
+`removeRowsByDate`) to delete that date's rows entirely.
 
-**The bottom zone bar-chart card (`#dashboardZoneChart`) is the one place
-on this screen that reads the *other*, unrelated dataset** —
-it aggregates `state.rows` (집품리스트 현황 data, which already has a 존
-column) by exact zone string, not `dashboardRows`, and is unaffected by
-the dashboard's own date-tab selection. It renders (and its empty state
-`#dashboardZoneEmptyState` toggles) purely based on whether 집품리스트
-현황 has any rows at all, independent of whether a dashboard excel has
-ever been uploaded.
+**The bottom floor/zone bar-chart cards (`#dashboardFloorChart`,
+`#dashboardZoneChart`, side by side) are the one place on this screen that
+read the *other*, unrelated dataset** — they aggregate `state.rows`
+(집품리스트 현황 data, which already has a 존 column) by floor-family
+(`getFloor`+`getFloorFamily` from core.js, e.g. zones "72"/"73" both fold
+into a single "7층" bucket) and by exact zone string respectively, not
+`dashboardRows`. Despite reading `state.rows`, both **are** scoped by the
+dashboard's own date-tab selection (`getDateScopedStateRows()` matches each
+집품리스트현황 row's own `createdAt` date string against
+`dashboardActiveDateTabs`) — so switching the dashboard's date tab changes
+what these two charts show even though the underlying dataset is unrelated
+to `dashboardRows`. Each renders (and its empty state
+`#dashboardFloorEmptyState`/`#dashboardZoneEmptyState` toggles) based on
+whether any 집품리스트현황 rows match the current date scope.
 
 ## Gotchas learned
 
