@@ -486,7 +486,7 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
           <span>초기화</span>
         </button>
-        <button id="extractMergeBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" disabled>홈에 병합</button>
+        <button id="extractMergeBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" disabled>집품리스트 병합</button>
       </div>
     </div>
 
@@ -1099,8 +1099,8 @@
           <span class="px-2 py-1 text-xs font-medium rounded-md bg-rose-50 text-rose-700 border border-rose-100">N열: 상태값</span>
         </div>
         <div class="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100 space-y-1">
-          <p>🔄 업로드할 때마다 기존 데이터와 <strong>병합(누적)</strong>됩니다.</p>
-          <p>♻️ <strong>C열(내부반출번호)</strong>이 이미 있는 행은 중복으로 보고 제외합니다.</p>
+          <p>🔄 <strong>생성일시(D열) 날짜 단위</strong>로 갱신됩니다.</p>
+          <p>♻️ 업로드 데이터에 있는 날짜는 기존 데이터를 <strong>새 데이터로 교체</strong>하고, 없는 날짜는 그대로 보존합니다.</p>
         </div>
       </div>
 
