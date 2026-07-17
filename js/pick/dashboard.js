@@ -12,6 +12,8 @@
   var openModalWithTransition = Pick.openModalWithTransition;
   var closeModalWithTransition = Pick.closeModalWithTransition;
   var textToMatrix = Pick.textToMatrix;
+  var getFloor = Pick.getFloor;
+  var getFloorFamily = Pick.getFloorFamily;
 
   // 대시보드 전용 데이터셋 — 집품리스트 현황(state.rows, 9열)과는 완전히 별개.
   // A~N(14열) 원본 엑셀에서 C(내부반출번호)/D(생성일시)/H(업체명)/N(상태값)/J·K·L(수량)만
@@ -195,6 +197,7 @@
   function qtyRemainLoadOf(r) { return r.qtyPicked - r.qtyLoaded; }
 
   function computeDashboardStats(rows) {
+    var assignWaiting = sumByStatus(rows, "할당대기", qtyTotalOf);
     var pending = sumByStatus(rows, "집품대기", qtyTotalOf);
     var picking = sumByStatus(rows, "집품중", qtyTotalOf);
     var pickTotal = sumByStatus(rows, ["집품대기", "집품중"], qtyTotalOf);
@@ -210,6 +213,7 @@
     var loadRemaining = sumByStatus(rows, ["상차준비완료", "상차중"], qtyRemainLoadOf);
 
     return {
+      assignWaiting: assignWaiting,
       pending: pending,
       picking: picking,
       pickTotal: pickTotal,
@@ -243,6 +247,26 @@
       map[zone] = (map[zone] || 0) + Number(r.quantity || 0);
     });
     return Object.keys(map).sort().map(function (zone) { return { zone: zone, qty: map[zone] }; });
+  }
+
+  // 층 코드 앞자리가 같으면 하나로 묶는다 — 예: 72, 73 존 모두 "7층"으로 합산.
+  function computeFloorQuantities(rows) {
+    var map = {};
+    rows.forEach(function (r) {
+      var floor = getFloor(r.zone);
+      var family = getFloorFamily(floor);
+      var label = family ? family + "층" : floor;
+      map[label] = (map[label] || 0) + Number(r.quantity || 0);
+    });
+    return Object.keys(map).sort().map(function (floor) { return { floor: floor, qty: map[floor] }; });
+  }
+
+  // 대시보드 날짜 탭(dashboardActiveDateTabs) 기준으로 집품리스트 현황(state.rows)을
+  // 스코프 — 존별/층별 그래프가 대시보드에서 선택한 생성일시를 따르도록.
+  function getDateScopedStateRows() {
+    if (!dashboardActiveDateTabs.length) return state.rows;
+    var activeSet = new Set(dashboardActiveDateTabs);
+    return state.rows.filter(function (r) { return activeSet.has(getCreatedDate(r)); });
   }
 
   // --- 날짜 탭 (대시보드 전용, 홈의 renderDateTabs와 별개 — dashboardRows 기준) ---
@@ -336,6 +360,29 @@
     });
   }
 
+  var floorChartInstance = null;
+
+  function renderFloorChart(floorData) {
+    if (floorChartInstance) { floorChartInstance.destroy(); floorChartInstance = null; }
+    var hasFloors = floorData.length > 0;
+    els.dashboardFloorEmptyState.classList.toggle("hidden", hasFloors);
+    els.dashboardFloorChartWrap.classList.toggle("hidden", !hasFloors);
+    if (!hasFloors) return;
+    floorChartInstance = new Chart(els.dashboardFloorChart, {
+      type: "bar",
+      data: {
+        labels: floorData.map(function (f) { return f.floor; }),
+        datasets: [{ label: "수량", data: floorData.map(function (f) { return f.qty; }), backgroundColor: "#0891b2", borderRadius: 4, maxBarThickness: 48 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+
   function renderCompanyList(containerEl, countEl, companies) {
     countEl.textContent = companies.length + "개";
     if (!companies.length) {
@@ -372,6 +419,7 @@
       var scoped = getDashboardScopedRows();
       var stats = computeDashboardStats(scoped);
 
+      els.dashboardCardAssignWaitingValue.textContent = stats.assignWaiting.toLocaleString("ko-KR");
       els.dashboardCardPendingValue.textContent = stats.pending.toLocaleString("ko-KR");
       els.dashboardCardPickingValue.textContent = stats.picking.toLocaleString("ko-KR");
       els.dashboardCardLoadReadyValue.textContent = stats.loadReady.toLocaleString("ko-KR");
@@ -389,7 +437,9 @@
       renderDashboardCompanyLists(scoped);
     }
 
-    renderZoneChart(computeZoneQuantities(state.rows));
+    var scopedStateRows = getDateScopedStateRows();
+    renderZoneChart(computeZoneQuantities(scopedStateRows));
+    renderFloorChart(computeFloorQuantities(scopedStateRows));
   }
 
   // --- exposed to other js/pick/*.js files via window.Pick ---
