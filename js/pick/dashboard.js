@@ -14,24 +14,27 @@
   var textToMatrix = Pick.textToMatrix;
 
   // 대시보드 전용 데이터셋 — 집품리스트 현황(state.rows, 9열)과는 완전히 별개.
-  // A~N(14열) 원본 엑셀에서 C(내부반출번호)/D(생성일시)/N(상태값)/J·K·L(수량)만 포지셔널로 읽는다.
-  // 1행은 머리글이라 건너뛴다(extract.js의 시트2 파싱과 동일 컨벤션).
+  // A~N(14열) 원본 엑셀에서 C(내부반출번호)/D(생성일시)/H(업체명)/N(상태값)/J·K·L(수량)만
+  // 포지셔널로 읽는다. 1행은 머리글이라 건너뛴다(extract.js의 시트2 파싱과 동일 컨벤션).
   // J=반출요청수량(그 행의 총 요청량), K=집품완료 수량(누적), L=반출완료 수량(누적) —
   // 집품 단계에서는 J가 전체, K가 진행량(qtyTotal-qtyPicked=남은 집품량), 상차 단계에서는
   // K가 전체(집품이 끝나야 상차가 시작되므로), L이 진행량(qtyPicked-qtyLoaded=남은 상차량).
-  // C(내부반출번호)는 재업로드 시 중복 판정 키로 쓴다 — 업로드는 교체가 아니라 누적 병합.
   var dashboardRows = [];
   var dashboardActiveDateTabs = [];
 
   var DASHBOARD_STORAGE_KEY = "pickListDashboardData";
   var DASHBOARD_DATE_TAB_KEY = "pickListDashboardDateTab";
 
-  // C=내부반출번호, D=생성일시, J=반출요청수량, K=집품완료 수량, L=반출완료 수량, N=상태값
-  var COL = { exportNo: 2, createdAt: 3, qtyTotal: 9, qtyPicked: 10, qtyLoaded: 11, status: 13 };
+  // C=내부반출번호, D=생성일시, H=업체명, J=반출요청수량, K=집품완료 수량, L=반출완료 수량, N=상태값
+  var COL = { exportNo: 2, createdAt: 3, company: 7, qtyTotal: 9, qtyPicked: 10, qtyLoaded: 11, status: 13 };
 
   function toNumber(v) {
     var n = Number(String(v === undefined || v === null ? "" : v).replace(/,/g, "").trim());
     return isNaN(n) ? 0 : n;
+  }
+
+  function cellStr(row, idx) {
+    return (row[idx] === undefined || row[idx] === null ? "" : String(row[idx])).trim();
   }
 
   function parseDashboardMatrix(matrix) {
@@ -39,11 +42,12 @@
     for (var i = 1; i < matrix.length; i++) {
       var row = matrix[i];
       if (!row || !row.length) continue;
-      var status = (row[COL.status] === undefined || row[COL.status] === null ? "" : String(row[COL.status])).trim();
+      var status = cellStr(row, COL.status);
       if (!status) continue;
       rows.push({
-        exportNo: (row[COL.exportNo] === undefined || row[COL.exportNo] === null ? "" : String(row[COL.exportNo])).trim(),
-        createdAt: (row[COL.createdAt] === undefined || row[COL.createdAt] === null ? "" : String(row[COL.createdAt])).trim(),
+        exportNo: cellStr(row, COL.exportNo),
+        createdAt: cellStr(row, COL.createdAt),
+        company: cellStr(row, COL.company),
         status: status,
         qtyTotal: toNumber(row[COL.qtyTotal]),
         qtyPicked: toNumber(row[COL.qtyPicked]),
@@ -53,20 +57,16 @@
     return rows;
   }
 
-  // applyParsedRows(core.js)의 dedup 패턴과 동일 — exportNo(내부반출번호)가 이미 있으면
-  // 건너뛰고 새 행만 합친다. exportNo가 비어있는 행은 식별 불가하므로 항상 추가.
+  // 재업로드는 행 단위 중복제거가 아니라 "생성일자(D열) 단위 갱신" — 새로 올라온
+  // 데이터에 포함된 날짜는 기존 dashboardRows에서 그 날짜분을 통째로 지우고
+  // 새 값으로 교체(해당 날짜가 기존에 없었으면 그냥 추가되는 것과 동일 효과),
+  // 그 외 날짜의 기존 데이터는 그대로 보존한다 — 최신 스냅샷만 남기기 위함.
   function mergeDashboardRows(rows) {
-    var existingKeys = {};
-    dashboardRows.forEach(function (r) { if (r.exportNo) existingKeys[r.exportNo] = true; });
-    var added = [];
-    var skipped = 0;
-    rows.forEach(function (r) {
-      if (r.exportNo && existingKeys[r.exportNo]) { skipped++; return; }
-      if (r.exportNo) existingKeys[r.exportNo] = true;
-      added.push(r);
-    });
-    dashboardRows = dashboardRows.concat(added);
-    return { added: added.length, skipped: skipped };
+    var incomingDates = uniqueValuesFrom(rows, getCreatedDate);
+    var dateSet = new Set(incomingDates);
+    var replacedCount = dashboardRows.filter(function (r) { return dateSet.has(getCreatedDate(r)); }).length;
+    dashboardRows = dashboardRows.filter(function (r) { return !dateSet.has(getCreatedDate(r)); }).concat(rows);
+    return { added: rows.length, dates: incomingDates, replaced: replacedCount };
   }
 
   function loadDashboardState() {
@@ -113,7 +113,8 @@
     saveDashboardData();
     renderDashboard();
     setDashboardUploadStatusMsg(
-      sourceLabel + "에서 " + result.added + "건을 추가했습니다." + (result.skipped ? " (중복 " + result.skipped + "건 제외)" : ""),
+      sourceLabel + "에서 " + result.added + "건을 업로드했습니다. (" + result.dates.length + "개 날짜 갱신" +
+        (result.replaced ? ", 기존 " + result.replaced + "건 교체" : "") + ")",
       "ok"
     );
     closeDashboardUploadModal();
@@ -181,28 +182,47 @@
   function qtyPickedOf(r) { return r.qtyPicked; }
   function qtyLoadedOf(r) { return r.qtyLoaded; }
 
+  function qtyRemainLoadOf(r) { return r.qtyPicked - r.qtyLoaded; }
+
   function computeDashboardStats(rows) {
     var pending = sumByStatus(rows, "집품대기", qtyTotalOf);
     var picking = sumByStatus(rows, "집품중", qtyTotalOf);
     var pickTotal = sumByStatus(rows, ["집품대기", "집품중"], qtyTotalOf);
     var pickRemaining = sumByStatus(rows, ["집품대기", "집품중"], function (r) { return r.qtyTotal - r.qtyPicked; });
+    var loadReady = sumByStatus(rows, "상차준비완료", qtyPickedOf);
+    var loading = sumByStatus(rows, "상차중", qtyRemainLoadOf);
     // 상태값 "반출완료"는 L열(반출완료 수량)과 이름이 정확히 대응 — 상차완료 행도
     // 같은 컬럼(반출까지 진행된 누적량)으로 합산한다.
     var shipped = sumByStatus(rows, ["상차완료", "반출완료"], qtyLoadedOf);
 
     var loadTotal = sumByStatus(rows, ["상차준비완료", "상차중"], qtyPickedOf);
-    var loadRemaining =
-      sumByStatus(rows, "상차준비완료", qtyPickedOf) +
-      sumByStatus(rows, "상차중", function (r) { return r.qtyPicked - r.qtyLoaded; });
+    // 남은 상차 수량 — 상차준비완료/상차중 두 상태 모두 동일하게 (K-L)로 통일.
+    var loadRemaining = sumByStatus(rows, ["상차준비완료", "상차중"], qtyRemainLoadOf);
 
     return {
       pending: pending,
       picking: picking,
       pickTotal: pickTotal,
       pickRemaining: pickRemaining,
+      loadReady: loadReady,
+      loading: loading,
       shipped: shipped,
       loadTotal: loadTotal,
       loadRemaining: loadRemaining
+    };
+  }
+
+  function computeDashboardCompanyLists(rows) {
+    function companiesFor(status) {
+      var set = {};
+      rows.forEach(function (r) { if (r.status === status && r.company) set[r.company] = true; });
+      return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, "ko-KR"); });
+    }
+    return {
+      pending: companiesFor("집품대기"),
+      picking: companiesFor("집품중"),
+      loadReady: companiesFor("상차준비완료"),
+      loading: companiesFor("상차중")
     };
   }
 
@@ -306,6 +326,30 @@
     });
   }
 
+  function renderCompanyList(containerEl, countEl, companies) {
+    countEl.textContent = companies.length + "개";
+    if (!companies.length) {
+      containerEl.innerHTML = '<p class="text-xs text-slate-400 py-2">해당 업체 없음</p>';
+      return;
+    }
+    containerEl.innerHTML = companies.map(function (name) {
+      return '<div class="px-4 py-2 text-xs text-slate-700">' + escapeHtml(name) + "</div>";
+    }).join("");
+  }
+
+  function renderDashboardCompanyLists(rows) {
+    var lists = computeDashboardCompanyLists(rows);
+    renderCompanyList(els.dashboardPendingCompanyList, els.dashboardPendingCompanyCount, lists.pending);
+    renderCompanyList(els.dashboardPickingCompanyList, els.dashboardPickingCompanyCount, lists.picking);
+    renderCompanyList(els.dashboardLoadReadyCompanyList, els.dashboardLoadReadyCompanyCount, lists.loadReady);
+    renderCompanyList(els.dashboardLoadingCompanyList, els.dashboardLoadingCompanyCount, lists.loading);
+  }
+
+  function pct(part, total) {
+    if (total <= 0) return "0%";
+    return Math.round((part / total) * 100) + "%";
+  }
+
   function renderDashboard() {
     var hasData = dashboardRows.length > 0;
     els.dashboardActiveFileInfo.classList.toggle("hidden", !hasData);
@@ -320,14 +364,19 @@
 
       els.dashboardCardPendingValue.textContent = stats.pending.toLocaleString("ko-KR");
       els.dashboardCardPickingValue.textContent = stats.picking.toLocaleString("ko-KR");
-      els.dashboardCardRemainingValue.textContent = stats.pickRemaining.toLocaleString("ko-KR");
+      els.dashboardCardLoadReadyValue.textContent = stats.loadReady.toLocaleString("ko-KR");
+      els.dashboardCardLoadingValue.textContent = stats.loading.toLocaleString("ko-KR");
       els.dashboardCardShippedValue.textContent = stats.shipped.toLocaleString("ko-KR");
 
       els.dashboardPickRemainingLabel.textContent = stats.pickRemaining.toLocaleString("ko-KR");
+      els.dashboardPickRemainingPct.textContent = "전체 " + stats.pickTotal.toLocaleString("ko-KR") + "개 중 " + pct(stats.pickRemaining, stats.pickTotal) + " 남음";
       els.dashboardLoadRemainingLabel.textContent = stats.loadRemaining.toLocaleString("ko-KR");
+      els.dashboardLoadRemainingPct.textContent = "전체 " + stats.loadTotal.toLocaleString("ko-KR") + "개 중 " + pct(stats.loadRemaining, stats.loadTotal) + " 남음";
 
       pickChartInstance = renderDonutChart(pickChartInstance, els.dashboardPickChart, stats.pickRemaining, stats.pickTotal - stats.pickRemaining, "#4f46e5");
       loadChartInstance = renderDonutChart(loadChartInstance, els.dashboardLoadChart, stats.loadRemaining, stats.loadTotal - stats.loadRemaining, "#0891b2");
+
+      renderDashboardCompanyLists(scoped);
     }
 
     renderZoneChart(computeZoneQuantities(state.rows));

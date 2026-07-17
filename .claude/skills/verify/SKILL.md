@@ -58,22 +58,6 @@ closes it) — always prepend the header row. File upload works the same way:
 click `#homeUploadBtn`, then `#fileSelectBtn`/drag onto `#dropZone`/set
 `#fileInput.files` — same ids as before, just relocated into the modal.
 
-### 대시보드 (`#dashboardView`, now "홈" / default landing view)
-
-Independent dataset from 집품리스트 현황 — upload via `#dashboardUploadBtn` →
-`#dashboardUploadModal` (file `#dashboardFileInput`/`#dashboardFileSelectBtn`,
-or paste `#dashboardPasteArea`/`#dashboardPasteApplyBtn`). Upload **merges**,
-it does not replace — dedup key is the C column (내부반출번호/`exportNo`);
-re-uploading a row with the same C value is skipped and reflected in
-`#dashboardUploadStatusMsg` ("N건 추가 (중복 M건 제외)"). Modal auto-closes on
-success only. Date tabs (`#dashboardDateTabsContainer`) support the same
-Ctrl/Cmd+click multi-select as home's date tabs, plus a `.date-tab-close` "✕"
-per date tab that calls `removeDashboardRowsByDate` (same `window.confirmModal`
-gate as core.js's `removeRowsByDate`). For a positional (non-header-matching)
-test fixture, columns are 0-indexed: C=2 (내부반출번호), D=3 (생성일시),
-J=9/K=10/L=11 (수량 3단계), N=13 (상태값) — row 0 is treated as a header and
-skipped regardless of its content.
-
 ### 트럭현황 홈 upload (`js/truck.js`, no `window.Pick`)
 
 Same button→modal pattern: click `#truckUploadBtn` → `#truckUploadModal` opens
@@ -190,26 +174,46 @@ groupNo+생성일자+company+zone) and then switches to the home view.
 file name, status message) — it does not touch `state.rows`/localStorage,
 so it fires instantly with no `confirmModal` gate (unlike home's `#resetBtn`).
 
-### 홈 대시보드 (`#dashboardView`, `js/pick/dashboard.js`) — now the default landing view
+### 반출 대시보드 (`#dashboardView`, `js/pick/dashboard.js`) — now the default landing view
 
-Sidebar order is now 홈(dashboard, default)/집품리스트 현황(old home,
+Sidebar order is now 홈(반출 대시보드, default)/집품리스트 현황(old home,
 `#homeView`, same id/logic, just relabeled)/집품 할당/집품리스트 추출.
 The dashboard has its **own independent dataset** (`dashboardRows`,
 localStorage key `pickListDashboardData`) uploaded via `#dashboardUploadBtn`
 → opens `#dashboardUploadModal` → `#dashboardFileSelectBtn` triggers
-`#dashboardFileInput` (single-sheet `.xlsx`, no paste alternative). The
-sheet is read **positionally** (no header-label matching, unlike home's
-`matrixToRows`): column D (index 3) = 생성일시, N (index 13) = 상태값,
-J/K/L (index 9/10/11) = quantity at each of 3 stages (total/picked/loaded).
-Row 1 is assumed to be a header row and skipped. To seed a test file with
-Playwright, build a 14-column-wide `aoa_to_sheet` matrix the same way as
-extract.js's test fixtures above, filling only indices 3/9/10/11/13 per row
-(other columns can stay empty strings).
+`#dashboardFileInput`, or paste via `#dashboardPasteArea`/`#dashboardPasteApplyBtn`
+(single-sheet `.xlsx` or tab-separated text). The sheet is read
+**positionally** (no header-label matching, unlike home's `matrixToRows`):
+C (index 2) = 내부반출번호, D (index 3) = 생성일시, H (index 7) = 업체명,
+N (index 13) = 상태값, J/K/L (index 9/10/11) = quantity at each of 3 stages
+(반출요청/집품완료/반출완료). Row 1 is assumed to be a header row and
+skipped. To seed a test file with Playwright, build a 14-column-wide
+`aoa_to_sheet` matrix the same way as extract.js's test fixtures above,
+filling only indices 2/3/7/9/10/11/13 per row (other columns can stay empty
+strings).
 
-Once uploaded, `#dashboardContent` shows 4 KPI cards
-(`#dashboardCardPendingValue`/`PickingValue`/`RemainingValue`/`ShippedValue`)
-and two Chart.js `doughnut` canvases (`#dashboardPickChart`/`#dashboardLoadChart`,
-center-overlay labels `#dashboardPickRemainingLabel`/`#dashboardLoadRemainingLabel`).
+**Upload is a per-date replace, not a per-row merge**: any 생성일시(D열)
+date present in the newly uploaded rows causes ALL existing `dashboardRows`
+for that date to be dropped and replaced by the new rows for that date —
+other dates are left untouched. This means re-uploading the same date twice
+with different data shows only the second upload's numbers (older snapshot
+of that date is gone), which is intentional (avoids stale/duplicate
+tracking without needing a stable per-row key). `#dashboardUploadStatusMsg`
+reports how many dates were refreshed.
+
+Once uploaded, `#dashboardContent` shows **5 KPI cards**
+(`#dashboardCardPendingValue`/`PickingValue`/`LoadReadyValue`/`LoadingValue`/`ShippedValue`
+— 집품대기/집품중/상차준비완료/상차중/상차완료·반출완료; there is no
+"남은 집품 수량" card anymore, that number now only lives in the donut's
+center label) and two Chart.js `doughnut` canvases
+(`#dashboardPickChart`/`#dashboardLoadChart`, center-overlay labels
+`#dashboardPickRemainingLabel`/`#dashboardLoadRemainingLabel` plus a
+percentage sub-label `#dashboardPickRemainingPct`/`#dashboardLoadRemainingPct`,
+e.g. "전체 40개 중 88% 남음"). Below the donuts, 4 scrollable "남은 OO 업체"
+cards (`#dashboardPendingCompanyList`/`PickingCompanyList`/`LoadReadyCompanyList`/`LoadingCompanyList`,
+each `max-h-48 overflow-y-auto`, with a count badge
+`#dashboardPendingCompanyCount` etc.) list deduped H열 company names per
+status, scoped to the current date-tab selection like the KPI cards.
 For assertions on exact chart data (not just the DOM label text), Chart.js
 exposes `Chart.getChart(canvasElement)` — e.g.
 `page.evaluate(() => Chart.getChart(document.getElementById('dashboardPickChart')).data.datasets[0].data)`
@@ -217,7 +221,10 @@ returns `[remaining, completed]` directly, far more reliable than reading
 pixels. A date-tab bar above the cards (`#dashboardDateTabsContainer`,
 same single/Ctrl-click multi-select pattern as home's date tabs but a
 fully separate implementation scoped to `dashboardRows`) filters the cards
-+ donuts only.
++ donuts + company lists only (not the zone chart, see below). Each date
+tab also has a `.date-tab-close` "✕" that calls `removeDashboardRowsByDate`
+(same `window.confirmModal` gate as core.js's `removeRowsByDate`) to delete
+that date's rows entirely.
 
 **The bottom zone bar-chart card (`#dashboardZoneChart`) is the one place
 on this screen that reads the *other*, unrelated dataset** —
