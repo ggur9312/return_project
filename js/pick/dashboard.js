@@ -15,12 +15,16 @@
   // 대시보드 전용 데이터셋 — 집품리스트 현황(state.rows, 9열)과는 완전히 별개.
   // A~N(14열) 원본 엑셀에서 D(생성일시)/N(상태값)/J·K·L(수량) 열만 포지셔널로 읽는다.
   // 1행은 머리글이라 건너뛴다(extract.js의 시트2 파싱과 동일 컨벤션).
+  // J=반출요청수량(그 행의 총 요청량), K=집품완료 수량(누적), L=반출완료 수량(누적) —
+  // 집품 단계에서는 J가 전체, K가 진행량(qtyTotal-qtyPicked=남은 집품량), 상차 단계에서는
+  // K가 전체(집품이 끝나야 상차가 시작되므로), L이 진행량(qtyPicked-qtyLoaded=남은 상차량).
   var dashboardRows = [];
   var dashboardActiveDateTabs = [];
 
   var DASHBOARD_STORAGE_KEY = "pickListDashboardData";
   var DASHBOARD_DATE_TAB_KEY = "pickListDashboardDateTab";
 
+  // D=생성일시, J=반출요청수량, K=집품완료 수량, L=반출완료 수량, N=상태값
   var COL = { createdAt: 3, qtyTotal: 9, qtyPicked: 10, qtyLoaded: 11, status: 13 };
 
   function toNumber(v) {
@@ -128,13 +132,16 @@
 
   function qtyTotalOf(r) { return r.qtyTotal; }
   function qtyPickedOf(r) { return r.qtyPicked; }
+  function qtyLoadedOf(r) { return r.qtyLoaded; }
 
   function computeDashboardStats(rows) {
     var pending = sumByStatus(rows, "집품대기", qtyTotalOf);
     var picking = sumByStatus(rows, "집품중", qtyTotalOf);
     var pickTotal = sumByStatus(rows, ["집품대기", "집품중"], qtyTotalOf);
     var pickRemaining = sumByStatus(rows, ["집품대기", "집품중"], function (r) { return r.qtyTotal - r.qtyPicked; });
-    var shipped = sumByStatus(rows, ["상차완료", "반출완료"], qtyPickedOf);
+    // 상태값 "반출완료"는 L열(반출완료 수량)과 이름이 정확히 대응 — 상차완료 행도
+    // 같은 컬럼(반출까지 진행된 누적량)으로 합산한다.
+    var shipped = sumByStatus(rows, ["상차완료", "반출완료"], qtyLoadedOf);
 
     var loadTotal = sumByStatus(rows, ["상차준비완료", "상차중"], qtyPickedOf);
     var loadRemaining =
