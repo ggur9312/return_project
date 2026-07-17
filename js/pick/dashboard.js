@@ -11,21 +11,23 @@
   var ASSIGN_TAB_INACTIVE = Pick.ASSIGN_TAB_INACTIVE;
   var openModalWithTransition = Pick.openModalWithTransition;
   var closeModalWithTransition = Pick.closeModalWithTransition;
+  var textToMatrix = Pick.textToMatrix;
 
   // 대시보드 전용 데이터셋 — 집품리스트 현황(state.rows, 9열)과는 완전히 별개.
-  // A~N(14열) 원본 엑셀에서 D(생성일시)/N(상태값)/J·K·L(수량) 열만 포지셔널로 읽는다.
+  // A~N(14열) 원본 엑셀에서 C(내부반출번호)/D(생성일시)/N(상태값)/J·K·L(수량)만 포지셔널로 읽는다.
   // 1행은 머리글이라 건너뛴다(extract.js의 시트2 파싱과 동일 컨벤션).
   // J=반출요청수량(그 행의 총 요청량), K=집품완료 수량(누적), L=반출완료 수량(누적) —
   // 집품 단계에서는 J가 전체, K가 진행량(qtyTotal-qtyPicked=남은 집품량), 상차 단계에서는
   // K가 전체(집품이 끝나야 상차가 시작되므로), L이 진행량(qtyPicked-qtyLoaded=남은 상차량).
+  // C(내부반출번호)는 재업로드 시 중복 판정 키로 쓴다 — 업로드는 교체가 아니라 누적 병합.
   var dashboardRows = [];
   var dashboardActiveDateTabs = [];
 
   var DASHBOARD_STORAGE_KEY = "pickListDashboardData";
   var DASHBOARD_DATE_TAB_KEY = "pickListDashboardDateTab";
 
-  // D=생성일시, J=반출요청수량, K=집품완료 수량, L=반출완료 수량, N=상태값
-  var COL = { createdAt: 3, qtyTotal: 9, qtyPicked: 10, qtyLoaded: 11, status: 13 };
+  // C=내부반출번호, D=생성일시, J=반출요청수량, K=집품완료 수량, L=반출완료 수량, N=상태값
+  var COL = { exportNo: 2, createdAt: 3, qtyTotal: 9, qtyPicked: 10, qtyLoaded: 11, status: 13 };
 
   function toNumber(v) {
     var n = Number(String(v === undefined || v === null ? "" : v).replace(/,/g, "").trim());
@@ -40,6 +42,7 @@
       var status = (row[COL.status] === undefined || row[COL.status] === null ? "" : String(row[COL.status])).trim();
       if (!status) continue;
       rows.push({
+        exportNo: (row[COL.exportNo] === undefined || row[COL.exportNo] === null ? "" : String(row[COL.exportNo])).trim(),
         createdAt: (row[COL.createdAt] === undefined || row[COL.createdAt] === null ? "" : String(row[COL.createdAt])).trim(),
         status: status,
         qtyTotal: toNumber(row[COL.qtyTotal]),
@@ -48,6 +51,22 @@
       });
     }
     return rows;
+  }
+
+  // applyParsedRows(core.js)의 dedup 패턴과 동일 — exportNo(내부반출번호)가 이미 있으면
+  // 건너뛰고 새 행만 합친다. exportNo가 비어있는 행은 식별 불가하므로 항상 추가.
+  function mergeDashboardRows(rows) {
+    var existingKeys = {};
+    dashboardRows.forEach(function (r) { if (r.exportNo) existingKeys[r.exportNo] = true; });
+    var added = [];
+    var skipped = 0;
+    rows.forEach(function (r) {
+      if (r.exportNo && existingKeys[r.exportNo]) { skipped++; return; }
+      if (r.exportNo) existingKeys[r.exportNo] = true;
+      added.push(r);
+    });
+    dashboardRows = dashboardRows.concat(added);
+    return { added: added.length, skipped: skipped };
   }
 
   function loadDashboardState() {
@@ -85,6 +104,21 @@
     els.dashboardUploadStatusMsg.className = "text-xs " + color;
   }
 
+  function applyDashboardRows(rows, sourceLabel) {
+    if (!rows.length) {
+      setDashboardUploadStatusMsg("유효한 데이터가 없습니다. N열(상태값)이 비어있지 않은 행이 있는지 확인해주세요.", "error");
+      return;
+    }
+    var result = mergeDashboardRows(rows);
+    saveDashboardData();
+    renderDashboard();
+    setDashboardUploadStatusMsg(
+      sourceLabel + "에서 " + result.added + "건을 추가했습니다." + (result.skipped ? " (중복 " + result.skipped + "건 제외)" : ""),
+      "ok"
+    );
+    closeDashboardUploadModal();
+  }
+
   function handleDashboardFile(file) {
     if (!file) return;
     els.dashboardFileName.textContent = file.name;
@@ -94,17 +128,7 @@
         var data = new Uint8Array(e.target.result);
         var wb = XLSX.read(data, { type: "array" });
         var matrix = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: "" });
-        var rows = parseDashboardMatrix(matrix);
-        if (!rows.length) {
-          setDashboardUploadStatusMsg("유효한 데이터가 없습니다. N열(상태값)이 비어있지 않은 행이 있는지 확인해주세요.", "error");
-          return;
-        }
-        dashboardRows = rows;
-        dashboardActiveDateTabs = [];
-        saveDashboardData();
-        saveDashboardDateTabState();
-        renderDashboard();
-        setDashboardUploadStatusMsg(rows.length + "건이 업로드되었습니다.", "ok");
+        applyDashboardRows(parseDashboardMatrix(matrix), "엑셀 파일");
       } catch (err) {
         setDashboardUploadStatusMsg("엑셀 파일을 읽는 중 오류가 발생했습니다: " + err.message, "error");
       }
@@ -112,9 +136,32 @@
     reader.readAsArrayBuffer(file);
   }
 
+  function handleDashboardPaste() {
+    var text = els.dashboardPasteArea.value;
+    if (!text.trim()) {
+      setDashboardUploadStatusMsg("붙여넣을 데이터를 입력해주세요.", "error");
+      return;
+    }
+    var matrix = textToMatrix(text);
+    applyDashboardRows(parseDashboardMatrix(matrix), "붙여넣기");
+    els.dashboardPasteArea.value = "";
+  }
+
+  async function removeDashboardRowsByDate(date) {
+    var count = dashboardRows.filter(function (r) { return getCreatedDate(r) === date; }).length;
+    if (!(await window.confirmModal("생성일자 '" + date + "' 데이터 " + count + "건을 모두 삭제할까요?"))) return;
+    dashboardRows = dashboardRows.filter(function (r) { return getCreatedDate(r) !== date; });
+    dashboardActiveDateTabs = dashboardActiveDateTabs.filter(function (d) { return d !== date; });
+    saveDashboardData();
+    saveDashboardDateTabState();
+    renderDashboard();
+    if (window.showToast) window.showToast("생성일자 '" + date + "' 데이터 " + count + "건이 삭제되었습니다.", "info");
+  }
+
   function openDashboardUploadModal() {
     els.dashboardFileInput.value = "";
     els.dashboardFileName.textContent = "";
+    els.dashboardPasteArea.value = "";
     setDashboardUploadStatusMsg("", null);
     openModalWithTransition(els.dashboardUploadModal, els.dashboardUploadModalBox);
   }
@@ -188,8 +235,14 @@
       var isActive = dashboardActiveDateTabs.indexOf(date) !== -1;
       var tabBtn = document.createElement("button");
       tabBtn.className = isActive ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
-      tabBtn.innerHTML = "<span>" + escapeHtml(date) + "</span>";
+      tabBtn.innerHTML =
+        "<span>" + escapeHtml(date) + "</span>" +
+        '<span class="date-tab-close text-xs opacity-70 hover:opacity-100 ml-1">✕</span>';
       tabBtn.addEventListener("click", function (e) {
+        if (e.target.closest(".date-tab-close")) {
+          removeDashboardRowsByDate(date);
+          return;
+        }
         if (e.ctrlKey || e.metaKey) {
           var idx = dashboardActiveDateTabs.indexOf(date);
           dashboardActiveDateTabs = idx !== -1
@@ -284,6 +337,7 @@
   Pick.loadDashboardState = loadDashboardState;
   Pick.renderDashboard = renderDashboard;
   Pick.handleDashboardFile = handleDashboardFile;
+  Pick.handleDashboardPaste = handleDashboardPaste;
   Pick.openDashboardUploadModal = openDashboardUploadModal;
   Pick.closeDashboardUploadModal = closeDashboardUploadModal;
 })(window.Pick = window.Pick || {});

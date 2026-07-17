@@ -46,23 +46,58 @@ fileInput.addEventListener('change', (e) => {
 
 
 /* ================================================================
-   SECTION 2B: 업로드 섹션 접기/펼치기
+   SECTION 2B: 업로드 모달 (버튼 클릭 시 오픈, 파일선택/붙여넣기 포함)
    ================================================================ */
-const TRUCK_UPLOAD_COLLAPSED_KEY = 'truckDashboardUploadCollapsed';
+const truckUploadModal = document.getElementById('truckUploadModal');
+const truckUploadModalBox = document.getElementById('truckUploadModalBox');
 
-function applyTruckUploadCollapsed(collapsed) {
-    document.getElementById('truckUploadToggleLabel').textContent = collapsed ? '펼치기' : '접기';
-    document.getElementById('truckUploadToggleIcon').classList.toggle('-rotate-90', collapsed);
-    document.getElementById('truckUploadCardBody').classList.toggle('hidden', collapsed);
+function openTruckUploadModal() {
+    truckUploadModal.classList.remove('hidden');
+    truckUploadModal.classList.add('flex');
+    requestAnimationFrame(() => {
+        truckUploadModal.classList.remove('opacity-0');
+        truckUploadModalBox.classList.remove('scale-95');
+    });
 }
 
-document.getElementById('truckUploadToggleBtn').addEventListener('click', () => {
-    const collapsed = localStorage.getItem(TRUCK_UPLOAD_COLLAPSED_KEY) !== '1';
-    localStorage.setItem(TRUCK_UPLOAD_COLLAPSED_KEY, collapsed ? '1' : '0');
-    applyTruckUploadCollapsed(collapsed);
-});
+function closeTruckUploadModal() {
+    truckUploadModal.classList.add('opacity-0');
+    truckUploadModalBox.classList.add('scale-95');
+    setTimeout(() => {
+        truckUploadModal.classList.remove('flex');
+        truckUploadModal.classList.add('hidden');
+    }, 200);
+}
 
-applyTruckUploadCollapsed(localStorage.getItem(TRUCK_UPLOAD_COLLAPSED_KEY) === '1');
+document.getElementById('truckUploadBtn').addEventListener('click', openTruckUploadModal);
+document.getElementById('truckUploadCloseBtn').addEventListener('click', closeTruckUploadModal);
+
+// core.js의 textToMatrix()와 동일 로직(줄바꿈/탭 분리) — js/truck.js는 window.Pick과
+// 별개라 로컬로 복제한다.
+function truckTextToMatrix(text) {
+    return text
+        .split(/\r\n|\r|\n/)
+        .filter(line => line.trim().length > 0)
+        .map(line => {
+            const delimiter = line.indexOf('\t') !== -1 ? '\t' : ',';
+            return line.split(delimiter).map(s => s.trim());
+        });
+}
+
+document.getElementById('truckPasteApplyBtn').addEventListener('click', () => {
+    const text = document.getElementById('truckPasteArea').value;
+    if (!text.trim()) {
+        showToast('붙여넣을 데이터를 입력해주세요.', 'error');
+        return;
+    }
+    const matrix = truckTextToMatrix(text);
+    if (matrix.length < 2) {
+        showToast('가공할 데이터가 부족합니다.', 'error');
+        return;
+    }
+    processData(matrix, '붙여넣기');
+    document.getElementById('truckPasteArea').value = '';
+});
 
 
 /* ================================================================
@@ -389,6 +424,7 @@ function processData(data, fileName) {
     document.getElementById('activeFileInfo').classList.remove('hidden');
 
     renderDashboard(globalProcessedData);
+    closeTruckUploadModal();
 
     if (addedCount > 0) {
         showToast(`트럭 운송 데이터 ${addedCount}건이 병합(누적) 되었습니다.`);

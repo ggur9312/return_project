@@ -36,17 +36,56 @@ extra `playwright install` needed). No Node/npm available on this machine.
 ### Seeding data through the real UI
 
 There is no debug hook / global `state` export. The only way to get rows into
-`state.rows` is the paste-tab-separated-text feature:
+`state.rows` is the paste-tab-separated-text feature — **now inside a modal**,
+not directly on the page:
 
-1. Fill `#pasteArea` with **tab-separated rows, header row required as the
+1. Navigate to 집품리스트 현황 (`#navHomeBtn`) — 홈 is now the dashboard, not
+   this screen.
+2. Click `#homeUploadBtn` to open `#homeUploadModal` (`#pasteArea` is not
+   visible/fillable until this modal is open — a bare `page.fill("#pasteArea", ...)`
+   without clicking the button first will time out waiting for visibility).
+3. Fill `#pasteArea` with **tab-separated rows, header row required as the
    first line**, exact Korean labels (must match `COLUMNS` in `js/pick/core.js`):
    `그룹번호  마감일시  생성일시  매입유형  업체명  상태  운송타입  존  수량`
    (zone = 존, quantity = 수량, 생성일시 is used for the date-tab / assign
    date filter — format like `2026-07-11 09:00`).
-2. Click `#pasteApplyBtn`.
+4. Click `#pasteApplyBtn` — on success the modal **auto-closes** (`handleParsedMatrix`
+   in core.js calls `closeModalWithTransition` at the end of its success path).
 
-Omitting the header row silently fails validation (`assignMsg`/`statusMsg`
-will say a column/header is missing or no dates found) — always prepend it.
+Omitting the header row silently fails validation (`statusMsg`, inside the
+modal, visible before it auto-closes on error since only the success path
+closes it) — always prepend the header row. File upload works the same way:
+click `#homeUploadBtn`, then `#fileSelectBtn`/drag onto `#dropZone`/set
+`#fileInput.files` — same ids as before, just relocated into the modal.
+
+### 대시보드 (`#dashboardView`, now "홈" / default landing view)
+
+Independent dataset from 집품리스트 현황 — upload via `#dashboardUploadBtn` →
+`#dashboardUploadModal` (file `#dashboardFileInput`/`#dashboardFileSelectBtn`,
+or paste `#dashboardPasteArea`/`#dashboardPasteApplyBtn`). Upload **merges**,
+it does not replace — dedup key is the C column (내부반출번호/`exportNo`);
+re-uploading a row with the same C value is skipped and reflected in
+`#dashboardUploadStatusMsg` ("N건 추가 (중복 M건 제외)"). Modal auto-closes on
+success only. Date tabs (`#dashboardDateTabsContainer`) support the same
+Ctrl/Cmd+click multi-select as home's date tabs, plus a `.date-tab-close` "✕"
+per date tab that calls `removeDashboardRowsByDate` (same `window.confirmModal`
+gate as core.js's `removeRowsByDate`). For a positional (non-header-matching)
+test fixture, columns are 0-indexed: C=2 (내부반출번호), D=3 (생성일시),
+J=9/K=10/L=11 (수량 3단계), N=13 (상태값) — row 0 is treated as a header and
+skipped regardless of its content.
+
+### 트럭현황 홈 upload (`js/truck.js`, no `window.Pick`)
+
+Same button→modal pattern: click `#truckUploadBtn` → `#truckUploadModal` opens
+(hand-rolled open/close via `openTruckUploadModal`/`closeTruckUploadModal` in
+truck.js — no core.js helpers available here). File: `#excelFile` (still
+requires header-label match on 그룹번호/생성일시/업체명/운송타입, only rows
+with 운송타입==="트럭" survive). Paste: `#truckPasteArea`/`#truckPasteApplyBtn`
+(new — previously truck had no paste option), parsed via a local
+`truckTextToMatrix()` in truck.js (duplicates core.js's `textToMatrix` logic
+since truck.js can't import it). Merges into `globalProcessedData` per-date,
+deduped by `groupNo_company` — unchanged behavior, only the surrounding UI
+moved into a modal. Modal auto-closes only on `processData`'s success path.
 
 ### Home "층별 인원 배치 계산" floor panel
 

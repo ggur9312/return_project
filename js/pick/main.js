@@ -19,7 +19,6 @@
   var LABEL_MARGIN_TOP_KEY = Pick.LABEL_MARGIN_TOP_KEY;
   var LABOR_STORAGE_KEY = Pick.LABOR_STORAGE_KEY;
   var STORAGE_KEY = Pick.STORAGE_KEY;
-  var UPLOAD_COLLAPSED_KEY = Pick.UPLOAD_COLLAPSED_KEY;
   var applyCardCollapsed = Pick.applyCardCollapsed;
   var closeModalWithTransition = Pick.closeModalWithTransition;
   var debounce = Pick.debounce;
@@ -38,7 +37,6 @@
   var loadFloorPanelCollapsed = Pick.loadFloorPanelCollapsed;
   var loadFromStorage = Pick.loadFromStorage;
   var loadSortRules = Pick.loadSortRules;
-  var loadUploadCollapsed = Pick.loadUploadCollapsed;
   var openModalWithTransition = Pick.openModalWithTransition;
   var renderDateTabs = Pick.renderDateTabs;
   var renderFilterQtySummary = Pick.renderFilterQtySummary;
@@ -62,6 +60,7 @@
   var loadDashboardState = Pick.loadDashboardState;
   var renderDashboard = Pick.renderDashboard;
   var handleDashboardFile = Pick.handleDashboardFile;
+  var handleDashboardPaste = Pick.handleDashboardPaste;
   var openDashboardUploadModal = Pick.openDashboardUploadModal;
   var closeDashboardUploadModal = Pick.closeDashboardUploadModal;
   var applyGtLabelPageStyle = Pick.applyGtLabelPageStyle;
@@ -151,6 +150,16 @@
   els.dashboardFileInput.addEventListener("change", function (e) {
     handleDashboardFile(e.target.files[0]);
   });
+  els.dashboardPasteApplyBtn.addEventListener("click", handleDashboardPaste);
+
+  els.homeUploadBtn.addEventListener("click", function () {
+    els.fileName.textContent = "";
+    setStatusMsg("", null);
+    openModalWithTransition(els.homeUploadModal, els.homeUploadModalBox);
+  });
+  els.homeUploadCloseBtn.addEventListener("click", function () {
+    closeModalWithTransition(els.homeUploadModal, els.homeUploadModalBox);
+  });
 
   els.fileSelectBtn.addEventListener("click", function () { els.fileInput.click(); });
   els.fileInput.addEventListener("change", function (e) {
@@ -214,12 +223,6 @@
     var collapsed = !loadFloorPanelCollapsed();
     localStorage.setItem(FLOOR_PANEL_COLLAPSED_KEY, collapsed ? "1" : "0");
     applyCardCollapsed(collapsed, els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
-  });
-
-  els.uploadToggleBtn.addEventListener("click", function () {
-    var collapsed = !loadUploadCollapsed();
-    localStorage.setItem(UPLOAD_COLLAPSED_KEY, collapsed ? "1" : "0");
-    applyCardCollapsed(collapsed, els.uploadToggleLabel, els.uploadToggleIcon, els.uploadCardBody, null);
   });
 
   els.filterSortToggleBtn.addEventListener("click", function () {
@@ -485,7 +488,6 @@
   loadGtState();
   (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom, margin.left, margin.top); })();
   applyCardCollapsed(loadFloorPanelCollapsed(), els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
-  applyCardCollapsed(loadUploadCollapsed(), els.uploadToggleLabel, els.uploadToggleIcon, els.uploadCardBody, null);
   applyCardCollapsed(loadFilterSortCollapsed(), els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
   els.laborInput.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
   // switchView()는 내부에서 Pick.refreshAll()을 호출하는데, 그 export(아래)는
