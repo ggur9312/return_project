@@ -61,7 +61,6 @@
   var LABEL_MARGIN_LEFT_KEY = "pickListLabelMarginLeft";
   var LABEL_MARGIN_TOP_KEY = "pickListLabelMarginTop";
   var FLOOR_PANEL_COLLAPSED_KEY = "pickListFloorPanelCollapsed";
-  var UPLOAD_COLLAPSED_KEY = "pickListUploadCollapsed";
   var FILTER_SORT_COLLAPSED_KEY = "pickListFilterSortCollapsed";
   var LABEL_MARGIN_DEFAULT = 3;
   var LABEL_MARGIN_LEFT_TOP_DEFAULT = 0;
@@ -129,11 +128,10 @@
     floorPanelToggleIcon: document.getElementById("floorPanelToggleIcon"),
     floorPanelSummary: document.getElementById("floorPanelSummary"),
     floorPanelBody: document.getElementById("floorPanelBody"),
-    uploadCard: document.getElementById("uploadCard"),
-    uploadToggleBtn: document.getElementById("uploadToggleBtn"),
-    uploadToggleLabel: document.getElementById("uploadToggleLabel"),
-    uploadToggleIcon: document.getElementById("uploadToggleIcon"),
-    uploadCardBody: document.getElementById("uploadCardBody"),
+    homeUploadBtn: document.getElementById("homeUploadBtn"),
+    homeUploadModal: document.getElementById("homeUploadModal"),
+    homeUploadModalBox: document.getElementById("homeUploadModalBox"),
+    homeUploadCloseBtn: document.getElementById("homeUploadCloseBtn"),
     dateTabsContainer: document.getElementById("dateTabsContainer"),
     filterBar: document.getElementById("filterBar"),
     filterButtonsContainer: document.getElementById("filterButtonsContainer"),
@@ -150,13 +148,52 @@
     sortAddBtn: document.getElementById("sortAddBtn"),
     sortResetBtn: document.getElementById("sortResetBtn"),
     sortZoneOPriorityBtn: document.getElementById("sortZoneOPriorityBtn"),
+    navDashboardBtn: document.getElementById("navDashboardBtn"),
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
     navExtractBtn: document.getElementById("navExtractBtn"),
     mainNavAside: document.getElementById("mainNavAside"),
+    dashboardView: document.getElementById("dashboardView"),
     homeView: document.getElementById("homeView"),
     assignView: document.getElementById("assignView"),
     extractView: document.getElementById("extractView"),
+    dashboardActiveFileInfo: document.getElementById("dashboardActiveFileInfo"),
+    dashboardResetBtn: document.getElementById("dashboardResetBtn"),
+    dashboardUploadBtn: document.getElementById("dashboardUploadBtn"),
+    dashboardUploadModal: document.getElementById("dashboardUploadModal"),
+    dashboardUploadModalBox: document.getElementById("dashboardUploadModalBox"),
+    dashboardUploadCloseBtn: document.getElementById("dashboardUploadCloseBtn"),
+    dashboardFileInput: document.getElementById("dashboardFileInput"),
+    dashboardFileSelectBtn: document.getElementById("dashboardFileSelectBtn"),
+    dashboardFileName: document.getElementById("dashboardFileName"),
+    dashboardPasteArea: document.getElementById("dashboardPasteArea"),
+    dashboardPasteApplyBtn: document.getElementById("dashboardPasteApplyBtn"),
+    dashboardUploadStatusMsg: document.getElementById("dashboardUploadStatusMsg"),
+    dashboardEmptyState: document.getElementById("dashboardEmptyState"),
+    dashboardContent: document.getElementById("dashboardContent"),
+    dashboardDateTabsContainer: document.getElementById("dashboardDateTabsContainer"),
+    dashboardCardPendingValue: document.getElementById("dashboardCardPendingValue"),
+    dashboardCardPickingValue: document.getElementById("dashboardCardPickingValue"),
+    dashboardCardLoadReadyValue: document.getElementById("dashboardCardLoadReadyValue"),
+    dashboardCardLoadingValue: document.getElementById("dashboardCardLoadingValue"),
+    dashboardCardShippedValue: document.getElementById("dashboardCardShippedValue"),
+    dashboardPickChart: document.getElementById("dashboardPickChart"),
+    dashboardPickRemainingLabel: document.getElementById("dashboardPickRemainingLabel"),
+    dashboardPickRemainingPct: document.getElementById("dashboardPickRemainingPct"),
+    dashboardLoadChart: document.getElementById("dashboardLoadChart"),
+    dashboardLoadRemainingLabel: document.getElementById("dashboardLoadRemainingLabel"),
+    dashboardLoadRemainingPct: document.getElementById("dashboardLoadRemainingPct"),
+    dashboardPendingCompanyList: document.getElementById("dashboardPendingCompanyList"),
+    dashboardPendingCompanyCount: document.getElementById("dashboardPendingCompanyCount"),
+    dashboardPickingCompanyList: document.getElementById("dashboardPickingCompanyList"),
+    dashboardPickingCompanyCount: document.getElementById("dashboardPickingCompanyCount"),
+    dashboardLoadReadyCompanyList: document.getElementById("dashboardLoadReadyCompanyList"),
+    dashboardLoadReadyCompanyCount: document.getElementById("dashboardLoadReadyCompanyCount"),
+    dashboardLoadingCompanyList: document.getElementById("dashboardLoadingCompanyList"),
+    dashboardLoadingCompanyCount: document.getElementById("dashboardLoadingCompanyCount"),
+    dashboardZoneEmptyState: document.getElementById("dashboardZoneEmptyState"),
+    dashboardZoneChartWrap: document.getElementById("dashboardZoneChartWrap"),
+    dashboardZoneChart: document.getElementById("dashboardZoneChart"),
     extractFileInput: document.getElementById("extractFileInput"),
     extractFileSelectBtn: document.getElementById("extractFileSelectBtn"),
     extractFileName: document.getElementById("extractFileName"),
@@ -386,6 +423,7 @@
     var applyResult = applyParsedRows(result.rows);
     setStatusMsg(sourceLabel + "에서 " + applyResult.added + "건을 추가했습니다." +
       (applyResult.skipped ? " (중복 " + applyResult.skipped + "건 제외)" : ""), "ok");
+    closeModalWithTransition(els.homeUploadModal, els.homeUploadModalBox);
   }
 
   function handleFile(file) {
@@ -1162,11 +1200,6 @@
     return raw === null ? true : raw === "1";
   }
 
-
-  function loadUploadCollapsed() {
-    return localStorage.getItem(UPLOAD_COLLAPSED_KEY) === "1";
-  }
-
   // --- 생성일자별 탭 (홈) ---
 
   function saveDateTabState() {
@@ -1254,12 +1287,15 @@
     // 화면으로 이동할 때는 항상 명시적으로 해제한다(Pick.refreshAll()의 암묵적
     // 초기화는 홈이 보일 때만 실행되어 이 경우를 놓친다).
     if (view !== "home") Pick.clearHomeSelection();
+    els.dashboardView.classList.toggle("hidden", view !== "dashboard");
     els.homeView.classList.toggle("hidden", view !== "home");
     els.assignView.classList.toggle("hidden", view !== "assign");
     els.extractView.classList.toggle("hidden", view !== "extract");
+    if (view === "dashboard") els.dashboardView.classList.add("animate-fadeIn");
     if (view === "home") els.homeView.classList.add("animate-fadeIn");
     if (view === "assign") els.assignView.classList.add("animate-fadeIn");
     if (view === "extract") els.extractView.classList.add("animate-fadeIn");
+    els.navDashboardBtn.className = view === "dashboard" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     els.navHomeBtn.className = view === "home" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     els.navAssignBtn.className = view === "assign" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
     els.navExtractBtn.className = view === "extract" ? NAV_BTN_ACTIVE : NAV_BTN_INACTIVE;
@@ -1342,7 +1378,6 @@
   Pick.LABEL_MARGIN_LEFT_KEY = LABEL_MARGIN_LEFT_KEY;
   Pick.LABEL_MARGIN_TOP_KEY = LABEL_MARGIN_TOP_KEY;
   Pick.FLOOR_PANEL_COLLAPSED_KEY = FLOOR_PANEL_COLLAPSED_KEY;
-  Pick.UPLOAD_COLLAPSED_KEY = UPLOAD_COLLAPSED_KEY;
   Pick.FILTER_SORT_COLLAPSED_KEY = FILTER_SORT_COLLAPSED_KEY;
   Pick.LABEL_MARGIN_DEFAULT = LABEL_MARGIN_DEFAULT;
   Pick.LABEL_MARGIN_LEFT_TOP_DEFAULT = LABEL_MARGIN_LEFT_TOP_DEFAULT;
@@ -1405,7 +1440,6 @@
   Pick.applyCardCollapsed = applyCardCollapsed;
   Pick.loadFloorPanelCollapsed = loadFloorPanelCollapsed;
   Pick.loadFilterSortCollapsed = loadFilterSortCollapsed;
-  Pick.loadUploadCollapsed = loadUploadCollapsed;
   Pick.saveDateTabState = saveDateTabState;
   Pick.loadDateTabState = loadDateTabState;
   Pick.getAllCreatedDates = getAllCreatedDates;

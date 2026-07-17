@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>집품·트럭 현황 데이터 관리</title>
+<title>집품·트럭 현황 대시보드</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%234f46e5'/%3E%3Cpath d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%234f46e5'/%3E%3Cpath d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -125,21 +125,19 @@
         <p class="text-xs text-slate-500 font-medium">엑셀 업로드·붙여넣기 기반 집품 데이터 관리</p>
       </div>
     </div>
-    <div class="flex items-center gap-2">
-      <div id="pickActiveFileInfo" class="hidden text-sm bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 font-medium max-w-xs truncate flex items-center space-x-1.5">
-        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span>데이터 로드됨</span>
-      </div>
-    </div>
   </div>
 </header>
 
 <div class="print:hidden max-w-[1600px] mx-auto flex gap-6 px-8 py-8">
 
   <aside id="mainNavAside" class="w-48 shrink-0 space-y-2 sticky top-28 self-start">
-    <button id="navHomeBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100">
+    <button id="navDashboardBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
       <span>홈</span>
+    </button>
+    <button id="navHomeBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <span>집품리스트 현황</span>
     </button>
     <button id="navAssignBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-4-4 4 4 0 004 4z"/></svg>
@@ -153,40 +151,180 @@
 
   <div class="flex-1 min-w-0">
 
-  <div id="homeView">
+  <div id="dashboardView" class="space-y-6">
 
-  <div class="space-y-3">
-    <div id="uploadCard" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-sm font-semibold text-slate-900">데이터 입력</h2>
-        <div class="flex items-center gap-3">
-          <button id="uploadToggleBtn" type="button" class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700">
-            <span id="uploadToggleLabel">접기</span>
-            <svg id="uploadToggleIcon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-          </button>
-        </div>
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h1 class="text-xl font-bold text-slate-900 tracking-tight">반출 대시보드</h1>
+        <p class="text-xs text-slate-500 mt-0.5">집품·상차 진행 현황을 한눈에 확인하세요.</p>
       </div>
-      <div id="uploadCardBody">
-        <section class="grid grid-cols-2 gap-6">
-          <div id="dropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
-            <h2 class="text-sm font-semibold text-slate-900 mb-1">엑셀 업로드</h2>
-            <p class="text-xs text-slate-500 mb-3">.xlsx / .xls / .csv 파일을 끌어다 놓거나 선택하세요</p>
-            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
-            <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="fileSelectBtn">파일 선택</button>
-            <span id="fileName" class="ml-3 text-xs text-slate-500"></span>
-          </div>
-
-          <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <h2 class="text-sm font-semibold text-slate-900 mb-1">직접 붙여넣기</h2>
-            <p class="text-xs text-slate-500 mb-3">엑셀에서 머리글 포함 영역을 복사해 붙여넣으세요</p>
-            <textarea id="pasteArea" rows="4" class="w-full resize-y bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="그룹번호&#9;마감일시&#9;생성일시&#9;매입유형&#9;업체명&#9;상태&#9;운송타입&#9;존&#9;수량"></textarea>
-            <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="pasteApplyBtn">붙여넣기 적용</button>
-          </div>
-        </section>
+      <div class="flex items-center gap-2">
+        <div id="dashboardActiveFileInfo" class="hidden text-sm bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 font-medium max-w-xs truncate flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>데이터 로드됨</span>
+        </div>
+        <button id="dashboardResetBtn" class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          <span>초기화</span>
+        </button>
+        <button id="dashboardUploadBtn" type="button" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+          <span>엑셀 업로드</span>
+        </button>
       </div>
     </div>
 
-    <div id="statusMsg" class="text-xs text-slate-500"></div>
+    <div id="dashboardEmptyState" class="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+      <div class="max-w-md mx-auto flex flex-col items-center">
+        <div class="text-slate-300 mb-4">
+          <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+        </div>
+        <h3 class="text-lg font-medium text-slate-900">대시보드 데이터가 없습니다</h3>
+        <p class="text-sm text-slate-500 mt-2">우측 상단의 "엑셀 업로드" 버튼으로 집품·상차 현황 데이터를 등록하세요.</p>
+      </div>
+    </div>
+
+    <div id="dashboardContent" class="hidden space-y-6">
+
+      <div class="border-b border-slate-200 pb-1">
+        <div id="dashboardDateTabsContainer" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow duration-200">
+          <div class="p-3 bg-amber-50 rounded-xl text-amber-600 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 font-medium">집품대기</p>
+            <p id="dashboardCardPendingValue" class="text-2xl font-bold text-slate-900 tabular-nums">0</p>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow duration-200">
+          <div class="p-3 bg-sky-50 rounded-xl text-sky-600 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 font-medium">집품중</p>
+            <p id="dashboardCardPickingValue" class="text-2xl font-bold text-slate-900 tabular-nums">0</p>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow duration-200">
+          <div class="p-3 bg-violet-50 rounded-xl text-violet-600 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 font-medium">상차준비완료</p>
+            <p id="dashboardCardLoadReadyValue" class="text-2xl font-bold text-slate-900 tabular-nums">0</p>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow duration-200">
+          <div class="p-3 bg-cyan-50 rounded-xl text-cyan-600 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17L17 7M17 7H7M17 7v10"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 font-medium">상차중</p>
+            <p id="dashboardCardLoadingValue" class="text-2xl font-bold text-slate-900 tabular-nums">0</p>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow duration-200">
+          <div class="p-3 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"></path></svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs text-slate-500 font-medium">상차완료·반출완료</p>
+            <p id="dashboardCardShippedValue" class="text-2xl font-bold text-slate-900 tabular-nums">0</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h3 class="text-sm font-semibold text-slate-900 mb-4">집품 현황</h3>
+          <div class="relative h-64">
+            <canvas id="dashboardPickChart"></canvas>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <p class="text-xs text-slate-500">남은 집품 수량</p>
+              <p id="dashboardPickRemainingLabel" class="text-xl font-bold text-slate-900 tabular-nums">0</p>
+              <p id="dashboardPickRemainingPct" class="text-[11px] text-slate-400 mt-0.5"></p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h3 class="text-sm font-semibold text-slate-900 mb-4">상차 현황</h3>
+          <div class="relative h-64">
+            <canvas id="dashboardLoadChart"></canvas>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <p class="text-xs text-slate-500">남은 상차 수량</p>
+              <p id="dashboardLoadRemainingLabel" class="text-xl font-bold text-slate-900 tabular-nums">0</p>
+              <p id="dashboardLoadRemainingPct" class="text-[11px] text-slate-400 mt-0.5"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h4 class="text-xs font-semibold text-slate-900">남은 집품대기 업체</h4>
+            <span id="dashboardPendingCompanyCount" class="text-xs text-slate-400 tabular-nums">0개</span>
+          </div>
+          <div id="dashboardPendingCompanyList" class="max-h-48 overflow-y-auto divide-y divide-slate-100"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h4 class="text-xs font-semibold text-slate-900">남은 집품중 업체</h4>
+            <span id="dashboardPickingCompanyCount" class="text-xs text-slate-400 tabular-nums">0개</span>
+          </div>
+          <div id="dashboardPickingCompanyList" class="max-h-48 overflow-y-auto divide-y divide-slate-100"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h4 class="text-xs font-semibold text-slate-900">남은 상차준비완료 업체</h4>
+            <span id="dashboardLoadReadyCompanyCount" class="text-xs text-slate-400 tabular-nums">0개</span>
+          </div>
+          <div id="dashboardLoadReadyCompanyList" class="max-h-48 overflow-y-auto divide-y divide-slate-100"></div>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h4 class="text-xs font-semibold text-slate-900">남은 상차중 업체</h4>
+            <span id="dashboardLoadingCompanyCount" class="text-xs text-slate-400 tabular-nums">0개</span>
+          </div>
+          <div id="dashboardLoadingCompanyList" class="max-h-48 overflow-y-auto divide-y divide-slate-100"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <h3 class="text-sm font-semibold text-slate-900 mb-4">존별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품리스트 현황 데이터 기준)</span></h3>
+      <div id="dashboardZoneEmptyState" class="p-10 text-center text-sm text-slate-400">집품리스트 현황에 데이터를 등록하면 존별 수량이 표시됩니다.</div>
+      <div id="dashboardZoneChartWrap" class="hidden h-72">
+        <canvas id="dashboardZoneChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="homeView" class="hidden">
+
+  <div class="space-y-3">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품리스트 현황</h1>
+        <p class="text-xs text-slate-500 mt-0.5">엑셀 업로드·붙여넣기로 등록한 집품 데이터를 관리합니다.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div id="pickActiveFileInfo" class="hidden text-sm bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 font-medium max-w-xs truncate flex items-center space-x-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>데이터 로드됨</span>
+        </div>
+        <button id="homeUploadBtn" type="button" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+          <span>엑셀 업로드</span>
+        </button>
+      </div>
+    </div>
 
     <div class="border-b border-slate-200 pb-1">
       <div id="dateTabsContainer" class="flex flex-wrap gap-2"></div>
@@ -348,7 +486,7 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
           <span>초기화</span>
         </button>
-        <button id="extractMergeBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" disabled>홈에 병합</button>
+        <button id="extractMergeBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" disabled>집품리스트 병합</button>
       </div>
     </div>
 
@@ -540,12 +678,6 @@
                     <p class="text-xs text-slate-500 font-medium">물류 데이터 자동 가공 및 누적 관리</p>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <div id="activeFileInfo" class="hidden text-sm bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 font-medium max-w-xs truncate flex items-center space-x-1.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span id="fileNameDisplay">데이터 로드됨</span>
-                </div>
-            </div>
         </div>
     </header>
 
@@ -566,56 +698,20 @@
 
         <div id="truckHomeView" class="space-y-8">
 
-        <div id="truckUploadCard" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-            <div class="flex items-center justify-between mb-2">
-                <h2 class="text-sm font-semibold text-slate-900">데이터 입력</h2>
-                <button id="truckUploadToggleBtn" type="button" class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700">
-                    <span id="truckUploadToggleLabel">접기</span>
-                    <svg id="truckUploadToggleIcon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+                <h2 class="text-lg font-bold text-slate-900">트럭현황 홈</h2>
+                <p class="text-xs text-slate-500 mt-0.5">트럭 운송 데이터를 업로드하고 날짜별로 관리합니다.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <div id="activeFileInfo" class="hidden text-sm bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 font-medium max-w-xs truncate flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="fileNameDisplay">데이터 로드됨</span>
+                </div>
+                <button id="truckUploadBtn" type="button" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    <span>엑셀 업로드</span>
                 </button>
-            </div>
-            <div id="truckUploadCardBody">
-        <section class="grid grid-cols-3 gap-6">
-
-            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
-                <div>
-                    <h2 class="text-md font-semibold text-slate-900 flex items-center space-x-2">
-                        <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <span>업로드 가이드라인</span>
-                    </h2>
-                    <p class="text-xs text-slate-500 mt-1">지정된 양식의 엑셀 데이터 파일(A~I열)을 업로드해 주세요.</p>
-
-                    <div class="mt-4 bg-slate-50 rounded-xl p-3 border border-slate-100">
-                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">필수 인식 머리글 (1행)</span>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">그룹번호</span>
-                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">생성일시</span>
-                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">업체명</span>
-                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-rose-50 text-rose-700 border border-rose-100">운송타입 (트럭)</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="text-xs text-slate-400 mt-4 pt-4 border-t border-slate-100 space-y-1.5">
-                    <p>💡 시스템이 자동으로 <strong>중복 행 제거</strong>, <strong>업체명 정렬</strong>을 수행합니다.</p>
-                    <p>⚠️ <strong>주의:</strong> 운송타입이 '트럭'인 데이터만 가져옵니다.</p>
-                    <p>🔄 추가 업로드 시 기존 데이터와 <strong>병합(누적)</strong>됩니다.</p>
-                </div>
-            </div>
-
-            <div class="col-span-2">
-                <div id="truckDropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200 h-full min-h-[220px]">
-                    <input type="file" id="excelFile" accept=".xlsx, .xls" class="hidden">
-                    <div class="p-4 bg-indigo-50 rounded-full text-indigo-600 mb-4 shadow-inner">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                        </svg>
-                    </div>
-                    <p class="text-sm font-semibold text-slate-900">클릭하거나 엑셀 파일을 이곳에 끌어다 놓으세요</p>
-                    <p class="text-xs text-slate-400 mt-1">XLSX, XLS 파일 형식만 지원 (최대 20MB)</p>
-                </div>
-            </div>
-        </section>
             </div>
         </div>
 
@@ -627,7 +723,7 @@
                     </svg>
                 </div>
                 <h3 class="text-lg font-medium text-slate-900">데이터가 비어 있습니다</h3>
-                <p class="text-sm text-slate-500 mt-2">상단의 업로드 영역에 엑셀 데이터를 등록하시면 생성일시 기준 자동 가공 및 테이블 인터페이스가 활성화됩니다.</p>
+                <p class="text-sm text-slate-500 mt-2">상단의 "엑셀 업로드" 버튼으로 데이터를 등록하시면 생성일시 기준 자동 가공 및 테이블 인터페이스가 활성화됩니다.</p>
             </div>
         </section>
 
@@ -771,6 +867,60 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                     <span>인쇄 실행</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="truckUploadModal" class="print:hidden fixed inset-0 bg-black/40 z-50 hidden items-center justify-center p-4 opacity-0 transition-opacity duration-200">
+        <div id="truckUploadModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-200">
+            <div class="shrink-0 px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
+                <h3 class="text-sm font-semibold text-slate-900">트럭 데이터 업로드</h3>
+                <button id="truckUploadCloseBtn" type="button" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <h2 class="text-md font-semibold text-slate-900 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span>업로드 가이드라인</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">지정된 양식의 엑셀 데이터 파일(A~I열)을 업로드해 주세요.</p>
+
+                    <div class="mt-4 bg-white rounded-xl p-3 border border-slate-100">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2">필수 인식 머리글 (1행)</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">그룹번호</span>
+                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">생성일시</span>
+                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">업체명</span>
+                            <span class="px-2 py-1 text-xs font-medium rounded-md bg-rose-50 text-rose-700 border border-rose-100">운송타입 (트럭)</span>
+                        </div>
+                    </div>
+
+                    <div class="text-xs text-slate-400 mt-4 pt-4 border-t border-slate-100 space-y-1.5">
+                        <p>💡 시스템이 자동으로 <strong>중복 행 제거</strong>, <strong>업체명 정렬</strong>을 수행합니다.</p>
+                        <p>⚠️ <strong>주의:</strong> 운송타입이 '트럭'인 데이터만 가져옵니다.</p>
+                        <p>🔄 추가 업로드 시 기존 데이터와 <strong>병합(누적)</strong>됩니다.</p>
+                    </div>
+                </div>
+
+                <div id="truckDropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
+                    <input type="file" id="excelFile" accept=".xlsx, .xls" class="hidden">
+                    <div class="p-4 bg-indigo-50 rounded-full text-indigo-600 mb-4 shadow-inner">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                    </div>
+                    <p class="text-sm font-semibold text-slate-900">클릭하거나 엑셀 파일을 이곳에 끌어다 놓으세요</p>
+                    <p class="text-xs text-slate-400 mt-1">XLSX, XLS 파일 형식만 지원 (최대 20MB)</p>
+                </div>
+
+                <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                    <h2 class="text-sm font-semibold text-slate-900 mb-1">직접 붙여넣기</h2>
+                    <p class="text-xs text-slate-500 mb-3">엑셀에서 머리글 포함 A~I열 영역을 복사해 붙여넣으세요</p>
+                    <textarea id="truckPasteArea" rows="4" class="w-full resize-y bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                    <button type="button" id="truckPasteApplyBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">붙여넣기 적용</button>
+                </div>
             </div>
         </div>
     </div>
@@ -925,6 +1075,105 @@
     </div>
 </div>
 
+<div id="dashboardUploadModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
+  <div id="dashboardUploadModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-200">
+    <div class="shrink-0 px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
+      <h3 class="text-sm font-semibold text-slate-900">반출 대시보드 데이터 업로드</h3>
+      <button id="dashboardUploadCloseBtn" type="button" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+      <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+        <h4 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+          <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <span>업로드 가이드</span>
+        </h4>
+        <p class="text-xs text-slate-500 mt-1">A~N열 원본 데이터 엑셀(1행은 머리글) 또는 같은 형식의 탭 구분 텍스트를 사용하세요.</p>
+        <div class="flex flex-wrap gap-1.5 mt-3">
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">C열: 내부반출번호</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">D열: 생성일시</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">J열: 반출요청수량</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">K열: 집품완료 수량</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">L열: 반출완료 수량</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-rose-50 text-rose-700 border border-rose-100">N열: 상태값</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100 space-y-1">
+          <p>🔄 <strong>생성일시(D열) 날짜 단위</strong>로 갱신됩니다.</p>
+          <p>♻️ 업로드 데이터에 있는 날짜는 기존 데이터를 <strong>새 데이터로 교체</strong>하고, 없는 날짜는 그대로 보존합니다.</p>
+        </div>
+      </div>
+
+      <div class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200 text-center">
+        <input type="file" id="dashboardFileInput" accept=".xlsx,.xls" hidden>
+        <button type="button" id="dashboardFileSelectBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">파일 선택</button>
+        <p id="dashboardFileName" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <h4 class="text-sm font-semibold text-slate-900 mb-1">직접 붙여넣기</h4>
+        <p class="text-xs text-slate-500 mb-3">엑셀에서 머리글 포함 A~N열 영역을 복사해 붙여넣으세요</p>
+        <textarea id="dashboardPasteArea" rows="4" class="w-full resize-y bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        <button type="button" id="dashboardPasteApplyBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">붙여넣기 적용</button>
+      </div>
+
+      <div id="dashboardUploadStatusMsg" class="text-xs text-slate-500"></div>
+    </div>
+  </div>
+</div>
+
+<div id="homeUploadModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
+  <div id="homeUploadModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-200">
+    <div class="shrink-0 px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
+      <h3 class="text-sm font-semibold text-slate-900">집품리스트 데이터 업로드</h3>
+      <button id="homeUploadCloseBtn" type="button" class="text-slate-400 hover:text-slate-600 focus:outline-none">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    <div class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+      <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+        <h4 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+          <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <span>업로드 가이드</span>
+        </h4>
+        <p class="text-xs text-slate-500 mt-1">1행에 아래 머리글이 정확히 포함된 엑셀 또는 탭 구분 텍스트를 사용하세요.</p>
+        <div class="flex flex-wrap gap-1.5 mt-3">
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">그룹번호</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">마감일시</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">생성일시</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">매입유형</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">업체명</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">상태</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">운송타입</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">존</span>
+          <span class="px-2 py-1 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">수량</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100 space-y-1">
+          <p>🔄 업로드할 때마다 기존 데이터와 <strong>병합(누적)</strong>됩니다.</p>
+          <p>♻️ <strong>그룹번호+생성일자+업체명+존</strong>이 모두 같은 행은 중복으로 보고 제외합니다.</p>
+        </div>
+      </div>
+
+      <div id="dropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
+        <h2 class="text-sm font-semibold text-slate-900 mb-1">엑셀 업로드</h2>
+        <p class="text-xs text-slate-500 mb-3">.xlsx / .xls / .csv 파일을 끌어다 놓거나 선택하세요</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
+        <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="fileSelectBtn">파일 선택</button>
+        <span id="fileName" class="ml-3 text-xs text-slate-500"></span>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900 mb-1">직접 붙여넣기</h2>
+        <p class="text-xs text-slate-500 mb-3">엑셀에서 머리글 포함 영역을 복사해 붙여넣으세요</p>
+        <textarea id="pasteArea" rows="4" class="w-full resize-y bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="그룹번호&#9;마감일시&#9;생성일시&#9;매입유형&#9;업체명&#9;상태&#9;운송타입&#9;존&#9;수량"></textarea>
+        <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="pasteApplyBtn">붙여넣기 적용</button>
+      </div>
+
+      <div id="statusMsg" class="text-xs text-slate-500"></div>
+    </div>
+  </div>
+</div>
+
 <div id="uiConfirmModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-[300] items-center justify-center p-4 opacity-0 transition-opacity duration-200">
   <div id="uiConfirmModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 transform scale-95 transition-transform duration-200">
     <p id="uiConfirmModalMsg" class="text-sm text-slate-700 whitespace-pre-wrap"></p>
@@ -936,6 +1185,7 @@
 </div>
 
 <script src="js/vendor/xlsx.full.min.js"></script>
+<script src="js/vendor/chart.umd.js"></script>
 <script src="js/truck.js"></script>
 <script src="js/shell.js"></script>
 <!-- 집품 현황 화면 로직 — 예전엔 js/app.js 하나(약 3800줄)였다가 여러 파일로 분할됨.
@@ -950,6 +1200,7 @@
 <script src="js/pick/assign-panel.js"></script>
 <script src="js/pick/home-table.js"></script>
 <script src="js/pick/extract.js"></script>
+<script src="js/pick/dashboard.js"></script>
 <script src="js/pick/main.js"></script>
 </body>
 </html>

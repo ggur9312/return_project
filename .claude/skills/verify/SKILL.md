@@ -36,17 +36,40 @@ extra `playwright install` needed). No Node/npm available on this machine.
 ### Seeding data through the real UI
 
 There is no debug hook / global `state` export. The only way to get rows into
-`state.rows` is the paste-tab-separated-text feature:
+`state.rows` is the paste-tab-separated-text feature — **now inside a modal**,
+not directly on the page:
 
-1. Fill `#pasteArea` with **tab-separated rows, header row required as the
+1. Navigate to 집품리스트 현황 (`#navHomeBtn`) — 홈 is now the dashboard, not
+   this screen.
+2. Click `#homeUploadBtn` to open `#homeUploadModal` (`#pasteArea` is not
+   visible/fillable until this modal is open — a bare `page.fill("#pasteArea", ...)`
+   without clicking the button first will time out waiting for visibility).
+3. Fill `#pasteArea` with **tab-separated rows, header row required as the
    first line**, exact Korean labels (must match `COLUMNS` in `js/pick/core.js`):
    `그룹번호  마감일시  생성일시  매입유형  업체명  상태  운송타입  존  수량`
    (zone = 존, quantity = 수량, 생성일시 is used for the date-tab / assign
    date filter — format like `2026-07-11 09:00`).
-2. Click `#pasteApplyBtn`.
+4. Click `#pasteApplyBtn` — on success the modal **auto-closes** (`handleParsedMatrix`
+   in core.js calls `closeModalWithTransition` at the end of its success path).
 
-Omitting the header row silently fails validation (`assignMsg`/`statusMsg`
-will say a column/header is missing or no dates found) — always prepend it.
+Omitting the header row silently fails validation (`statusMsg`, inside the
+modal, visible before it auto-closes on error since only the success path
+closes it) — always prepend the header row. File upload works the same way:
+click `#homeUploadBtn`, then `#fileSelectBtn`/drag onto `#dropZone`/set
+`#fileInput.files` — same ids as before, just relocated into the modal.
+
+### 트럭현황 홈 upload (`js/truck.js`, no `window.Pick`)
+
+Same button→modal pattern: click `#truckUploadBtn` → `#truckUploadModal` opens
+(hand-rolled open/close via `openTruckUploadModal`/`closeTruckUploadModal` in
+truck.js — no core.js helpers available here). File: `#excelFile` (still
+requires header-label match on 그룹번호/생성일시/업체명/운송타입, only rows
+with 운송타입==="트럭" survive). Paste: `#truckPasteArea`/`#truckPasteApplyBtn`
+(new — previously truck had no paste option), parsed via a local
+`truckTextToMatrix()` in truck.js (duplicates core.js's `textToMatrix` logic
+since truck.js can't import it). Merges into `globalProcessedData` per-date,
+deduped by `groupNo_company` — unchanged behavior, only the surrounding UI
+moved into a modal. Modal auto-closes only on `processData`'s success path.
 
 ### Home "층별 인원 배치 계산" floor panel
 
@@ -150,6 +173,67 @@ groupNo+생성일자+company+zone) and then switches to the home view.
 `#extractResetBtn` clears the in-memory preview only (`extractedRows`,
 file name, status message) — it does not touch `state.rows`/localStorage,
 so it fires instantly with no `confirmModal` gate (unlike home's `#resetBtn`).
+
+### 반출 대시보드 (`#dashboardView`, `js/pick/dashboard.js`) — now the default landing view
+
+Sidebar order is now 홈(반출 대시보드, default)/집품리스트 현황(old home,
+`#homeView`, same id/logic, just relabeled)/집품 할당/집품리스트 추출.
+The dashboard has its **own independent dataset** (`dashboardRows`,
+localStorage key `pickListDashboardData`) uploaded via `#dashboardUploadBtn`
+→ opens `#dashboardUploadModal` → `#dashboardFileSelectBtn` triggers
+`#dashboardFileInput`, or paste via `#dashboardPasteArea`/`#dashboardPasteApplyBtn`
+(single-sheet `.xlsx` or tab-separated text). The sheet is read
+**positionally** (no header-label matching, unlike home's `matrixToRows`):
+C (index 2) = 내부반출번호, D (index 3) = 생성일시, H (index 7) = 업체명,
+N (index 13) = 상태값, J/K/L (index 9/10/11) = quantity at each of 3 stages
+(반출요청/집품완료/반출완료). Row 1 is assumed to be a header row and
+skipped. To seed a test file with Playwright, build a 14-column-wide
+`aoa_to_sheet` matrix the same way as extract.js's test fixtures above,
+filling only indices 2/3/7/9/10/11/13 per row (other columns can stay empty
+strings).
+
+**Upload is a per-date replace, not a per-row merge**: any 생성일시(D열)
+date present in the newly uploaded rows causes ALL existing `dashboardRows`
+for that date to be dropped and replaced by the new rows for that date —
+other dates are left untouched. This means re-uploading the same date twice
+with different data shows only the second upload's numbers (older snapshot
+of that date is gone), which is intentional (avoids stale/duplicate
+tracking without needing a stable per-row key). `#dashboardUploadStatusMsg`
+reports how many dates were refreshed.
+
+Once uploaded, `#dashboardContent` shows **5 KPI cards**
+(`#dashboardCardPendingValue`/`PickingValue`/`LoadReadyValue`/`LoadingValue`/`ShippedValue`
+— 집품대기/집품중/상차준비완료/상차중/상차완료·반출완료; there is no
+"남은 집품 수량" card anymore, that number now only lives in the donut's
+center label) and two Chart.js `doughnut` canvases
+(`#dashboardPickChart`/`#dashboardLoadChart`, center-overlay labels
+`#dashboardPickRemainingLabel`/`#dashboardLoadRemainingLabel` plus a
+percentage sub-label `#dashboardPickRemainingPct`/`#dashboardLoadRemainingPct`,
+e.g. "전체 40개 중 88% 남음"). Below the donuts, 4 scrollable "남은 OO 업체"
+cards (`#dashboardPendingCompanyList`/`PickingCompanyList`/`LoadReadyCompanyList`/`LoadingCompanyList`,
+each `max-h-48 overflow-y-auto`, with a count badge
+`#dashboardPendingCompanyCount` etc.) list deduped H열 company names per
+status, scoped to the current date-tab selection like the KPI cards.
+For assertions on exact chart data (not just the DOM label text), Chart.js
+exposes `Chart.getChart(canvasElement)` — e.g.
+`page.evaluate(() => Chart.getChart(document.getElementById('dashboardPickChart')).data.datasets[0].data)`
+returns `[remaining, completed]` directly, far more reliable than reading
+pixels. A date-tab bar above the cards (`#dashboardDateTabsContainer`,
+same single/Ctrl-click multi-select pattern as home's date tabs but a
+fully separate implementation scoped to `dashboardRows`) filters the cards
++ donuts + company lists only (not the zone chart, see below). Each date
+tab also has a `.date-tab-close` "✕" that calls `removeDashboardRowsByDate`
+(same `window.confirmModal` gate as core.js's `removeRowsByDate`) to delete
+that date's rows entirely.
+
+**The bottom zone bar-chart card (`#dashboardZoneChart`) is the one place
+on this screen that reads the *other*, unrelated dataset** —
+it aggregates `state.rows` (집품리스트 현황 data, which already has a 존
+column) by exact zone string, not `dashboardRows`, and is unaffected by
+the dashboard's own date-tab selection. It renders (and its empty state
+`#dashboardZoneEmptyState` toggles) purely based on whether 집품리스트
+현황 has any rows at all, independent of whether a dashboard excel has
+ever been uploaded.
 
 ## Gotchas learned
 
