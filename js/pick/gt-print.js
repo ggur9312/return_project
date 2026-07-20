@@ -503,8 +503,8 @@
   }
 
   function spareGroupCount(g, splitSize, overrides) {
-    var override = overrides && overrides[spareGroupKey(g)];
-    return override || Math.ceil(g.qty / splitSize);
+    var override = overrides ? overrides[spareGroupKey(g)] : undefined;
+    return override !== undefined ? override : Math.ceil(g.qty / splitSize);
   }
 
   // 겉 테두리·구분선이 전혀 없는 완전한 백지 한 장(맨 앞 빈 라벨 옵션용)
@@ -582,7 +582,7 @@
         '<div class="flex items-center justify-between gap-2 text-xs py-1 border-b border-slate-100 last:border-b-0">' +
         '<span class="text-slate-700">' + escapeHtml(g.groupNo) + " · " + escapeHtml(g.company) +
         ' <span class="text-slate-400">(' + g.qty.toLocaleString("ko-KR") + "개, 기본 " + defaultCount + "장)</span></span>" +
-        '<input type="number" min="1" step="1" class="spare-group-override w-16 bg-white border border-slate-200 rounded-md px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" data-key="' + escapeHtml(key) + '" placeholder="' + defaultCount + '" value="' + overrideVal + '">' +
+        '<input type="number" min="0" step="1" class="spare-group-override w-16 bg-white border border-slate-200 rounded-md px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500" data-key="' + escapeHtml(key) + '" placeholder="' + defaultCount + '" value="' + overrideVal + '">' +
         "</div>"
       );
     }).join("");
@@ -591,7 +591,10 @@
       input.addEventListener("input", function () {
         var key = input.dataset.key;
         var v = parseInt(input.value, 10);
-        if (v && v >= 1) sparePrintOverrides[key] = v; else delete sparePrintOverrides[key];
+        // 0장(이 조합은 여분 출력에서 제외)도 유효한 값이므로 falsy 체크(v &&)가 아니라
+        // 빈 문자열/NaN인지로만 "값 없음"을 판단한다 — 0은 falsy라서 v && 로 걸러내면
+        // 항상 기본값(defaultCount)으로 되돌아가 0장 지정이 불가능해지는 버그가 있었다.
+        if (input.value.trim() !== "" && !isNaN(v) && v >= 0) sparePrintOverrides[key] = v; else delete sparePrintOverrides[key];
         updateSparePrintPreview();
       });
     });
