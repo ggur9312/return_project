@@ -220,6 +220,7 @@
     assignCreateCloseBtn: document.getElementById("assignCreateCloseBtn"),
     customAssignModal: document.getElementById("customAssignModal"),
     customAssignModalBox: document.getElementById("customAssignModalBox"),
+    customAssignCloseBtn: document.getElementById("customAssignCloseBtn"),
     customAssignRowCountNotice: document.getElementById("customAssignRowCountNotice"),
     customAssignCountInput: document.getElementById("customAssignCountInput"),
     customAssignPreviewContainer: document.getElementById("customAssignPreviewContainer"),
@@ -1059,18 +1060,24 @@
 
   // 필터 적용 결과 수량 요약 + 필터·정렬 활성 개수(이전엔 별도 #filterSortSummary
   // 줄에 있었으나, 하나의 강조 박스로 통합)를 함께 보여준다.
+  // 요약 문장 하나로 뭉치지 않고, 집품리스트 테이블의 "상태" 배지와 같은
+  // rounded-full pill 스타일로 항목별 개별 박스로 나눠 보여준다.
   function renderFilterQtySummary(filteredRows, unfilteredRows) {
     var filterCount = ALL_COLUMNS.filter(function (c) {
       return state.filters[c.key] !== null && state.filters[c.key] !== undefined;
     }).length;
     var sortCount = state.sortRules.length;
-    var extraParts = [];
-    if (filterCount > 0) extraParts.push("필터 " + filterCount + "개");
-    if (sortCount > 0) extraParts.push("정렬 " + sortCount + "개");
-    els.filterQtySummary.textContent =
-      "필터 적용: " + filteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(filteredRows).toLocaleString("ko-KR") + "개 · " +
-      "전체: " + unfilteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개" +
-      (extraParts.length ? " · " + extraParts.join(" · ") : "");
+    var badges = [
+      '<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">필터 적용 ' + filteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(filteredRows).toLocaleString("ko-KR") + '개</span>',
+      '<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">전체 ' + unfilteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(unfilteredRows).toLocaleString("ko-KR") + '개</span>'
+    ];
+    if (filterCount > 0) {
+      badges.push('<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">필터 ' + filterCount + '개</span>');
+    }
+    if (sortCount > 0) {
+      badges.push('<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">정렬 ' + sortCount + '개</span>');
+    }
+    els.filterQtySummary.innerHTML = badges.join("");
   }
 
   // 층 코드의 첫 글자가 숫자면 그 숫자를 "층대" 키로 추출(72→"7", 73→"7", 9→"9",

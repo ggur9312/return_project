@@ -322,6 +322,7 @@
   els.customAssignCountInput.addEventListener("input", updateCustomAssignPreview);
   els.customAssignConfirmBtn.addEventListener("click", confirmCustomAssignment);
   els.customAssignCancelBtn.addEventListener("click", closeCustomAssignModal);
+  els.customAssignCloseBtn.addEventListener("click", closeCustomAssignModal);
 
   els.homeSelectionClearBtn.addEventListener("click", clearHomeSelection);
 
