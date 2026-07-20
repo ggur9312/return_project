@@ -115,12 +115,14 @@
     floorTotalQty: document.getElementById("floorTotalQty"),
     floorUnfilteredQty: document.getElementById("floorUnfilteredQty"),
     floorPerPersonQty: document.getElementById("floorPerPersonQty"),
+    floorPerPersonQtyUnfiltered: document.getElementById("floorPerPersonQtyUnfiltered"),
     filterQtySummary: document.getElementById("filterQtySummary"),
     homeSelectionBar: document.getElementById("homeSelectionBar"),
     homeSelectionSummary: document.getElementById("homeSelectionSummary"),
     homeSelectionAssignBtn: document.getElementById("homeSelectionAssignBtn"),
     homeSelectionClearBtn: document.getElementById("homeSelectionClearBtn"),
     floorBars: document.getElementById("floorBars"),
+    floorBarsUnfiltered: document.getElementById("floorBarsUnfiltered"),
     floorPanelToggleBtn: document.getElementById("floorPanelToggleBtn"),
     floorPanelToggleLabel: document.getElementById("floorPanelToggleLabel"),
     floorPanelToggleIcon: document.getElementById("floorPanelToggleIcon"),
@@ -1072,7 +1074,10 @@
     return m ? m[0] : null;
   }
 
-  function renderFloorPanel(rows, unfilteredRows) {
+  // 요청3+4: rows 하나를 층별로 집계해 표시용 조각(합계/1인당/막대 HTML/접힘 요약)을
+  // 만든다. renderFloorPanel이 필터 적용본/미적용본에 각각 한 번씩 호출해 좌우 카드를
+  // 채운다 — 계산 로직은 완전히 공유, DOM 기록만 호출부에서 갈라진다.
+  function buildFloorSectionResult(rows, labor) {
     var byFloor = {};
     rows.forEach(function (r) {
       var floor = getFloor(r.zone);
@@ -1080,8 +1085,6 @@
     });
     var floors = Object.keys(byFloor).sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); });
 
-    // 실제로 같은 첫자리를 공유하는 층이 2개 이상일 때만 "층대" 합계를 보여준다 —
-    // 층이 하나뿐이면 "N층대"가 "N층"과 완전히 같은 값이라 중복 표시가 된다.
     var familyQty = {};
     var familyMembers = {};
     floors.forEach(function (f) {
@@ -1091,29 +1094,27 @@
       familyMembers[family] = familyMembers[family] || [];
       familyMembers[family].push(f);
     });
-    var multiFamilies = Object.keys(familyQty).filter(function (fam) { return familyMembers[fam].length > 1; });
+    // 요청4: 이전엔 같은 층대 멤버가 2개 이상일 때만 층대 요약줄을 보여줬으나(중복
+    // 표시 방지 목적으로 추가됐던 게이트), 사용자가 멤버 1개짜리 층대도 보여달라고
+    // 명시적으로 요청 — familyQty에 등록된 모든 층대를 그대로 쓴다.
+    var allFamilies = Object.keys(familyQty);
 
     var totalQty = floors.reduce(function (sum, f) { return sum + byFloor[f]; }, 0);
-    els.floorTotalQty.textContent = totalQty.toLocaleString("ko-KR") + "개";
-    els.floorUnfilteredQty.textContent = sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
-
-    var labor = parseFloat(els.laborInput.value);
     var hasLabor = !isNaN(labor) && labor > 0 && totalQty > 0;
     var perPersonText = hasLabor ? Math.round(totalQty / labor).toLocaleString("ko-KR") + "개" : "-";
-    els.floorPerPersonQty.textContent = perPersonText;
     var maxQty = floors.reduce(function (m, f) { return Math.max(m, byFloor[f]); }, 0) || 1;
 
-    var familySummaryText = multiFamilies
+    var familySummaryText = allFamilies
       .sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); })
       .map(function (fam) { return fam + "층 " + familyQty[fam].toLocaleString("ko-KR") + "개"; })
       .join(" · ");
     var floorSummaryText = floors.map(function (f) { return f + "층 " + byFloor[f].toLocaleString("ko-KR") + "개"; }).join(" · ");
-    els.floorPanelSummary.textContent = floors.length
+    var summaryText = floors.length
       ? (familySummaryText ? familySummaryText + " · " : "") + floorSummaryText
       : "데이터 없음";
 
     var renderedFamilies = {};
-    els.floorBars.innerHTML = floors.map(function (f) {
+    var barsHtml = floors.map(function (f) {
       var qty = byFloor[f];
       var widthPct = (qty / maxQty) * 100;
 
@@ -1122,7 +1123,7 @@
       // 인당계산과 같은 급의 작고 수수한 텍스트로 축소해 대분류와 중복돼 보이지
       // 않게 한다(정보 자체를 숨기지는 않음). 수량/막대는 항상 그대로 유지.
       var family = getFloorFamily(f);
-      var isMultiFamilyMember = !!family && multiFamilies.indexOf(family) !== -1;
+      var isMultiFamilyMember = !!family && allFamilies.indexOf(family) !== -1;
 
       var laborHtml;
       var perPersonHtml;
@@ -1180,6 +1181,23 @@
       }
       return familyHeaderHtml + floorRowHtml;
     }).join("");
+
+    return { totalQty: totalQty, perPersonText: perPersonText, summaryText: summaryText, barsHtml: barsHtml };
+  }
+
+  function renderFloorPanel(rows, unfilteredRows) {
+    var labor = parseFloat(els.laborInput.value);
+
+    var filteredResult = buildFloorSectionResult(rows, labor);
+    els.floorTotalQty.textContent = filteredResult.totalQty.toLocaleString("ko-KR") + "개";
+    els.floorPerPersonQty.textContent = filteredResult.perPersonText;
+    els.floorBars.innerHTML = filteredResult.barsHtml;
+    els.floorPanelSummary.textContent = filteredResult.summaryText;
+
+    var unfilteredResult = buildFloorSectionResult(unfilteredRows, labor);
+    els.floorUnfilteredQty.textContent = unfilteredResult.totalQty.toLocaleString("ko-KR") + "개";
+    els.floorPerPersonQtyUnfiltered.textContent = unfilteredResult.perPersonText;
+    els.floorBarsUnfiltered.innerHTML = unfilteredResult.barsHtml;
   }
 
   // 접기/펼치기 카드 공용 헬퍼(층별 카드, 업로드 카드) — 라벨/아이콘/본문(+선택적 요약줄)을

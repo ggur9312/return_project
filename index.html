@@ -43,9 +43,9 @@
     .p-col-title { font-size:10pt;font-weight:bold;height:28px;margin-bottom:0; color: #555; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
     .p-col-content { flex: 1; display: flex; align-items: center; justify-content: center; font-size:16pt; font-weight:bold; text-align: center; word-break: break-all; }
     .p-col-content svg { margin-top: 8px; }
-    .p-barcode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 8px; width: 100%; }
-    .p-barcode-item { display: flex; justify-content: center; min-width: 0; }
-    .p-barcode-item svg { max-width: 100%; height: auto; margin-top: 0; }
+    .p-barcode-stack { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; }
+    .p-barcode-stack-item { display: flex; justify-content: center; min-width: 0; width: 100%; }
+    .p-barcode-stack-item svg { max-width: 100%; height: auto; margin-top: 0; }
 
     /* --- 트럭 출력 전용 테이블 룰 --- */
     .p-table { width:100%;table-layout:fixed;border-collapse:collapse;text-align:center;font-size:12pt;page-break-inside:avoid;}
@@ -373,11 +373,29 @@
         <label class="text-sm text-slate-600 flex items-center gap-2">총 투입 인원
           <input type="number" id="laborInput" min="0" step="1" placeholder="예: 10" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </label>
-        <span class="text-sm text-slate-500">필터 적용 수량: <span id="floorTotalQty" class="font-bold tabular-nums text-slate-900">0개</span></span>
-        <span class="text-sm text-slate-500">전체 수량(필터 미적용): <span id="floorUnfilteredQty" class="font-bold tabular-nums text-slate-500">0개</span></span>
-        <span class="text-sm text-slate-500">1인당 할당량: <span id="floorPerPersonQty" class="font-bold tabular-nums text-slate-900">-</span></span>
       </div>
-      <div id="floorBars" class="flex flex-col gap-2"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="border border-slate-200 rounded-xl p-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-3">
+            <h3 class="text-xs font-semibold text-slate-700">전체 수량 (필터 미적용)</h3>
+            <div class="text-xs text-slate-500 flex items-center gap-3">
+              <span>합계 <span id="floorUnfilteredQty" class="font-bold tabular-nums text-slate-900">0개</span></span>
+              <span>1인당 <span id="floorPerPersonQtyUnfiltered" class="font-bold tabular-nums text-slate-900">-</span></span>
+            </div>
+          </div>
+          <div id="floorBarsUnfiltered" class="flex flex-col gap-2"></div>
+        </div>
+        <div class="border border-slate-200 rounded-xl p-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-3">
+            <h3 class="text-xs font-semibold text-slate-700">필터 적용 수량</h3>
+            <div class="text-xs text-slate-500 flex items-center gap-3">
+              <span>합계 <span id="floorTotalQty" class="font-bold tabular-nums text-slate-900">0개</span></span>
+              <span>1인당 <span id="floorPerPersonQty" class="font-bold tabular-nums text-slate-900">-</span></span>
+            </div>
+          </div>
+          <div id="floorBars" class="flex flex-col gap-2"></div>
+        </div>
+      </div>
     </div>
   </section>
 

@@ -837,6 +837,11 @@ function executePrint() {
     const dateLimit = document.getElementById('pInputDateLimit').value;
     const groupLimit = document.getElementById('pInputGroupLimit').value;
     const groupLimitCodes = groupLimit.split(',').map(s => s.trim()).filter(s => s !== '');
+    // 3개씩 묶어 콤마로 재조합한 문자열 하나를 바코드 한 줄로 인코딩 (그리드 아님, 세로 스택).
+    const groupLimitLines = [];
+    for (let i = 0; i < groupLimitCodes.length; i += 3) {
+        groupLimitLines.push(groupLimitCodes.slice(i, i + 3).join(','));
+    }
 
     const selectedDates = Array.from(
         document.querySelectorAll('#pDateCheckboxList input[type="checkbox"]:checked')
@@ -862,7 +867,7 @@ function executePrint() {
                  </div>`;
     }
 
-    if (dateLimit.trim() !== '' || groupLimitCodes.length > 0) {
+    if (dateLimit.trim() !== '' || groupLimitLines.length > 0) {
         html += `<div class="p-row">`;
 
         // Left col (Date)
@@ -871,12 +876,12 @@ function executePrint() {
                     <div class="p-col-content">${dateLimit}</div>
                  </div>`;
 
-        // Right col (Barcode) — 콤마로 구분된 각 코드를 3개씩 한 줄에 배치되는 그리드로 렌더링
+        // Right col (Barcode) — 3개씩 콤마로 묶은 문자열을 한 줄씩 세로로 쌓아 렌더링
         html += `<div class="p-col">
                     <div class="p-col-title">그룹번호 상차제한</div>
                     <div class="p-col-content">
-                        ${groupLimitCodes.length > 0 ? `<div class="p-barcode-grid">
-                            ${groupLimitCodes.map((code, i) => `<div class="p-barcode-item"><svg id="printBarcode-${i}"></svg></div>`).join('')}
+                        ${groupLimitLines.length > 0 ? `<div class="p-barcode-stack">
+                            ${groupLimitLines.map((line, i) => `<div class="p-barcode-stack-item"><svg id="printBarcode-${i}"></svg></div>`).join('')}
                         </div>` : ''}
                     </div>
                  </div>`;
@@ -890,22 +895,21 @@ function executePrint() {
 
     printArea.innerHTML = html;
 
-    // Generate Barcode(s) — 콤마로 구분된 각 코드를 개별 CODE128로 렌더링.
-    // 3개짜리 텍스트 하나를 거대한 바코드로 만들던 기존 방식은 .p-col 폭을
-    // 넘어서 잘려 보이는 문제가 있었음 — 코드별로 나눠 그리드에 배치해 해결.
-    groupLimitCodes.forEach((code, i) => {
+    // 3개씩 콤마로 묶인 줄 하나당 바코드 하나 — displayValue로 보이는 텍스트가
+    // 곧 콤마 포함 원본 청크 문자열 그대로가 되도록 한다.
+    groupLimitLines.forEach((line, i) => {
         try {
-            JsBarcode(`#printBarcode-${i}`, code, {
+            JsBarcode(`#printBarcode-${i}`, line, {
                 format: "CODE128",
-                width: 1.3,
-                height: 32,
+                width: 1.5,
+                height: 36,
                 displayValue: true,
-                fontSize: 11,
+                fontSize: 13,
                 margin: 0
             });
         } catch (e) {
             console.error("Barcode generation failed", e);
-            document.getElementById(`printBarcode-${i}`).outerHTML = `<span>[바코드 변환 오류: ${code}]</span>`;
+            document.getElementById(`printBarcode-${i}`).outerHTML = `<span>[바코드 변환 오류: ${line}]</span>`;
         }
     });
 
