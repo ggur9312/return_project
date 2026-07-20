@@ -53,6 +53,7 @@
   var nextCustomAssignSeq = Pick.nextCustomAssignSeq;
   var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
   var splitBalanced = Pick.splitBalanced;
+  var renderWorkerGroupCards = Pick.renderWorkerGroupCards;
   var handleExtractFile = Pick.handleExtractFile;
   var mergeExtractedIntoHome = Pick.mergeExtractedIntoHome;
   var resetExtractPreview = Pick.resetExtractPreview;
@@ -121,13 +122,13 @@
 
   var customAssignRows = [];
   var customAssignGroups = null; // splitBalanced 결과 — 작업자별 행 배열
+  var customAssignActiveWorkerIdx = null; // 커스텀 할당 미리보기 탭(전체/작업자 N) 상태
 
   // 홈 드래그선택 "할당" 버튼에서 여는 작은 모달 — 선택한 행들을 투입 인원수만큼
   // splitBalanced로 나눠 커스텀(floorInput 없는) assignConfig를 만든다. 정식
-  // 층수+인원 생성 모달(#assignCreateModal)과 달리 층/날짜 필터가 없고, 행 단위
-  // 요약(작업자별 행수·수량)만 미리보기로 보여준다 — 상세 행 단위 재배정은
-  // 확정 후 결과 화면(작업자 카드의 이동 select)에서 이미 가능하므로 여기서
-  // 중복 구현하지 않는다.
+  // 층수+인원 생성 모달(#assignCreateModal)과 달리 층/날짜 필터가 없을 뿐, 미리보기
+  // 자체는 assign-panel.js의 renderWorkerGroupCards를 그대로 재사용해 정식 모달과
+  // 동일한 작업자별 카드+행 단위 상세 테이블(재배정 select 포함)로 보여준다.
   function openCustomAssignModal(rows) {
     customAssignRows = rows.slice();
     els.customAssignRowCountNotice.innerHTML = '선택한 <span class="font-bold text-slate-900">' + customAssignRows.length + '</span>행을 할당합니다.';
@@ -146,10 +147,17 @@
     var items = customAssignRows.map(function (r) { return { zone: r.zone || "(미지정)", qty: r.quantity || 0, rows: [r] }; });
     var groups = splitBalanced(items, count);
     customAssignGroups = groups.map(function (g) { return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []); });
-    els.customAssignPreviewContainer.innerHTML = customAssignGroups.map(function (groupRows, idx) {
-      var total = groupRows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
-      return '<div class="flex items-center justify-between gap-2"><span class="font-medium text-slate-700">작업자 ' + (idx + 1) + '</span><span class="text-slate-500">' + groupRows.length + '행 · <span class="font-bold text-indigo-600">' + total.toLocaleString("ko-KR") + '개</span></span></div>';
-    }).join("");
+    // 인원수를 바꿀 때마다 그룹 배열이 통째로 새로 만들어지므로, 이전 activeIdx가
+    // 새 그룹 수 범위를 벗어나 카드가 통째로 빈 채로 렌더링되는 것을 막기 위해 매번 리셋.
+    customAssignActiveWorkerIdx = null;
+    renderCustomAssignPreview();
+  }
+
+  function renderCustomAssignPreview() {
+    renderWorkerGroupCards(els.customAssignPreviewContainer, customAssignGroups, customAssignActiveWorkerIdx, function (newIdx) {
+      customAssignActiveWorkerIdx = newIdx;
+      renderCustomAssignPreview();
+    });
   }
 
   function confirmCustomAssignment() {

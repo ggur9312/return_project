@@ -852,14 +852,18 @@
     );
   }
 
-  function renderAssignPreview() {
-    if (!assignPreviewGroups) {
-      els.assignPreviewContainer.innerHTML = "";
+  // 작업자별 카드+탭 미리보기 렌더링 — #assignCreateModal/#customAssignModal 두 모달이
+  // 함께 쓴다. container/groups/activeIdx를 인자로 받아 특정 컨테이너나 모듈 클로저
+  // 상태를 하드코딩하지 않음: groups는 호출자가 소유한 배열을 그대로 참조로 받아 행
+  // 재배정(select change) 시 splice/push로 직접 변경한다(호출자 쪽 변수도 같은 배열
+  // 객체이므로 별도 동기화 없이 자동 반영됨). activeIdx 변경은 mutate 대신 콜백으로
+  // 위임해 호출자가 자기 모듈 변수를 갱신한 뒤 다시 이 함수를 호출하게 한다.
+  function renderWorkerGroupCards(container, groups, activeIdx, onActiveIdxChange) {
+    if (!groups) {
+      container.innerHTML = "";
       return;
     }
-    var groups = assignPreviewGroups;
     var workerCount = groups.length;
-    var activeIdx = assignPreviewActiveWorkerIdx;
 
     var tabsHtml = "";
     if (groups.length > 1) {
@@ -885,27 +889,33 @@
       );
     }).join("");
 
-    els.assignPreviewContainer.innerHTML = tabsHtml + cardsHtml;
+    container.innerHTML = tabsHtml + cardsHtml;
 
-    Array.prototype.forEach.call(els.assignPreviewContainer.querySelectorAll(".assign-preview-tab-btn"), function (btn) {
+    Array.prototype.forEach.call(container.querySelectorAll(".assign-preview-tab-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var v = btn.dataset.workerIdx;
-        assignPreviewActiveWorkerIdx = v === "" ? null : parseInt(v, 10);
-        renderAssignPreview();
+        onActiveIdxChange(v === "" ? null : parseInt(v, 10));
       });
     });
 
-    Array.prototype.forEach.call(els.assignPreviewContainer.querySelectorAll(".assign-preview-row-select"), function (sel) {
+    Array.prototype.forEach.call(container.querySelectorAll(".assign-preview-row-select"), function (sel) {
       sel.addEventListener("change", function () {
         var fromIdx = parseInt(sel.dataset.workerIdx, 10);
         var rowIdx = parseInt(sel.dataset.rowIdx, 10);
         var toIdx = parseInt(sel.value, 10);
         if (fromIdx === toIdx) return;
-        var row = assignPreviewGroups[fromIdx][rowIdx];
-        assignPreviewGroups[fromIdx].splice(rowIdx, 1);
-        assignPreviewGroups[toIdx].push(row);
-        renderAssignPreview();
+        var row = groups[fromIdx][rowIdx];
+        groups[fromIdx].splice(rowIdx, 1);
+        groups[toIdx].push(row);
+        renderWorkerGroupCards(container, groups, activeIdx, onActiveIdxChange);
       });
+    });
+  }
+
+  function renderAssignPreview() {
+    renderWorkerGroupCards(els.assignPreviewContainer, assignPreviewGroups, assignPreviewActiveWorkerIdx, function (newIdx) {
+      assignPreviewActiveWorkerIdx = newIdx;
+      renderAssignPreview();
     });
   }
 
@@ -1007,6 +1017,7 @@
   Pick.assignPreviewActiveWorkerIdx = assignPreviewActiveWorkerIdx;
   Pick.generateAssignPreview = generateAssignPreview;
   Pick.renderAssignPreviewRows = renderAssignPreviewRows;
+  Pick.renderWorkerGroupCards = renderWorkerGroupCards;
   Pick.renderAssignPreview = renderAssignPreview;
   Pick.confirmAssignConfig = confirmAssignConfig;
   Pick.resetAssignCreateModal = resetAssignCreateModal;
