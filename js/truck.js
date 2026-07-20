@@ -76,6 +76,85 @@ function closeTruckUploadModal() {
 document.getElementById('truckUploadBtn').addEventListener('click', openTruckUploadModal);
 document.getElementById('truckUploadCloseBtn').addEventListener('click', closeTruckUploadModal);
 
+
+/* ================================================================
+   SECTION 2B-2: 트럭 건 수동 추가 모달
+   ================================================================ */
+const truckAddModal = document.getElementById('truckAddModal');
+const truckAddModalBox = document.getElementById('truckAddModalBox');
+
+function openTruckAddModal() {
+    if (!truckAddModal.classList.contains('hidden')) return;
+    if (window.lockBodyScroll) window.lockBodyScroll();
+    document.getElementById('truckAddGroupNoInput').value = '';
+    document.getElementById('truckAddDateInput').value = '';
+    document.getElementById('truckAddCompanyInput').value = '';
+    document.getElementById('truckAddMsg').classList.add('hidden');
+    truckAddModal.classList.remove('hidden');
+    truckAddModal.classList.add('flex');
+    requestAnimationFrame(() => {
+        truckAddModal.classList.remove('opacity-0');
+        truckAddModalBox.classList.remove('scale-95');
+    });
+}
+
+function closeTruckAddModal() {
+    if (truckAddModal.classList.contains('opacity-0')) return;
+    truckAddModal.classList.add('opacity-0');
+    truckAddModalBox.classList.add('scale-95');
+    setTimeout(() => {
+        truckAddModal.classList.remove('flex');
+        truckAddModal.classList.add('hidden');
+        if (window.unlockBodyScroll) window.unlockBodyScroll();
+    }, 200);
+}
+
+function confirmTruckAdd() {
+    const groupNo = document.getElementById('truckAddGroupNoInput').value.trim();
+    const dateVal = document.getElementById('truckAddDateInput').value;
+    const company = document.getElementById('truckAddCompanyInput').value.trim();
+    const msgEl = document.getElementById('truckAddMsg');
+
+    if (!dateVal || !company) {
+        msgEl.textContent = '생성일시와 업체명은 필수입니다.';
+        msgEl.classList.remove('hidden');
+        return;
+    }
+
+    if (!globalProcessedData[dateVal]) globalProcessedData[dateVal] = [];
+
+    // processData()와 동일한 그룹번호_업체명 중복 검사(같은 날짜 버킷 내에서만)
+    const uniqueKey = `${groupNo}_${company}`;
+    const isDuplicate = globalProcessedData[dateVal].some(item => `${item.groupNo}_${item.company}` === uniqueKey);
+    if (isDuplicate) {
+        msgEl.textContent = '이미 같은 그룹번호/업체명의 데이터가 해당 날짜에 존재합니다.';
+        msgEl.classList.remove('hidden');
+        return;
+    }
+
+    globalProcessedData[dateVal].push({
+        groupNo: groupNo,
+        company: company,
+        picking: false,
+        inputs: { palette: 'KPP', emptyGt: 0, palettePick: 0, paletteGt: 0 }
+    });
+    globalProcessedData[dateVal].sort((a, b) => a.company.localeCompare(b.company, 'ko-KR'));
+
+    document.getElementById('truckEmptyState').classList.add('hidden');
+    document.getElementById('activeFileInfo').classList.remove('hidden');
+
+    activeTabDate = dateVal; // 방금 추가한 날짜 탭이 바로 보이도록
+    renderDashboard(globalProcessedData);
+    closeTruckAddModal();
+    showToast('트럭 건이 추가되었습니다.');
+}
+
+document.getElementById('truckAddBtn').addEventListener('click', openTruckAddModal);
+document.getElementById('truckAddCloseBtn').addEventListener('click', closeTruckAddModal);
+document.getElementById('truckAddCancelBtn').addEventListener('click', closeTruckAddModal);
+document.getElementById('truckAddConfirmBtn').addEventListener('click', confirmTruckAdd);
+
+
 // core.js의 textToMatrix()와 동일 로직(줄바꿈/탭 분리) — js/truck.js는 window.Pick과
 // 별개라 로컬로 복제한다.
 function truckTextToMatrix(text) {
