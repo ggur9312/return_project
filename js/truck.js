@@ -925,13 +925,12 @@ function executePrint() {
    SECTION 12: SIDEBAR VIEW SWITCHING (홈 / 트럭주기)
    ================================================================ */
 function truckSwitchView(view) {
-    if (window.flashPageLoading) window.flashPageLoading();
     const homeView = document.getElementById('truckHomeView');
     const cycleView = document.getElementById('cycleView');
     const navHomeBtn = document.getElementById('truckNavHomeBtn');
     const navCycleBtn = document.getElementById('navCycleBtn');
 
-    const activeClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-white text-indigo-700 shadow-sm";
+    const activeClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors text-white";
     const inactiveClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white";
 
     if (view === 'cycle') {

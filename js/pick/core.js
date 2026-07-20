@@ -72,7 +72,7 @@
   var FILTER_BTN_INACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
   var FILTER_BTN_ACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-indigo-600 text-white shadow-md shadow-indigo-100 font-medium text-xs px-3 py-1.5 rounded-lg transition-all";
 
-  var NAV_BTN_ACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-white text-indigo-700 shadow-sm";
+  var NAV_BTN_ACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors text-white";
   var NAV_BTN_INACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white";
   var ASSIGN_TAB_ACTIVE = "px-4 py-2.5 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100 flex items-center gap-2 transition-all duration-200";
   var ASSIGN_TAB_INACTIVE = "px-4 py-2.5 text-sm font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-all duration-200";
@@ -1067,14 +1067,14 @@
     }).length;
     var sortCount = state.sortRules.length;
     var badges = [
-      '<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">필터 적용 ' + filteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(filteredRows).toLocaleString("ko-KR") + '개</span>',
-      '<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">전체 ' + unfilteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(unfilteredRows).toLocaleString("ko-KR") + '개</span>'
+      '<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">필터 적용 ' + filteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(filteredRows).toLocaleString("ko-KR") + '개</span>',
+      '<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-slate-100 text-slate-600 border border-slate-200">전체 ' + unfilteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(unfilteredRows).toLocaleString("ko-KR") + '개</span>'
     ];
     if (filterCount > 0) {
-      badges.push('<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">필터 ' + filterCount + '개</span>');
+      badges.push('<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-amber-50 text-amber-700 border border-amber-100">필터 ' + filterCount + '개</span>');
     }
     if (sortCount > 0) {
-      badges.push('<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">정렬 ' + sortCount + '개</span>');
+      badges.push('<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-100">정렬 ' + sortCount + '개</span>');
     }
     els.filterQtySummary.innerHTML = badges.join("");
   }
@@ -1308,7 +1308,6 @@
   // --- 뷰 전환 (홈 / 집품 할당) ---
 
   function switchView(view) {
-    if (window.flashPageLoading) window.flashPageLoading();
     // 홈 화면의 드래그/Ctrl 선택 상태는 홈 화면에서만 유효해야 하므로, 다른
     // 화면으로 이동할 때는 항상 명시적으로 해제한다(Pick.refreshAll()의 암묵적
     // 초기화는 홈이 보일 때만 실행되어 이 경우를 놓친다).

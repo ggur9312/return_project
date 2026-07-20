@@ -98,9 +98,9 @@
     if (view === "dashboard" && window.Pick && window.Pick.refreshAll) window.Pick.refreshAll();
   }
 
-  dashboardBtn.addEventListener("click", function () { window.flashPageLoading && window.flashPageLoading(); apply("dashboard"); });
-  pickBtn.addEventListener("click", function () { window.flashPageLoading && window.flashPageLoading(); apply("pick"); });
-  truckBtn.addEventListener("click", function () { window.flashPageLoading && window.flashPageLoading(); apply("truck"); });
+  dashboardBtn.addEventListener("click", function () { apply("dashboard"); });
+  pickBtn.addEventListener("click", function () { apply("pick"); });
+  truckBtn.addEventListener("click", function () { apply("truck"); });
 
   var saved = null;
   try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) {}
