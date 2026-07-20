@@ -248,7 +248,7 @@
       var opts = "";
       for (var w = 0; w < groupCount; w++) {
         var selected = (String(c.id) === String(cfgId) && w === workerIdx) ? " selected" : "";
-        opts += '<option value="' + c.id + ':' + w + '"' + selected + '>' + (c.custom ? ("커스텀 " + c.customSeq) : ("작업자 " + (w + 1))) + "</option>";
+        opts += '<option value="' + c.id + ':' + w + '"' + selected + '>' + (c.custom ? ("커스텀 " + c.customSeq + (groupCount > 1 ? " - 작업자 " + (w + 1) : "")) : ("작업자 " + (w + 1))) + "</option>";
       }
       return '<optgroup label="' + escapeHtml(label) + '">' + opts + "</optgroup>";
     }).join("");
@@ -808,9 +808,10 @@
     if (!rows.length) {
       return '<div class="px-5 py-4 text-center text-xs text-slate-400">배정 없음</div>';
     }
+    var assignedIds = getAssignedRowIdSet();
     var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
       return '<th class="px-2 py-1.5 text-left' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
-    }).join("") + '<th class="px-2 py-1.5 text-right">작업자</th>';
+    }).join("") + '<th class="px-2 py-1.5 text-left">할당여부</th><th class="px-2 py-1.5 text-right">작업자</th>';
     var workerOptionsHtml = "";
     for (var wIdx = 0; wIdx < workerCount; wIdx++) {
       workerOptionsHtml += '<option value="' + wIdx + '"' + (wIdx === workerIdx ? " selected" : "") + '>작업자 ' + (wIdx + 1) + "</option>";
@@ -820,6 +821,9 @@
         '<select class="assign-preview-row-select bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-worker-idx="' + workerIdx + '" data-row-idx="' + rowIdx + '">' +
         workerOptionsHtml +
         "</select>";
+      var assignedBadge = assignedIds.has(r.id)
+        ? '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">할당됨</span>'
+        : '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-50 text-slate-400 border border-slate-200">미할당</span>';
       return (
         '<tr class="border-b border-slate-100 last:border-b-0">' +
         ASSIGN_DETAIL_COLUMNS.map(function (col) {
@@ -834,6 +838,7 @@
           }
           return '<td class="px-2 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
+        '<td class="px-2 py-1.5 whitespace-nowrap">' + assignedBadge + "</td>" +
         '<td class="px-2 py-1.5 text-right">' + selectHtml + "</td>" +
         "</tr>"
       );
@@ -847,14 +852,18 @@
     );
   }
 
-  function renderAssignPreview() {
-    if (!assignPreviewGroups) {
-      els.assignPreviewContainer.innerHTML = "";
+  // 작업자별 카드+탭 미리보기 렌더링 — #assignCreateModal/#customAssignModal 두 모달이
+  // 함께 쓴다. container/groups/activeIdx를 인자로 받아 특정 컨테이너나 모듈 클로저
+  // 상태를 하드코딩하지 않음: groups는 호출자가 소유한 배열을 그대로 참조로 받아 행
+  // 재배정(select change) 시 splice/push로 직접 변경한다(호출자 쪽 변수도 같은 배열
+  // 객체이므로 별도 동기화 없이 자동 반영됨). activeIdx 변경은 mutate 대신 콜백으로
+  // 위임해 호출자가 자기 모듈 변수를 갱신한 뒤 다시 이 함수를 호출하게 한다.
+  function renderWorkerGroupCards(container, groups, activeIdx, onActiveIdxChange) {
+    if (!groups) {
+      container.innerHTML = "";
       return;
     }
-    var groups = assignPreviewGroups;
     var workerCount = groups.length;
-    var activeIdx = assignPreviewActiveWorkerIdx;
 
     var tabsHtml = "";
     if (groups.length > 1) {
@@ -880,27 +889,33 @@
       );
     }).join("");
 
-    els.assignPreviewContainer.innerHTML = tabsHtml + cardsHtml;
+    container.innerHTML = tabsHtml + cardsHtml;
 
-    Array.prototype.forEach.call(els.assignPreviewContainer.querySelectorAll(".assign-preview-tab-btn"), function (btn) {
+    Array.prototype.forEach.call(container.querySelectorAll(".assign-preview-tab-btn"), function (btn) {
       btn.addEventListener("click", function () {
         var v = btn.dataset.workerIdx;
-        assignPreviewActiveWorkerIdx = v === "" ? null : parseInt(v, 10);
-        renderAssignPreview();
+        onActiveIdxChange(v === "" ? null : parseInt(v, 10));
       });
     });
 
-    Array.prototype.forEach.call(els.assignPreviewContainer.querySelectorAll(".assign-preview-row-select"), function (sel) {
+    Array.prototype.forEach.call(container.querySelectorAll(".assign-preview-row-select"), function (sel) {
       sel.addEventListener("change", function () {
         var fromIdx = parseInt(sel.dataset.workerIdx, 10);
         var rowIdx = parseInt(sel.dataset.rowIdx, 10);
         var toIdx = parseInt(sel.value, 10);
         if (fromIdx === toIdx) return;
-        var row = assignPreviewGroups[fromIdx][rowIdx];
-        assignPreviewGroups[fromIdx].splice(rowIdx, 1);
-        assignPreviewGroups[toIdx].push(row);
-        renderAssignPreview();
+        var row = groups[fromIdx][rowIdx];
+        groups[fromIdx].splice(rowIdx, 1);
+        groups[toIdx].push(row);
+        renderWorkerGroupCards(container, groups, activeIdx, onActiveIdxChange);
       });
+    });
+  }
+
+  function renderAssignPreview() {
+    renderWorkerGroupCards(els.assignPreviewContainer, assignPreviewGroups, assignPreviewActiveWorkerIdx, function (newIdx) {
+      assignPreviewActiveWorkerIdx = newIdx;
+      renderAssignPreview();
     });
   }
 
@@ -1002,6 +1017,7 @@
   Pick.assignPreviewActiveWorkerIdx = assignPreviewActiveWorkerIdx;
   Pick.generateAssignPreview = generateAssignPreview;
   Pick.renderAssignPreviewRows = renderAssignPreviewRows;
+  Pick.renderWorkerGroupCards = renderWorkerGroupCards;
   Pick.renderAssignPreview = renderAssignPreview;
   Pick.confirmAssignConfig = confirmAssignConfig;
   Pick.resetAssignCreateModal = resetAssignCreateModal;

@@ -39,14 +39,14 @@ There is no debug hook / global `state` export. The only way to get rows into
 `state.rows` is the paste-tab-separated-text feature — **now inside a modal**,
 not directly on the page:
 
-1. Click `#switchToPickBtn` in the top-level `#appSwitcherBar` first — 집품현황
+1. Click `#switchToPickBtn` in the left `#appSidebar` first — 집품현황
    (`#pickApp`) starts `hidden` by default now (대시보드/`#dashboardApp` is the
-   default landing tab). Once inside, `#navHomeBtn`/`#homeView` (집품리스트
-   현황) are already the default-active sub-view — no `#navHomeBtn` click
-   needed unless you've navigated elsewhere in that sidebar (`#mainNavAside`
-   now has only 3 items: 집품리스트 현황/집품 할당/집품리스트 추출 — the old
-   "홈" dashboard nav item was removed when 대시보드 was promoted to a
-   top-level `#appSwitcherBar` tab).
+   default landing tab). Clicking it also expands `#pickSidebarSubnav` (3
+   items: 집품리스트 현황/집품 할당/집품리스트 추출) directly beneath the
+   집품 현황 button in the sidebar. Once inside, `#navHomeBtn`/`#homeView`
+   (집품리스트 현황) are already the default-active sub-view — no
+   `#navHomeBtn` click needed unless you've navigated elsewhere in that
+   sub-nav.
 2. Click `#homeUploadBtn` to open `#homeUploadModal` (`#pasteArea` is not
    visible/fillable until this modal is open — a bare `page.fill("#pasteArea", ...)`
    without clicking the button first will time out waiting for visibility).
@@ -66,8 +66,10 @@ click `#homeUploadBtn`, then `#fileSelectBtn`/drag onto `#dropZone`/set
 
 ### 트럭리스트 현황 upload (`js/truck.js`, no `window.Pick`)
 
-Click `#switchToTruckBtn` in `#appSwitcherBar` first to reveal `#truckApp`
-(also starts `hidden` by default now). Same button→modal pattern: click
+Click `#switchToTruckBtn` in the left `#appSidebar` first to reveal `#truckApp`
+(also starts `hidden` by default now; this also expands `#truckSidebarSubnav`
+— 트럭리스트 현황/트럭주기 — beneath the 트럭 현황 button). Same
+button→modal pattern: click
 `#truckUploadBtn` → `#truckUploadModal` opens
 (hand-rolled open/close via `openTruckUploadModal`/`closeTruckUploadModal` in
 truck.js — no core.js helpers available here). File: `#excelFile` (still
@@ -182,17 +184,18 @@ groupNo+생성일자+company+zone) and then switches to the home view.
 file name, status message) — it does not touch `state.rows`/localStorage,
 so it fires instantly with no `confirmModal` gate (unlike home's `#resetBtn`).
 
-### 반출 대시보드 (`#dashboardView` inside `#dashboardApp`, `js/pick/dashboard.js`) — now a top-level `#appSwitcherBar` tab, default on load
+### 반출 대시보드 (`#dashboardView` inside `#dashboardApp`, `js/pick/dashboard.js`) — a top-level `#appSidebar` tab, default on load
 
-대시보드 is no longer inside 집품현황's own sidebar — it's a top-level tab
-(`#switchToDashboardBtn` in `#appSwitcherBar`, alongside `#switchToPickBtn`/
-`#switchToTruckBtn`), the default visible tab on first load (`#dashboardApp`
-has no `hidden` class by default; `#pickApp`/`#truckApp` both do). It has no
-sidebar of its own. 집품현황의 내부 `#mainNavAside`는 이제 3개 항목만 있다:
-집품리스트 현황(old home, `#homeView`, same id/logic, now the sidebar's
-default-active item)/집품 할당/집품리스트 추출 — "홈"(대시보드) 항목은
-사라졌다. Switching between `#appSwitcherBar` tabs (including into
-대시보드) is handled entirely by `js/shell.js`, not `js/pick/main.js`.
+대시보드 is a top-level tab (`#switchToDashboardBtn` in the left `#appSidebar`,
+alongside `#switchToPickBtn`/`#switchToTruckBtn`), the default visible tab on
+first load (`#dashboardApp` has no `hidden` class by default; `#pickApp`/
+`#truckApp` both do). It has no sub-nav group of its own (unlike
+집품현황/트럭현황, clicking it doesn't expand anything below it). 집품현황의
+서브내비(`#pickSidebarSubnav`)는 3개 항목만 있다: 집품리스트 현황(old home,
+`#homeView`, same id/logic, its default-active item)/집품 할당/집품리스트
+추출 — "홈"(대시보드) 항목은 없다. Switching between `#appSidebar` tabs
+(including into 대시보드) is handled entirely by `js/shell.js`, not
+`js/pick/main.js`.
 The dashboard has its **own independent dataset** (`dashboardRows`,
 localStorage key `pickListDashboardData`) uploaded via `#dashboardUploadBtn`
 → opens `#dashboardUploadModal` → `#dashboardFileSelectBtn` triggers

@@ -61,7 +61,6 @@
   var LABEL_MARGIN_LEFT_KEY = "pickListLabelMarginLeft";
   var LABEL_MARGIN_TOP_KEY = "pickListLabelMarginTop";
   var FLOOR_PANEL_COLLAPSED_KEY = "pickListFloorPanelCollapsed";
-  var FILTER_SORT_COLLAPSED_KEY = "pickListFilterSortCollapsed";
   var LABEL_MARGIN_DEFAULT = 3;
   var LABEL_MARGIN_LEFT_TOP_DEFAULT = 0;
   var BADGE_CLASSES = [
@@ -73,8 +72,8 @@
   var FILTER_BTN_INACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
   var FILTER_BTN_ACTIVE = "filter-bar-btn inline-flex items-center gap-1 bg-indigo-600 text-white shadow-md shadow-indigo-100 font-medium text-xs px-3 py-1.5 rounded-lg transition-all";
 
-  var NAV_BTN_ACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100";
-  var NAV_BTN_INACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50";
+  var NAV_BTN_ACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors text-white";
+  var NAV_BTN_INACTIVE = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white";
   var ASSIGN_TAB_ACTIVE = "px-4 py-2.5 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100 flex items-center gap-2 transition-all duration-200";
   var ASSIGN_TAB_INACTIVE = "px-4 py-2.5 text-sm font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-all duration-200";
 
@@ -112,17 +111,18 @@
     statusMsg: document.getElementById("statusMsg"),
     resetBtn: document.getElementById("resetBtn"),
     pickActiveFileInfo: document.getElementById("pickActiveFileInfo"),
-    pickDataStatusCard: document.getElementById("pickDataStatusCard"),
     laborInput: document.getElementById("laborInput"),
     floorTotalQty: document.getElementById("floorTotalQty"),
     floorUnfilteredQty: document.getElementById("floorUnfilteredQty"),
     floorPerPersonQty: document.getElementById("floorPerPersonQty"),
+    floorPerPersonQtyUnfiltered: document.getElementById("floorPerPersonQtyUnfiltered"),
     filterQtySummary: document.getElementById("filterQtySummary"),
     homeSelectionBar: document.getElementById("homeSelectionBar"),
     homeSelectionSummary: document.getElementById("homeSelectionSummary"),
     homeSelectionAssignBtn: document.getElementById("homeSelectionAssignBtn"),
     homeSelectionClearBtn: document.getElementById("homeSelectionClearBtn"),
     floorBars: document.getElementById("floorBars"),
+    floorBarsUnfiltered: document.getElementById("floorBarsUnfiltered"),
     floorPanelToggleBtn: document.getElementById("floorPanelToggleBtn"),
     floorPanelToggleLabel: document.getElementById("floorPanelToggleLabel"),
     floorPanelToggleIcon: document.getElementById("floorPanelToggleIcon"),
@@ -136,9 +136,6 @@
     filterBar: document.getElementById("filterBar"),
     filterButtonsContainer: document.getElementById("filterButtonsContainer"),
     filterResetAllBtn: document.getElementById("filterResetAllBtn"),
-    filterSortToggleBtn: document.getElementById("filterSortToggleBtn"),
-    filterSortToggleLabel: document.getElementById("filterSortToggleLabel"),
-    filterSortToggleIcon: document.getElementById("filterSortToggleIcon"),
     filterSortBody: document.getElementById("filterSortBody"),
     table: document.getElementById("dataTable"),
     emptyState: document.getElementById("emptyState"),
@@ -151,7 +148,6 @@
     navHomeBtn: document.getElementById("navHomeBtn"),
     navAssignBtn: document.getElementById("navAssignBtn"),
     navExtractBtn: document.getElementById("navExtractBtn"),
-    mainNavAside: document.getElementById("mainNavAside"),
     dashboardApp: document.getElementById("dashboardApp"),
     dashboardView: document.getElementById("dashboardView"),
     homeView: document.getElementById("homeView"),
@@ -195,6 +191,7 @@
     dashboardFloorEmptyState: document.getElementById("dashboardFloorEmptyState"),
     dashboardFloorChartWrap: document.getElementById("dashboardFloorChartWrap"),
     dashboardFloorChart: document.getElementById("dashboardFloorChart"),
+    dashboardFloorTotalValue: document.getElementById("dashboardFloorTotalValue"),
     dashboardZoneEmptyState: document.getElementById("dashboardZoneEmptyState"),
     dashboardZoneChartWrap: document.getElementById("dashboardZoneChartWrap"),
     dashboardZoneChart: document.getElementById("dashboardZoneChart"),
@@ -220,6 +217,14 @@
     assignConfirmBtn: document.getElementById("assignConfirmBtn"),
     assignCancelBtn: document.getElementById("assignCancelBtn"),
     assignCreateCloseBtn: document.getElementById("assignCreateCloseBtn"),
+    customAssignModal: document.getElementById("customAssignModal"),
+    customAssignModalBox: document.getElementById("customAssignModalBox"),
+    customAssignCloseBtn: document.getElementById("customAssignCloseBtn"),
+    customAssignRowCountNotice: document.getElementById("customAssignRowCountNotice"),
+    customAssignCountInput: document.getElementById("customAssignCountInput"),
+    customAssignPreviewContainer: document.getElementById("customAssignPreviewContainer"),
+    customAssignConfirmBtn: document.getElementById("customAssignConfirmBtn"),
+    customAssignCancelBtn: document.getElementById("customAssignCancelBtn"),
     assignTabsContainer: document.getElementById("assignTabsContainer"),
     assignFilterSortBar: document.getElementById("assignFilterSortBar"),
     assignFilterButtonsContainer: document.getElementById("assignFilterButtonsContainer"),
@@ -1054,18 +1059,24 @@
 
   // 필터 적용 결과 수량 요약 + 필터·정렬 활성 개수(이전엔 별도 #filterSortSummary
   // 줄에 있었으나, 하나의 강조 박스로 통합)를 함께 보여준다.
+  // 요약 문장 하나로 뭉치지 않고, 집품리스트 테이블의 "상태" 배지와 같은
+  // rounded-full pill 스타일로 항목별 개별 박스로 나눠 보여준다.
   function renderFilterQtySummary(filteredRows, unfilteredRows) {
     var filterCount = ALL_COLUMNS.filter(function (c) {
       return state.filters[c.key] !== null && state.filters[c.key] !== undefined;
     }).length;
     var sortCount = state.sortRules.length;
-    var extraParts = [];
-    if (filterCount > 0) extraParts.push("필터 " + filterCount + "개");
-    if (sortCount > 0) extraParts.push("정렬 " + sortCount + "개");
-    els.filterQtySummary.textContent =
-      "필터 적용: " + filteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(filteredRows).toLocaleString("ko-KR") + "개 · " +
-      "전체: " + unfilteredRows.length.toLocaleString("ko-KR") + "행 · " + sumQty(unfilteredRows).toLocaleString("ko-KR") + "개" +
-      (extraParts.length ? " · " + extraParts.join(" · ") : "");
+    var badges = [
+      '<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">필터 적용 ' + filteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(filteredRows).toLocaleString("ko-KR") + '개</span>',
+      '<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-slate-100 text-slate-600 border border-slate-200">전체 ' + unfilteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(unfilteredRows).toLocaleString("ko-KR") + '개</span>'
+    ];
+    if (filterCount > 0) {
+      badges.push('<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-amber-50 text-amber-700 border border-amber-100">필터 ' + filterCount + '개</span>');
+    }
+    if (sortCount > 0) {
+      badges.push('<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-100">정렬 ' + sortCount + '개</span>');
+    }
+    els.filterQtySummary.innerHTML = badges.join("");
   }
 
   // 층 코드의 첫 글자가 숫자면 그 숫자를 "층대" 키로 추출(72→"7", 73→"7", 9→"9",
@@ -1076,7 +1087,10 @@
     return m ? m[0] : null;
   }
 
-  function renderFloorPanel(rows, unfilteredRows) {
+  // 요청3+4: rows 하나를 층별로 집계해 표시용 조각(합계/1인당/막대 HTML/접힘 요약)을
+  // 만든다. renderFloorPanel이 필터 적용본/미적용본에 각각 한 번씩 호출해 좌우 카드를
+  // 채운다 — 계산 로직은 완전히 공유, DOM 기록만 호출부에서 갈라진다.
+  function buildFloorSectionResult(rows, labor) {
     var byFloor = {};
     rows.forEach(function (r) {
       var floor = getFloor(r.zone);
@@ -1084,8 +1098,6 @@
     });
     var floors = Object.keys(byFloor).sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); });
 
-    // 실제로 같은 첫자리를 공유하는 층이 2개 이상일 때만 "층대" 합계를 보여준다 —
-    // 층이 하나뿐이면 "N층대"가 "N층"과 완전히 같은 값이라 중복 표시가 된다.
     var familyQty = {};
     var familyMembers = {};
     floors.forEach(function (f) {
@@ -1095,29 +1107,27 @@
       familyMembers[family] = familyMembers[family] || [];
       familyMembers[family].push(f);
     });
-    var multiFamilies = Object.keys(familyQty).filter(function (fam) { return familyMembers[fam].length > 1; });
+    // 요청4: 이전엔 같은 층대 멤버가 2개 이상일 때만 층대 요약줄을 보여줬으나(중복
+    // 표시 방지 목적으로 추가됐던 게이트), 사용자가 멤버 1개짜리 층대도 보여달라고
+    // 명시적으로 요청 — familyQty에 등록된 모든 층대를 그대로 쓴다.
+    var allFamilies = Object.keys(familyQty);
 
     var totalQty = floors.reduce(function (sum, f) { return sum + byFloor[f]; }, 0);
-    els.floorTotalQty.textContent = totalQty.toLocaleString("ko-KR") + "개";
-    els.floorUnfilteredQty.textContent = sumQty(unfilteredRows).toLocaleString("ko-KR") + "개";
-
-    var labor = parseFloat(els.laborInput.value);
     var hasLabor = !isNaN(labor) && labor > 0 && totalQty > 0;
     var perPersonText = hasLabor ? Math.round(totalQty / labor).toLocaleString("ko-KR") + "개" : "-";
-    els.floorPerPersonQty.textContent = perPersonText;
     var maxQty = floors.reduce(function (m, f) { return Math.max(m, byFloor[f]); }, 0) || 1;
 
-    var familySummaryText = multiFamilies
+    var familySummaryText = allFamilies
       .sort(function (a, b) { return floorSortKey(a) - floorSortKey(b); })
       .map(function (fam) { return fam + "층 " + familyQty[fam].toLocaleString("ko-KR") + "개"; })
       .join(" · ");
     var floorSummaryText = floors.map(function (f) { return f + "층 " + byFloor[f].toLocaleString("ko-KR") + "개"; }).join(" · ");
-    els.floorPanelSummary.textContent = floors.length
+    var summaryText = floors.length
       ? (familySummaryText ? familySummaryText + " · " : "") + floorSummaryText
       : "데이터 없음";
 
     var renderedFamilies = {};
-    els.floorBars.innerHTML = floors.map(function (f) {
+    var barsHtml = floors.map(function (f) {
       var qty = byFloor[f];
       var widthPct = (qty / maxQty) * 100;
 
@@ -1126,7 +1136,7 @@
       // 인당계산과 같은 급의 작고 수수한 텍스트로 축소해 대분류와 중복돼 보이지
       // 않게 한다(정보 자체를 숨기지는 않음). 수량/막대는 항상 그대로 유지.
       var family = getFloorFamily(f);
-      var isMultiFamilyMember = !!family && multiFamilies.indexOf(family) !== -1;
+      var isMultiFamilyMember = !!family && allFamilies.indexOf(family) !== -1;
 
       var laborHtml;
       var perPersonHtml;
@@ -1184,6 +1194,23 @@
       }
       return familyHeaderHtml + floorRowHtml;
     }).join("");
+
+    return { totalQty: totalQty, perPersonText: perPersonText, summaryText: summaryText, barsHtml: barsHtml };
+  }
+
+  function renderFloorPanel(rows, unfilteredRows) {
+    var labor = parseFloat(els.laborInput.value);
+
+    var filteredResult = buildFloorSectionResult(rows, labor);
+    els.floorTotalQty.textContent = filteredResult.totalQty.toLocaleString("ko-KR") + "개";
+    els.floorPerPersonQty.textContent = filteredResult.perPersonText;
+    els.floorBars.innerHTML = filteredResult.barsHtml;
+    els.floorPanelSummary.textContent = filteredResult.summaryText;
+
+    var unfilteredResult = buildFloorSectionResult(unfilteredRows, labor);
+    els.floorUnfilteredQty.textContent = unfilteredResult.totalQty.toLocaleString("ko-KR") + "개";
+    els.floorPerPersonQtyUnfiltered.textContent = unfilteredResult.perPersonText;
+    els.floorBarsUnfiltered.innerHTML = unfilteredResult.barsHtml;
   }
 
   // 접기/펼치기 카드 공용 헬퍼(층별 카드, 업로드 카드) — 라벨/아이콘/본문(+선택적 요약줄)을
@@ -1197,11 +1224,6 @@
 
   function loadFloorPanelCollapsed() {
     return localStorage.getItem(FLOOR_PANEL_COLLAPSED_KEY) === "1";
-  }
-
-  function loadFilterSortCollapsed() {
-    var raw = localStorage.getItem(FILTER_SORT_COLLAPSED_KEY);
-    return raw === null ? true : raw === "1";
   }
 
   // --- 생성일자별 탭 (홈) ---
@@ -1286,7 +1308,6 @@
   // --- 뷰 전환 (홈 / 집품 할당) ---
 
   function switchView(view) {
-    if (window.flashPageLoading) window.flashPageLoading();
     // 홈 화면의 드래그/Ctrl 선택 상태는 홈 화면에서만 유효해야 하므로, 다른
     // 화면으로 이동할 때는 항상 명시적으로 해제한다(Pick.refreshAll()의 암묵적
     // 초기화는 홈이 보일 때만 실행되어 이 경우를 놓친다).
@@ -1379,7 +1400,6 @@
   Pick.LABEL_MARGIN_LEFT_KEY = LABEL_MARGIN_LEFT_KEY;
   Pick.LABEL_MARGIN_TOP_KEY = LABEL_MARGIN_TOP_KEY;
   Pick.FLOOR_PANEL_COLLAPSED_KEY = FLOOR_PANEL_COLLAPSED_KEY;
-  Pick.FILTER_SORT_COLLAPSED_KEY = FILTER_SORT_COLLAPSED_KEY;
   Pick.LABEL_MARGIN_DEFAULT = LABEL_MARGIN_DEFAULT;
   Pick.LABEL_MARGIN_LEFT_TOP_DEFAULT = LABEL_MARGIN_LEFT_TOP_DEFAULT;
   Pick.BADGE_CLASSES = BADGE_CLASSES;
@@ -1441,7 +1461,6 @@
   Pick.renderFloorPanel = renderFloorPanel;
   Pick.applyCardCollapsed = applyCardCollapsed;
   Pick.loadFloorPanelCollapsed = loadFloorPanelCollapsed;
-  Pick.loadFilterSortCollapsed = loadFilterSortCollapsed;
   Pick.saveDateTabState = saveDateTabState;
   Pick.loadDateTabState = loadDateTabState;
   Pick.getAllCreatedDates = getAllCreatedDates;

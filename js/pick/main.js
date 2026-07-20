@@ -9,7 +9,6 @@
   var openAssignCreateModal = Pick.openAssignCreateModal;
   var renderAssignPanel = Pick.renderAssignPanel;
   var renderAssignTabs = Pick.renderAssignTabs;
-  var FILTER_SORT_COLLAPSED_KEY = Pick.FILTER_SORT_COLLAPSED_KEY;
   var FLOOR_PANEL_COLLAPSED_KEY = Pick.FLOOR_PANEL_COLLAPSED_KEY;
   var LABEL_MARGIN_BOTTOM_KEY = Pick.LABEL_MARGIN_BOTTOM_KEY;
   var LABEL_MARGIN_DEFAULT = Pick.LABEL_MARGIN_DEFAULT;
@@ -33,7 +32,6 @@
   var homeSortBarController = Pick.homeSortBarController;
   var loadAssignState = Pick.loadAssignState;
   var loadDateTabState = Pick.loadDateTabState;
-  var loadFilterSortCollapsed = Pick.loadFilterSortCollapsed;
   var loadFloorPanelCollapsed = Pick.loadFloorPanelCollapsed;
   var loadFromStorage = Pick.loadFromStorage;
   var loadSortRules = Pick.loadSortRules;
@@ -54,6 +52,8 @@
   var getCreatedDate = Pick.getCreatedDate;
   var nextCustomAssignSeq = Pick.nextCustomAssignSeq;
   var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
+  var splitBalanced = Pick.splitBalanced;
+  var renderWorkerGroupCards = Pick.renderWorkerGroupCards;
   var handleExtractFile = Pick.handleExtractFile;
   var mergeExtractedIntoHome = Pick.mergeExtractedIntoHome;
   var resetExtractPreview = Pick.resetExtractPreview;
@@ -93,7 +93,6 @@
     // 로드됨" 배지를 표시 — 화면 전환과 무관하게 항상 최신 상태를 반영해야 하므로
     // 아래 화면별 분기와 달리 무조건 실행한다.
     els.pickActiveFileInfo.classList.toggle("hidden", state.rows.length === 0);
-    els.pickDataStatusCard.classList.toggle("hidden", state.rows.length === 0);
     // 보이지 않는 화면까지 매번 통째로 다시 그리는 낭비를 막기 위해, 현재
     // 화면(hidden 클래스 여부)에 맞는 렌더링만 실행 — switchView()가 두
     // 화면의 hidden 클래스만 토글하므로 그 상태를 그대로 기준으로 삼는다.
@@ -121,23 +120,63 @@
     }
   }
 
-  // 선택한 행들을 단일 작업자짜리 커스텀 할당 config로 바로 생성 — 홈 선택바의
-  // "할당" 버튼에서 호출된다.
-  function createCustomAssignment(rows) {
-    var dates = Array.from(new Set(rows.map(function (r) { return getCreatedDate(r); })));
+  var customAssignRows = [];
+  var customAssignGroups = null; // splitBalanced 결과 — 작업자별 행 배열
+  var customAssignActiveWorkerIdx = null; // 커스텀 할당 미리보기 탭(전체/작업자 N) 상태
+
+  // 홈 드래그선택 "할당" 버튼에서 여는 작은 모달 — 선택한 행들을 투입 인원수만큼
+  // splitBalanced로 나눠 커스텀(floorInput 없는) assignConfig를 만든다. 정식
+  // 층수+인원 생성 모달(#assignCreateModal)과 달리 층/날짜 필터가 없을 뿐, 미리보기
+  // 자체는 assign-panel.js의 renderWorkerGroupCards를 그대로 재사용해 정식 모달과
+  // 동일한 작업자별 카드+행 단위 상세 테이블(재배정 select 포함)로 보여준다.
+  function openCustomAssignModal(rows) {
+    customAssignRows = rows.slice();
+    els.customAssignRowCountNotice.innerHTML = '선택한 <span class="font-bold text-slate-900">' + customAssignRows.length + '</span>행을 할당합니다.';
+    els.customAssignCountInput.value = "1";
+    updateCustomAssignPreview();
+    openModalWithTransition(els.customAssignModal, els.customAssignModalBox);
+  }
+
+  function closeCustomAssignModal() {
+    closeModalWithTransition(els.customAssignModal, els.customAssignModalBox);
+  }
+
+  function updateCustomAssignPreview() {
+    var count = parseInt(els.customAssignCountInput.value, 10);
+    if (!count || count < 1) count = 1;
+    var items = customAssignRows.map(function (r) { return { zone: r.zone || "(미지정)", qty: r.quantity || 0, rows: [r] }; });
+    var groups = splitBalanced(items, count);
+    customAssignGroups = groups.map(function (g) { return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []); });
+    // 인원수를 바꿀 때마다 그룹 배열이 통째로 새로 만들어지므로, 이전 activeIdx가
+    // 새 그룹 수 범위를 벗어나 카드가 통째로 빈 채로 렌더링되는 것을 막기 위해 매번 리셋.
+    customAssignActiveWorkerIdx = null;
+    renderCustomAssignPreview();
+  }
+
+  function renderCustomAssignPreview() {
+    renderWorkerGroupCards(els.customAssignPreviewContainer, customAssignGroups, customAssignActiveWorkerIdx, function (newIdx) {
+      customAssignActiveWorkerIdx = newIdx;
+      renderCustomAssignPreview();
+    });
+  }
+
+  function confirmCustomAssignment() {
+    if (!customAssignGroups) return;
+    var dates = Array.from(new Set(customAssignRows.map(function (r) { return getCreatedDate(r); })));
     var id = Date.now();
     state.assignConfigs.push({
       id: id,
       floorInput: null,
       custom: true,
       customSeq: nextCustomAssignSeq(),
-      count: 1,
-      workerGroups: [rows.slice()],
+      count: customAssignGroups.length,
+      workerGroups: customAssignGroups,
       createdDates: dates
     });
     state.assignActiveId = id;
     state.assignActiveWorkerIdx = null;
     saveAssignState();
+    closeCustomAssignModal();
     switchView("assign");
     renderAssignTabs();
     if (window.showToast) window.showToast("커스텀 할당이 생성되었습니다.");
@@ -227,12 +266,6 @@
     applyCardCollapsed(collapsed, els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
   });
 
-  els.filterSortToggleBtn.addEventListener("click", function () {
-    var collapsed = !loadFilterSortCollapsed();
-    localStorage.setItem(FILTER_SORT_COLLAPSED_KEY, collapsed ? "1" : "0");
-    applyCardCollapsed(collapsed, els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
-  });
-
   var debouncedRenderFloorPanel = debounce(function () {
     renderFloorPanel(getFilteredRows(), getDateScopedRows());
   }, 200);
@@ -245,7 +278,10 @@
   els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
   els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
   els.navExtractBtn.addEventListener("click", function () { switchView("extract"); });
-  els.assignOpenModalBtn.addEventListener("click", openAssignCreateModal);
+  els.assignOpenModalBtn.addEventListener("click", function () {
+    clearHomeSelection();
+    openAssignCreateModal();
+  });
   els.assignPreviewBtn.addEventListener("click", async function () {
     if (hasActiveFilter()) {
       if (!(await window.confirmModal("현재 목록에 필터가 적용되어 있어 필터링된 데이터만 할당됩니다. 계속하시겠습니까?"))) return;
@@ -288,8 +324,13 @@
       if (!(await window.confirmModal(msg))) return;
     }
     clearHomeSelection();
-    createCustomAssignment(selectedRows);
+    openCustomAssignModal(selectedRows);
   });
+
+  els.customAssignCountInput.addEventListener("input", updateCustomAssignPreview);
+  els.customAssignConfirmBtn.addEventListener("click", confirmCustomAssignment);
+  els.customAssignCancelBtn.addEventListener("click", closeCustomAssignModal);
+  els.customAssignCloseBtn.addEventListener("click", closeCustomAssignModal);
 
   els.homeSelectionClearBtn.addEventListener("click", clearHomeSelection);
 
@@ -489,7 +530,6 @@
   loadGtState();
   (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom, margin.left, margin.top); })();
   applyCardCollapsed(loadFloorPanelCollapsed(), els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
-  applyCardCollapsed(loadFilterSortCollapsed(), els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
   els.laborInput.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
   // switchView()는 내부에서 Pick.refreshAll()을 호출하는데, 그 export(아래)는
   // 초기화 시퀀스보다 뒤에 실행되므로 init 중에는 switchView를 호출하지 않고

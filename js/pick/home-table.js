@@ -49,7 +49,7 @@
         ? '<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">할당됨</span>'
         : '<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-400 border border-slate-200">미할당</span>';
       return (
-        '<tr class="home-table-row hover:bg-slate-50/80 transition-colors' + (marked ? " bg-indigo-50" : "") + '" data-row-id="' + escapeHtml(r.id) + '">' +
+        '<tr class="home-table-row transition-colors' + (marked ? " bg-emerald-100" : " hover:bg-slate-50/80") + '" data-row-id="' + escapeHtml(r.id) + '">' +
         COLUMNS.map(function (col) {
           if (col.key === "status") {
             var cls = state.statusBadgeMap[r.status] || "";
@@ -114,7 +114,9 @@
     }
 
     Array.prototype.forEach.call(els.tableBody.querySelectorAll(".home-table-row"), function (tr) {
-      tr.classList.toggle("bg-indigo-50", homeMarkedIds.has(tr.dataset.rowId));
+      var isMarked = homeMarkedIds.has(tr.dataset.rowId);
+      tr.classList.toggle("bg-emerald-100", isMarked);
+      tr.classList.toggle("hover:bg-slate-50/80", !isMarked);
     });
     updateHomeSelectionSummary();
   }
@@ -136,7 +138,8 @@
   function clearHomeSelection() {
     Pick.homeMarkedIds = homeMarkedIds = new Set();
     Array.prototype.forEach.call(els.tableBody.querySelectorAll(".home-table-row"), function (tr) {
-      tr.classList.remove("bg-indigo-50");
+      tr.classList.remove("bg-emerald-100");
+      tr.classList.add("hover:bg-slate-50/80");
     });
     updateHomeSelectionSummary();
   }

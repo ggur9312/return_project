@@ -261,6 +261,7 @@ async function clearData() {
     globalProcessedData = {};
     activeTabDate = null;
     document.getElementById('dashboardContainer').classList.add('hidden');
+    document.getElementById('printSettingsCard').classList.add('hidden');
     document.getElementById('truckEmptyState').classList.remove('hidden');
     document.getElementById('activeFileInfo').classList.add('hidden');
     renderCycleDateTabs();
@@ -277,6 +278,7 @@ async function deleteDateData(date) {
     if (remainingDates.length === 0) {
         activeTabDate = null;
         document.getElementById('dashboardContainer').classList.add('hidden');
+        document.getElementById('printSettingsCard').classList.add('hidden');
         document.getElementById('truckEmptyState').classList.remove('hidden');
         document.getElementById('activeFileInfo').classList.add('hidden');
     } else {
@@ -444,6 +446,7 @@ function getSafeId(str) {
 function renderDashboard(data) {
     const container = document.getElementById('dashboardContainer');
     container.classList.remove('hidden');
+    document.getElementById('printSettingsCard').classList.remove('hidden');
 
     const tabsContainer = document.getElementById('tabsContainer');
     const tableContainer = document.getElementById('tableContainer');
@@ -560,6 +563,7 @@ function renderDashboard(data) {
         tableContainer.appendChild(tablePanel);
     });
 
+    renderPrintDateCheckboxList();
     renderCycleDateTabs();
     saveState();
 }
@@ -647,18 +651,12 @@ function switchTab(targetDate, allDates) {
 
 
 /* ================================================================
-   SECTION 11: PRINT FUNCTIONALITY (모달 + A4 출력물 생성 + 바코드)
+   SECTION 11: PRINT FUNCTIONALITY (상시 카드 + A4 출력물 생성 + 바코드)
    ================================================================ */
-const printModal = document.getElementById('printModal');
-const printModalBox = document.getElementById('printModalBox');
 
-function openPrintModal() {
-    if (!activeTabDate) {
-        showToast('출력할 데이터 탭이 활성화되지 않았습니다.', 'error');
-        return;
-    }
-
-    // Render date checkbox list (multi-select), default checking the active tab's date
+// #printSettingsCard의 날짜 체크박스 목록을 최신 데이터 기준으로 다시 그린다.
+// (활성 탭 날짜가 기본 체크) — renderDashboard()에서 데이터가 바뀔 때마다 호출된다.
+function renderPrintDateCheckboxList() {
     const listEl = document.getElementById('pDateCheckboxList');
     const sortedDates = Object.keys(globalProcessedData).sort();
     listEl.innerHTML = sortedDates.map(date => `
@@ -667,14 +665,6 @@ function openPrintModal() {
             <span>${date} <span class="text-slate-400">(${globalProcessedData[date].length}건)</span></span>
         </label>
     `).join('');
-
-    printModal.classList.remove('hidden');
-    printModal.classList.add('flex');
-    // small delay for transition
-    setTimeout(() => {
-        printModal.classList.remove('opacity-0');
-        printModalBox.classList.remove('scale-95');
-    }, 10);
 }
 
 function toggleSelectAllDates() {
@@ -683,21 +673,14 @@ function toggleSelectAllDates() {
     checkboxes.forEach(cb => cb.checked = !allChecked);
 }
 
-function closePrintModal() {
-    printModal.classList.add('opacity-0');
-    printModalBox.classList.add('scale-95');
-    setTimeout(() => {
-        printModal.classList.remove('flex');
-        printModal.classList.add('hidden');
-    }, 200);
-}
-
-// GT 수량 표시 텍스트: 팔레트 집품이 있으면 (+N P) 표기, 집품중이면 뒤에 물결(~) 표기.
+// GT 수량 표시 텍스트: 팔레트 집품/팔레트 GT가 있으면 (+N P / N GT) 표기, 집품중이면 뒤에 물결(~) 표기.
 // 인쇄 출력(buildTruckRows)과 화면 미리보기(buildPreviewRows) 양쪽에서 공용으로 사용.
 function gtDisplayText(d) {
-    let text = d.inputs.palettePick > 0
-        ? `${d.inputs.emptyGt} (+${d.inputs.palettePick}P)`
-        : `${d.inputs.emptyGt}`;
+    const parts = [];
+    if (d.inputs.palettePick > 0) parts.push(`${d.inputs.palettePick}P`);
+    if (d.inputs.paletteGt > 0) parts.push(`${d.inputs.paletteGt}GT`);
+    let text = `${d.inputs.emptyGt}`;
+    if (parts.length > 0) text += ` (+${parts.join(' / ')})`;
     if (d.picking) text += ' ~';
     return text;
 }
@@ -853,6 +836,12 @@ function executePrint() {
     const notes = document.getElementById('pInputNotes').value;
     const dateLimit = document.getElementById('pInputDateLimit').value;
     const groupLimit = document.getElementById('pInputGroupLimit').value;
+    const groupLimitCodes = groupLimit.split(',').map(s => s.trim()).filter(s => s !== '');
+    // 3개씩 묶어 콤마로 재조합한 문자열 하나를 바코드 한 줄로 인코딩 (그리드 아님, 세로 스택).
+    const groupLimitLines = [];
+    for (let i = 0; i < groupLimitCodes.length; i += 3) {
+        groupLimitLines.push(groupLimitCodes.slice(i, i + 3).join(','));
+    }
 
     const selectedDates = Array.from(
         document.querySelectorAll('#pDateCheckboxList input[type="checkbox"]:checked')
@@ -878,7 +867,7 @@ function executePrint() {
                  </div>`;
     }
 
-    if (dateLimit.trim() !== '' || groupLimit.trim() !== '') {
+    if (dateLimit.trim() !== '' || groupLimitLines.length > 0) {
         html += `<div class="p-row">`;
 
         // Left col (Date)
@@ -887,11 +876,13 @@ function executePrint() {
                     <div class="p-col-content">${dateLimit}</div>
                  </div>`;
 
-        // Right col (Barcode)
+        // Right col (Barcode) — 3개씩 콤마로 묶은 문자열을 한 줄씩 세로로 쌓아 렌더링
         html += `<div class="p-col">
                     <div class="p-col-title">그룹번호 상차제한</div>
                     <div class="p-col-content">
-                        ${groupLimit.trim() !== '' ? `<svg id="printBarcode"></svg>` : ''}
+                        ${groupLimitLines.length > 0 ? `<div class="p-barcode-stack">
+                            ${groupLimitLines.map((line, i) => `<div class="p-barcode-stack-item"><svg id="printBarcode-${i}"></svg></div>`).join('')}
+                        </div>` : ''}
                     </div>
                  </div>`;
         html += `</div>`;
@@ -904,27 +895,27 @@ function executePrint() {
 
     printArea.innerHTML = html;
 
-    // Generate Barcode if groupLimit provided
-    if (groupLimit.trim() !== '') {
+    // 3개씩 콤마로 묶인 줄 하나당 바코드 하나 — displayValue로 보이는 텍스트가
+    // 곧 콤마 포함 원본 청크 문자열 그대로가 되도록 한다.
+    groupLimitLines.forEach((line, i) => {
         try {
-            JsBarcode("#printBarcode", groupLimit, {
+            JsBarcode(`#printBarcode-${i}`, line, {
                 format: "CODE128",
-                width: 2,
-                height: 40,
+                width: 1.5,
+                height: 36,
                 displayValue: true,
-                fontSize: 16,
+                fontSize: 13,
                 margin: 0
             });
         } catch (e) {
             console.error("Barcode generation failed", e);
-            document.getElementById("printBarcode").outerHTML = `<span>[바코드 변환 오류: ${groupLimit}]</span>`;
+            document.getElementById(`printBarcode-${i}`).outerHTML = `<span>[바코드 변환 오류: ${line}]</span>`;
         }
-    }
+    });
 
     // Trigger Print
     setTimeout(() => {
         window.print();
-        closePrintModal();
         showToast('출력이 완료되었습니다.');
     }, 300);
 }
@@ -934,14 +925,13 @@ function executePrint() {
    SECTION 12: SIDEBAR VIEW SWITCHING (홈 / 트럭주기)
    ================================================================ */
 function truckSwitchView(view) {
-    if (window.flashPageLoading) window.flashPageLoading();
     const homeView = document.getElementById('truckHomeView');
     const cycleView = document.getElementById('cycleView');
     const navHomeBtn = document.getElementById('truckNavHomeBtn');
     const navCycleBtn = document.getElementById('navCycleBtn');
 
-    const activeClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center space-x-2 transition-colors bg-indigo-600 text-white shadow-md shadow-indigo-100";
-    const inactiveClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center space-x-2 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50";
+    const activeClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors text-white";
+    const inactiveClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white";
 
     if (view === 'cycle') {
         homeView.classList.add('hidden');
