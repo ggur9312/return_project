@@ -61,7 +61,6 @@
   var LABEL_MARGIN_LEFT_KEY = "pickListLabelMarginLeft";
   var LABEL_MARGIN_TOP_KEY = "pickListLabelMarginTop";
   var FLOOR_PANEL_COLLAPSED_KEY = "pickListFloorPanelCollapsed";
-  var FILTER_SORT_COLLAPSED_KEY = "pickListFilterSortCollapsed";
   var LABEL_MARGIN_DEFAULT = 3;
   var LABEL_MARGIN_LEFT_TOP_DEFAULT = 0;
   var BADGE_CLASSES = [
@@ -112,7 +111,6 @@
     statusMsg: document.getElementById("statusMsg"),
     resetBtn: document.getElementById("resetBtn"),
     pickActiveFileInfo: document.getElementById("pickActiveFileInfo"),
-    pickDataStatusCard: document.getElementById("pickDataStatusCard"),
     laborInput: document.getElementById("laborInput"),
     floorTotalQty: document.getElementById("floorTotalQty"),
     floorUnfilteredQty: document.getElementById("floorUnfilteredQty"),
@@ -136,9 +134,6 @@
     filterBar: document.getElementById("filterBar"),
     filterButtonsContainer: document.getElementById("filterButtonsContainer"),
     filterResetAllBtn: document.getElementById("filterResetAllBtn"),
-    filterSortToggleBtn: document.getElementById("filterSortToggleBtn"),
-    filterSortToggleLabel: document.getElementById("filterSortToggleLabel"),
-    filterSortToggleIcon: document.getElementById("filterSortToggleIcon"),
     filterSortBody: document.getElementById("filterSortBody"),
     table: document.getElementById("dataTable"),
     emptyState: document.getElementById("emptyState"),
@@ -195,6 +190,7 @@
     dashboardFloorEmptyState: document.getElementById("dashboardFloorEmptyState"),
     dashboardFloorChartWrap: document.getElementById("dashboardFloorChartWrap"),
     dashboardFloorChart: document.getElementById("dashboardFloorChart"),
+    dashboardFloorTotalValue: document.getElementById("dashboardFloorTotalValue"),
     dashboardZoneEmptyState: document.getElementById("dashboardZoneEmptyState"),
     dashboardZoneChartWrap: document.getElementById("dashboardZoneChartWrap"),
     dashboardZoneChart: document.getElementById("dashboardZoneChart"),
@@ -1199,11 +1195,6 @@
     return localStorage.getItem(FLOOR_PANEL_COLLAPSED_KEY) === "1";
   }
 
-  function loadFilterSortCollapsed() {
-    var raw = localStorage.getItem(FILTER_SORT_COLLAPSED_KEY);
-    return raw === null ? true : raw === "1";
-  }
-
   // --- 생성일자별 탭 (홈) ---
 
   function saveDateTabState() {
@@ -1379,7 +1370,6 @@
   Pick.LABEL_MARGIN_LEFT_KEY = LABEL_MARGIN_LEFT_KEY;
   Pick.LABEL_MARGIN_TOP_KEY = LABEL_MARGIN_TOP_KEY;
   Pick.FLOOR_PANEL_COLLAPSED_KEY = FLOOR_PANEL_COLLAPSED_KEY;
-  Pick.FILTER_SORT_COLLAPSED_KEY = FILTER_SORT_COLLAPSED_KEY;
   Pick.LABEL_MARGIN_DEFAULT = LABEL_MARGIN_DEFAULT;
   Pick.LABEL_MARGIN_LEFT_TOP_DEFAULT = LABEL_MARGIN_LEFT_TOP_DEFAULT;
   Pick.BADGE_CLASSES = BADGE_CLASSES;
@@ -1441,7 +1431,6 @@
   Pick.renderFloorPanel = renderFloorPanel;
   Pick.applyCardCollapsed = applyCardCollapsed;
   Pick.loadFloorPanelCollapsed = loadFloorPanelCollapsed;
-  Pick.loadFilterSortCollapsed = loadFilterSortCollapsed;
   Pick.saveDateTabState = saveDateTabState;
   Pick.loadDateTabState = loadDateTabState;
   Pick.getAllCreatedDates = getAllCreatedDates;

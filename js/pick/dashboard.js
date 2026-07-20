@@ -439,7 +439,10 @@
 
     var scopedStateRows = getDateScopedStateRows();
     renderZoneChart(computeZoneQuantities(scopedStateRows));
-    renderFloorChart(computeFloorQuantities(scopedStateRows));
+    var floorData = computeFloorQuantities(scopedStateRows);
+    renderFloorChart(floorData);
+    els.dashboardFloorTotalValue.textContent =
+      floorData.reduce(function (sum, f) { return sum + f.qty; }, 0).toLocaleString("ko-KR") + "개";
   }
 
   // --- exposed to other js/pick/*.js files via window.Pick ---

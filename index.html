@@ -43,6 +43,9 @@
     .p-col-title { font-size:10pt;font-weight:bold;height:28px;margin-bottom:0; color: #555; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
     .p-col-content { flex: 1; display: flex; align-items: center; justify-content: center; font-size:16pt; font-weight:bold; text-align: center; word-break: break-all; }
     .p-col-content svg { margin-top: 8px; }
+    .p-barcode-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 8px; width: 100%; }
+    .p-barcode-item { display: flex; justify-content: center; min-width: 0; }
+    .p-barcode-item svg { max-width: 100%; height: auto; margin-top: 0; }
 
     /* --- 트럭 출력 전용 테이블 룰 --- */
     .p-table { width:100%;table-layout:fixed;border-collapse:collapse;text-align:center;font-size:12pt;page-break-inside:avoid;}
@@ -271,7 +274,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h3 class="text-sm font-semibold text-slate-900 mb-4">층별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품리스트 현황 데이터 기준)</span></h3>
+        <h3 class="text-sm font-semibold text-slate-900 mb-4">층별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품리스트 현황 데이터 기준)</span> <span class="text-xs font-semibold text-indigo-600 tabular-nums ml-1">전체 수량 <span id="dashboardFloorTotalValue">0개</span></span></h3>
         <div id="dashboardFloorEmptyState" class="p-10 text-center text-sm text-slate-400">집품리스트 현황에 데이터를 등록하면 층별 수량이 표시됩니다.</div>
         <div id="dashboardFloorChartWrap" class="hidden h-72">
           <canvas id="dashboardFloorChart"></canvas>
@@ -339,6 +342,10 @@
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span>데이터 로드됨</span>
         </div>
+        <button id="resetBtn" class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          <span>초기화</span>
+        </button>
         <button id="homeUploadBtn" type="button" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
           <span>엑셀 업로드</span>
@@ -374,30 +381,13 @@
     </div>
   </section>
 
-  <section id="pickDataStatusCard" class="hidden flex flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm mt-8">
-    <div>
-      <h3 class="text-lg font-bold text-slate-900">데이터 실시간 입력 현황</h3>
-      <p class="text-xs text-slate-500 mt-0.5">등록된 집품 데이터를 초기화하거나 층수·인원을 입력해 작업자별 집품 할당을 생성할 수 있습니다.</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <button id="resetBtn" class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-        <span>초기화</span>
-      </button>
-      <button id="assignOpenModalBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">집품 할당</button>
-    </div>
-  </section>
-
   <section id="filterSortCard" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mt-8">
     <div class="flex items-center justify-between gap-2">
       <h2 class="text-sm font-semibold text-slate-900">필터·정렬</h2>
-      <button id="filterSortToggleBtn" type="button" class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700">
-        <span id="filterSortToggleLabel">펼치기</span>
-        <svg id="filterSortToggleIcon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-      </button>
+      <button id="assignOpenModalBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">집품 할당</button>
     </div>
     <div id="filterQtySummary" class="text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mt-3"></div>
-    <div id="filterSortBody" class="hidden mt-4 space-y-3">
+    <div id="filterSortBody" class="mt-4 space-y-3">
       <section class="flex items-center gap-2 flex-wrap" id="filterBar">
         <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">필터</span>
         <div id="filterButtonsContainer" class="flex items-center gap-2 flex-wrap"></div>
@@ -728,6 +718,10 @@
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span id="fileNameDisplay">데이터 로드됨</span>
                 </div>
+                <button onclick="clearData()" class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    <span>초기화</span>
+                </button>
                 <button id="truckUploadBtn" type="button" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                     <span>엑셀 업로드</span>
@@ -748,7 +742,7 @@
         </section>
 
         <section id="printSettingsCard" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-            <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center justify-between gap-4 pb-4 border-b border-slate-100">
                 <div>
                     <h3 class="text-lg font-bold text-slate-900">출력 설정</h3>
                     <p class="text-xs text-slate-500 mt-0.5">아래 조건을 설정한 뒤 출력을 누르면 바로 인쇄 미리보기가 나타납니다.</p>
@@ -784,19 +778,6 @@
         </section>
 
         <section id="dashboardContainer" class="hidden space-y-6">
-
-            <div class="flex flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div>
-                    <h3 class="text-lg font-bold text-slate-900">데이터 실시간 입력 현황</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">예상 팔레트는 빈 GT 기준 소수점 한자리 반올림되어 자동 계산됩니다.</p>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <button onclick="clearData()" class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        <span>초기화</span>
-                    </button>
-                </div>
-            </div>
 
             <div class="border-b border-slate-200 pb-1">
                 <div id="tabsContainer" class="flex flex-wrap gap-2">

@@ -9,7 +9,6 @@
   var openAssignCreateModal = Pick.openAssignCreateModal;
   var renderAssignPanel = Pick.renderAssignPanel;
   var renderAssignTabs = Pick.renderAssignTabs;
-  var FILTER_SORT_COLLAPSED_KEY = Pick.FILTER_SORT_COLLAPSED_KEY;
   var FLOOR_PANEL_COLLAPSED_KEY = Pick.FLOOR_PANEL_COLLAPSED_KEY;
   var LABEL_MARGIN_BOTTOM_KEY = Pick.LABEL_MARGIN_BOTTOM_KEY;
   var LABEL_MARGIN_DEFAULT = Pick.LABEL_MARGIN_DEFAULT;
@@ -33,7 +32,6 @@
   var homeSortBarController = Pick.homeSortBarController;
   var loadAssignState = Pick.loadAssignState;
   var loadDateTabState = Pick.loadDateTabState;
-  var loadFilterSortCollapsed = Pick.loadFilterSortCollapsed;
   var loadFloorPanelCollapsed = Pick.loadFloorPanelCollapsed;
   var loadFromStorage = Pick.loadFromStorage;
   var loadSortRules = Pick.loadSortRules;
@@ -93,7 +91,6 @@
     // 로드됨" 배지를 표시 — 화면 전환과 무관하게 항상 최신 상태를 반영해야 하므로
     // 아래 화면별 분기와 달리 무조건 실행한다.
     els.pickActiveFileInfo.classList.toggle("hidden", state.rows.length === 0);
-    els.pickDataStatusCard.classList.toggle("hidden", state.rows.length === 0);
     // 보이지 않는 화면까지 매번 통째로 다시 그리는 낭비를 막기 위해, 현재
     // 화면(hidden 클래스 여부)에 맞는 렌더링만 실행 — switchView()가 두
     // 화면의 hidden 클래스만 토글하므로 그 상태를 그대로 기준으로 삼는다.
@@ -225,12 +222,6 @@
     var collapsed = !loadFloorPanelCollapsed();
     localStorage.setItem(FLOOR_PANEL_COLLAPSED_KEY, collapsed ? "1" : "0");
     applyCardCollapsed(collapsed, els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
-  });
-
-  els.filterSortToggleBtn.addEventListener("click", function () {
-    var collapsed = !loadFilterSortCollapsed();
-    localStorage.setItem(FILTER_SORT_COLLAPSED_KEY, collapsed ? "1" : "0");
-    applyCardCollapsed(collapsed, els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
   });
 
   var debouncedRenderFloorPanel = debounce(function () {
@@ -489,7 +480,6 @@
   loadGtState();
   (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom, margin.left, margin.top); })();
   applyCardCollapsed(loadFloorPanelCollapsed(), els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
-  applyCardCollapsed(loadFilterSortCollapsed(), els.filterSortToggleLabel, els.filterSortToggleIcon, els.filterSortBody, null);
   els.laborInput.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
   // switchView()는 내부에서 Pick.refreshAll()을 호출하는데, 그 export(아래)는
   // 초기화 시퀀스보다 뒤에 실행되므로 init 중에는 switchView를 호출하지 않고

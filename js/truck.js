@@ -836,6 +836,7 @@ function executePrint() {
     const notes = document.getElementById('pInputNotes').value;
     const dateLimit = document.getElementById('pInputDateLimit').value;
     const groupLimit = document.getElementById('pInputGroupLimit').value;
+    const groupLimitCodes = groupLimit.split(',').map(s => s.trim()).filter(s => s !== '');
 
     const selectedDates = Array.from(
         document.querySelectorAll('#pDateCheckboxList input[type="checkbox"]:checked')
@@ -861,7 +862,7 @@ function executePrint() {
                  </div>`;
     }
 
-    if (dateLimit.trim() !== '' || groupLimit.trim() !== '') {
+    if (dateLimit.trim() !== '' || groupLimitCodes.length > 0) {
         html += `<div class="p-row">`;
 
         // Left col (Date)
@@ -870,11 +871,13 @@ function executePrint() {
                     <div class="p-col-content">${dateLimit}</div>
                  </div>`;
 
-        // Right col (Barcode)
+        // Right col (Barcode) — 콤마로 구분된 각 코드를 3개씩 한 줄에 배치되는 그리드로 렌더링
         html += `<div class="p-col">
                     <div class="p-col-title">그룹번호 상차제한</div>
                     <div class="p-col-content">
-                        ${groupLimit.trim() !== '' ? `<svg id="printBarcode"></svg>` : ''}
+                        ${groupLimitCodes.length > 0 ? `<div class="p-barcode-grid">
+                            ${groupLimitCodes.map((code, i) => `<div class="p-barcode-item"><svg id="printBarcode-${i}"></svg></div>`).join('')}
+                        </div>` : ''}
                     </div>
                  </div>`;
         html += `</div>`;
@@ -887,22 +890,24 @@ function executePrint() {
 
     printArea.innerHTML = html;
 
-    // Generate Barcode if groupLimit provided
-    if (groupLimit.trim() !== '') {
+    // Generate Barcode(s) — 콤마로 구분된 각 코드를 개별 CODE128로 렌더링.
+    // 3개짜리 텍스트 하나를 거대한 바코드로 만들던 기존 방식은 .p-col 폭을
+    // 넘어서 잘려 보이는 문제가 있었음 — 코드별로 나눠 그리드에 배치해 해결.
+    groupLimitCodes.forEach((code, i) => {
         try {
-            JsBarcode("#printBarcode", groupLimit, {
+            JsBarcode(`#printBarcode-${i}`, code, {
                 format: "CODE128",
-                width: 2,
-                height: 40,
+                width: 1.3,
+                height: 32,
                 displayValue: true,
-                fontSize: 16,
+                fontSize: 11,
                 margin: 0
             });
         } catch (e) {
             console.error("Barcode generation failed", e);
-            document.getElementById("printBarcode").outerHTML = `<span>[바코드 변환 오류: ${groupLimit}]</span>`;
+            document.getElementById(`printBarcode-${i}`).outerHTML = `<span>[바코드 변환 오류: ${code}]</span>`;
         }
-    }
+    });
 
     // Trigger Print
     setTimeout(() => {
