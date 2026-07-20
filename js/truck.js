@@ -261,6 +261,7 @@ async function clearData() {
     globalProcessedData = {};
     activeTabDate = null;
     document.getElementById('dashboardContainer').classList.add('hidden');
+    document.getElementById('printSettingsCard').classList.add('hidden');
     document.getElementById('truckEmptyState').classList.remove('hidden');
     document.getElementById('activeFileInfo').classList.add('hidden');
     renderCycleDateTabs();
@@ -277,6 +278,7 @@ async function deleteDateData(date) {
     if (remainingDates.length === 0) {
         activeTabDate = null;
         document.getElementById('dashboardContainer').classList.add('hidden');
+        document.getElementById('printSettingsCard').classList.add('hidden');
         document.getElementById('truckEmptyState').classList.remove('hidden');
         document.getElementById('activeFileInfo').classList.add('hidden');
     } else {
@@ -444,6 +446,7 @@ function getSafeId(str) {
 function renderDashboard(data) {
     const container = document.getElementById('dashboardContainer');
     container.classList.remove('hidden');
+    document.getElementById('printSettingsCard').classList.remove('hidden');
 
     const tabsContainer = document.getElementById('tabsContainer');
     const tableContainer = document.getElementById('tableContainer');
@@ -560,6 +563,7 @@ function renderDashboard(data) {
         tableContainer.appendChild(tablePanel);
     });
 
+    renderPrintDateCheckboxList();
     renderCycleDateTabs();
     saveState();
 }
@@ -647,18 +651,12 @@ function switchTab(targetDate, allDates) {
 
 
 /* ================================================================
-   SECTION 11: PRINT FUNCTIONALITY (모달 + A4 출력물 생성 + 바코드)
+   SECTION 11: PRINT FUNCTIONALITY (상시 카드 + A4 출력물 생성 + 바코드)
    ================================================================ */
-const printModal = document.getElementById('printModal');
-const printModalBox = document.getElementById('printModalBox');
 
-function openPrintModal() {
-    if (!activeTabDate) {
-        showToast('출력할 데이터 탭이 활성화되지 않았습니다.', 'error');
-        return;
-    }
-
-    // Render date checkbox list (multi-select), default checking the active tab's date
+// #printSettingsCard의 날짜 체크박스 목록을 최신 데이터 기준으로 다시 그린다.
+// (활성 탭 날짜가 기본 체크) — renderDashboard()에서 데이터가 바뀔 때마다 호출된다.
+function renderPrintDateCheckboxList() {
     const listEl = document.getElementById('pDateCheckboxList');
     const sortedDates = Object.keys(globalProcessedData).sort();
     listEl.innerHTML = sortedDates.map(date => `
@@ -667,14 +665,6 @@ function openPrintModal() {
             <span>${date} <span class="text-slate-400">(${globalProcessedData[date].length}건)</span></span>
         </label>
     `).join('');
-
-    printModal.classList.remove('hidden');
-    printModal.classList.add('flex');
-    // small delay for transition
-    setTimeout(() => {
-        printModal.classList.remove('opacity-0');
-        printModalBox.classList.remove('scale-95');
-    }, 10);
 }
 
 function toggleSelectAllDates() {
@@ -683,21 +673,14 @@ function toggleSelectAllDates() {
     checkboxes.forEach(cb => cb.checked = !allChecked);
 }
 
-function closePrintModal() {
-    printModal.classList.add('opacity-0');
-    printModalBox.classList.add('scale-95');
-    setTimeout(() => {
-        printModal.classList.remove('flex');
-        printModal.classList.add('hidden');
-    }, 200);
-}
-
-// GT 수량 표시 텍스트: 팔레트 집품이 있으면 (+N P) 표기, 집품중이면 뒤에 물결(~) 표기.
+// GT 수량 표시 텍스트: 팔레트 집품/팔레트 GT가 있으면 (+N P / N GT) 표기, 집품중이면 뒤에 물결(~) 표기.
 // 인쇄 출력(buildTruckRows)과 화면 미리보기(buildPreviewRows) 양쪽에서 공용으로 사용.
 function gtDisplayText(d) {
-    let text = d.inputs.palettePick > 0
-        ? `${d.inputs.emptyGt} (+${d.inputs.palettePick}P)`
-        : `${d.inputs.emptyGt}`;
+    const parts = [];
+    if (d.inputs.palettePick > 0) parts.push(`${d.inputs.palettePick}P`);
+    if (d.inputs.paletteGt > 0) parts.push(`${d.inputs.paletteGt}GT`);
+    let text = `${d.inputs.emptyGt}`;
+    if (parts.length > 0) text += ` (+${parts.join(' / ')})`;
     if (d.picking) text += ' ~';
     return text;
 }
@@ -924,7 +907,6 @@ function executePrint() {
     // Trigger Print
     setTimeout(() => {
         window.print();
-        closePrintModal();
         showToast('출력이 완료되었습니다.');
     }, 300);
 }

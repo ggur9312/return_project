@@ -747,6 +747,42 @@
             </div>
         </section>
 
+        <section id="printSettingsCard" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+            <div class="flex items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">출력 설정</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">아래 조건을 설정한 뒤 출력을 누르면 바로 인쇄 미리보기가 나타납니다.</p>
+                </div>
+                <button onclick="executePrint()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    <span>출력</span>
+                </button>
+            </div>
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-sm font-semibold text-slate-700">출력할 생성일시 선택</label>
+                    <button type="button" onclick="toggleSelectAllDates()" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">전체 선택/해제</button>
+                </div>
+                <p class="text-xs text-slate-400 mb-2">선택한 날짜별로 구분되어 출력됩니다. 유의사항/상차제한 항목은 공통으로 적용됩니다.</p>
+                <div id="pDateCheckboxList" class="max-h-40 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 text-sm">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">유의사항 (Notes)</label>
+                <textarea id="pInputNotes" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="출력물 상단에 표기될 유의사항을 입력하세요."></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">날짜 상차제한</label>
+                    <input type="text" id="pInputDateLimit" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="예: 2026-07-05 제한">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">그룹번호 상차제한</label>
+                    <input type="text" id="pInputGroupLimit" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="바코드(Code128)로 변환됨">
+                </div>
+            </div>
+        </section>
+
         <section id="dashboardContainer" class="hidden space-y-6">
 
             <div class="flex flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -758,10 +794,6 @@
                     <button onclick="clearData()" class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         <span>초기화</span>
-                    </button>
-                    <button onclick="openPrintModal()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                        <span>출력</span>
                     </button>
                 </div>
             </div>
@@ -839,49 +871,6 @@
             </section>
         </div>
 
-        </div>
-    </div>
-
-    <div id="printModal" class="print:hidden fixed inset-0 bg-slate-900/60 z-[100] hidden items-center justify-center opacity-0 transition-opacity duration-200">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-200" id="printModalBox">
-            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 class="text-lg font-bold text-slate-800">출력 양식 설정</h3>
-                <button onclick="closePrintModal()" class="text-slate-400 hover:text-slate-600 focus:outline-none">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
-            <div class="p-6 space-y-5">
-                <div>
-                    <div class="flex items-center justify-between mb-1">
-                        <label class="block text-sm font-semibold text-slate-700">출력할 생성일시 선택</label>
-                        <button type="button" onclick="toggleSelectAllDates()" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">전체 선택/해제</button>
-                    </div>
-                    <p class="text-xs text-slate-400 mb-2">선택한 날짜별로 구분되어 출력됩니다. 유의사항/상차제한 항목은 공통으로 적용됩니다.</p>
-                    <div id="pDateCheckboxList" class="max-h-40 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 text-sm">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">유의사항 (Notes)</label>
-                    <textarea id="pInputNotes" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="출력물 상단에 표기될 유의사항을 입력하세요."></textarea>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">날짜 상차제한</label>
-                        <input type="text" id="pInputDateLimit" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="예: 2026-07-05 제한">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">그룹번호 상차제한</label>
-                        <input type="text" id="pInputGroupLimit" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="바코드(Code128)로 변환됨">
-                    </div>
-                </div>
-            </div>
-            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end space-x-2">
-                <button onclick="closePrintModal()" class="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">취소</button>
-                <button onclick="executePrint()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 flex items-center space-x-1.5 shadow-sm">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                    <span>인쇄 실행</span>
-                </button>
-            </div>
         </div>
     </div>
 
