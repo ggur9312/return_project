@@ -248,7 +248,7 @@
       var opts = "";
       for (var w = 0; w < groupCount; w++) {
         var selected = (String(c.id) === String(cfgId) && w === workerIdx) ? " selected" : "";
-        opts += '<option value="' + c.id + ':' + w + '"' + selected + '>' + (c.custom ? ("커스텀 " + c.customSeq) : ("작업자 " + (w + 1))) + "</option>";
+        opts += '<option value="' + c.id + ':' + w + '"' + selected + '>' + (c.custom ? ("커스텀 " + c.customSeq + (groupCount > 1 ? " - 작업자 " + (w + 1) : "")) : ("작업자 " + (w + 1))) + "</option>";
       }
       return '<optgroup label="' + escapeHtml(label) + '">' + opts + "</optgroup>";
     }).join("");
@@ -808,9 +808,10 @@
     if (!rows.length) {
       return '<div class="px-5 py-4 text-center text-xs text-slate-400">배정 없음</div>';
     }
+    var assignedIds = getAssignedRowIdSet();
     var headHtml = ASSIGN_DETAIL_COLUMNS.map(function (col) {
       return '<th class="px-2 py-1.5 text-left' + (col.key === "quantity" ? " text-right" : "") + '">' + col.label + "</th>";
-    }).join("") + '<th class="px-2 py-1.5 text-right">작업자</th>';
+    }).join("") + '<th class="px-2 py-1.5 text-left">할당여부</th><th class="px-2 py-1.5 text-right">작업자</th>';
     var workerOptionsHtml = "";
     for (var wIdx = 0; wIdx < workerCount; wIdx++) {
       workerOptionsHtml += '<option value="' + wIdx + '"' + (wIdx === workerIdx ? " selected" : "") + '>작업자 ' + (wIdx + 1) + "</option>";
@@ -820,6 +821,9 @@
         '<select class="assign-preview-row-select bg-white border border-slate-200 rounded-md px-2 py-1 text-xs" data-worker-idx="' + workerIdx + '" data-row-idx="' + rowIdx + '">' +
         workerOptionsHtml +
         "</select>";
+      var assignedBadge = assignedIds.has(r.id)
+        ? '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">할당됨</span>'
+        : '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-50 text-slate-400 border border-slate-200">미할당</span>';
       return (
         '<tr class="border-b border-slate-100 last:border-b-0">' +
         ASSIGN_DETAIL_COLUMNS.map(function (col) {
@@ -834,6 +838,7 @@
           }
           return '<td class="px-2 py-1.5 text-slate-700 whitespace-nowrap">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
+        '<td class="px-2 py-1.5 whitespace-nowrap">' + assignedBadge + "</td>" +
         '<td class="px-2 py-1.5 text-right">' + selectHtml + "</td>" +
         "</tr>"
       );

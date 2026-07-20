@@ -52,6 +52,7 @@
   var getCreatedDate = Pick.getCreatedDate;
   var nextCustomAssignSeq = Pick.nextCustomAssignSeq;
   var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
+  var splitBalanced = Pick.splitBalanced;
   var handleExtractFile = Pick.handleExtractFile;
   var mergeExtractedIntoHome = Pick.mergeExtractedIntoHome;
   var resetExtractPreview = Pick.resetExtractPreview;
@@ -118,23 +119,56 @@
     }
   }
 
-  // 선택한 행들을 단일 작업자짜리 커스텀 할당 config로 바로 생성 — 홈 선택바의
-  // "할당" 버튼에서 호출된다.
-  function createCustomAssignment(rows) {
-    var dates = Array.from(new Set(rows.map(function (r) { return getCreatedDate(r); })));
+  var customAssignRows = [];
+  var customAssignGroups = null; // splitBalanced 결과 — 작업자별 행 배열
+
+  // 홈 드래그선택 "할당" 버튼에서 여는 작은 모달 — 선택한 행들을 투입 인원수만큼
+  // splitBalanced로 나눠 커스텀(floorInput 없는) assignConfig를 만든다. 정식
+  // 층수+인원 생성 모달(#assignCreateModal)과 달리 층/날짜 필터가 없고, 행 단위
+  // 요약(작업자별 행수·수량)만 미리보기로 보여준다 — 상세 행 단위 재배정은
+  // 확정 후 결과 화면(작업자 카드의 이동 select)에서 이미 가능하므로 여기서
+  // 중복 구현하지 않는다.
+  function openCustomAssignModal(rows) {
+    customAssignRows = rows.slice();
+    els.customAssignRowCountNotice.innerHTML = '선택한 <span class="font-bold text-slate-900">' + customAssignRows.length + '</span>행을 할당합니다.';
+    els.customAssignCountInput.value = "1";
+    updateCustomAssignPreview();
+    openModalWithTransition(els.customAssignModal, els.customAssignModalBox);
+  }
+
+  function closeCustomAssignModal() {
+    closeModalWithTransition(els.customAssignModal, els.customAssignModalBox);
+  }
+
+  function updateCustomAssignPreview() {
+    var count = parseInt(els.customAssignCountInput.value, 10);
+    if (!count || count < 1) count = 1;
+    var items = customAssignRows.map(function (r) { return { zone: r.zone || "(미지정)", qty: r.quantity || 0, rows: [r] }; });
+    var groups = splitBalanced(items, count);
+    customAssignGroups = groups.map(function (g) { return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []); });
+    els.customAssignPreviewContainer.innerHTML = customAssignGroups.map(function (groupRows, idx) {
+      var total = groupRows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
+      return '<div class="flex items-center justify-between gap-2"><span class="font-medium text-slate-700">작업자 ' + (idx + 1) + '</span><span class="text-slate-500">' + groupRows.length + '행 · <span class="font-bold text-indigo-600">' + total.toLocaleString("ko-KR") + '개</span></span></div>';
+    }).join("");
+  }
+
+  function confirmCustomAssignment() {
+    if (!customAssignGroups) return;
+    var dates = Array.from(new Set(customAssignRows.map(function (r) { return getCreatedDate(r); })));
     var id = Date.now();
     state.assignConfigs.push({
       id: id,
       floorInput: null,
       custom: true,
       customSeq: nextCustomAssignSeq(),
-      count: 1,
-      workerGroups: [rows.slice()],
+      count: customAssignGroups.length,
+      workerGroups: customAssignGroups,
       createdDates: dates
     });
     state.assignActiveId = id;
     state.assignActiveWorkerIdx = null;
     saveAssignState();
+    closeCustomAssignModal();
     switchView("assign");
     renderAssignTabs();
     if (window.showToast) window.showToast("커스텀 할당이 생성되었습니다.");
@@ -236,7 +270,10 @@
   els.navHomeBtn.addEventListener("click", function () { switchView("home"); });
   els.navAssignBtn.addEventListener("click", function () { switchView("assign"); });
   els.navExtractBtn.addEventListener("click", function () { switchView("extract"); });
-  els.assignOpenModalBtn.addEventListener("click", openAssignCreateModal);
+  els.assignOpenModalBtn.addEventListener("click", function () {
+    clearHomeSelection();
+    openAssignCreateModal();
+  });
   els.assignPreviewBtn.addEventListener("click", async function () {
     if (hasActiveFilter()) {
       if (!(await window.confirmModal("현재 목록에 필터가 적용되어 있어 필터링된 데이터만 할당됩니다. 계속하시겠습니까?"))) return;
@@ -279,8 +316,12 @@
       if (!(await window.confirmModal(msg))) return;
     }
     clearHomeSelection();
-    createCustomAssignment(selectedRows);
+    openCustomAssignModal(selectedRows);
   });
+
+  els.customAssignCountInput.addEventListener("input", updateCustomAssignPreview);
+  els.customAssignConfirmBtn.addEventListener("click", confirmCustomAssignment);
+  els.customAssignCancelBtn.addEventListener("click", closeCustomAssignModal);
 
   els.homeSelectionClearBtn.addEventListener("click", clearHomeSelection);
 
