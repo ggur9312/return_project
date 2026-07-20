@@ -1067,14 +1067,14 @@
     }).length;
     var sortCount = state.sortRules.length;
     var badges = [
-      '<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">필터 적용 ' + filteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(filteredRows).toLocaleString("ko-KR") + '개</span>',
-      '<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-slate-100 text-slate-600 border border-slate-200">전체 ' + unfilteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(unfilteredRows).toLocaleString("ko-KR") + '개</span>'
+      '<span class="inline-block px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">필터 적용 ' + filteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(filteredRows).toLocaleString("ko-KR") + '개</span>',
+      '<span class="inline-block px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">전체 ' + unfilteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(unfilteredRows).toLocaleString("ko-KR") + '개</span>'
     ];
     if (filterCount > 0) {
-      badges.push('<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-amber-50 text-amber-700 border border-amber-100">필터 ' + filterCount + '개</span>');
+      badges.push('<span class="inline-block px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">필터 ' + filterCount + '개</span>');
     }
     if (sortCount > 0) {
-      badges.push('<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-100">정렬 ' + sortCount + '개</span>');
+      badges.push('<span class="inline-block px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">정렬 ' + sortCount + '개</span>');
     }
     els.filterQtySummary.innerHTML = badges.join("");
   }
@@ -1359,6 +1359,8 @@
 
   // --- 공용 모달 트랜지션 헬퍼 (열기/닫기 시 페이드+스케일) ---
   function openModalWithTransition(modalEl, boxEl) {
+    if (!modalEl.classList.contains("hidden")) return; // 이미 열려 있음 — 중복 호출 시 배경 스크롤 잠금 카운트가 어긋나는 것 방지
+    if (window.lockBodyScroll) window.lockBodyScroll();
     modalEl.classList.remove("hidden");
     modalEl.classList.add("flex");
     requestAnimationFrame(function () {
@@ -1368,11 +1370,13 @@
   }
 
   function closeModalWithTransition(modalEl, boxEl) {
+    if (modalEl.classList.contains("opacity-0")) return; // 이미 닫히는 중 — 중복 호출 시 잠금 해제가 중복되는 것 방지
     modalEl.classList.add("opacity-0");
     if (boxEl) boxEl.classList.add("scale-95");
     setTimeout(function () {
       modalEl.classList.add("hidden");
       modalEl.classList.remove("flex");
+      if (window.unlockBodyScroll) window.unlockBodyScroll();
     }, 200);
   }
 

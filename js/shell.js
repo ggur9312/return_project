@@ -25,6 +25,27 @@
   };
 })();
 
+// 두 앱 공용 모달 배경 스크롤 잠금 — 모달 내부를 스크롤할 때 배경 페이지까지
+// 같이 스크롤되는 것을 막는다. 참조 카운트를 두는 이유: 모달이 겹쳐 열릴 수
+// 있어서(예: 확인 모달이 다른 모달 위에 뜨는 경우) 안쪽 모달이 닫혀도 바깥
+// 모달이 아직 열려 있으면 잠금을 풀면 안 된다 — 카운트가 0이 될 때만 해제.
+(function () {
+  "use strict";
+  var openModalCount = 0;
+  window.lockBodyScroll = function () {
+    openModalCount++;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+  };
+  window.unlockBodyScroll = function () {
+    openModalCount = Math.max(0, openModalCount - 1);
+    if (openModalCount === 0) {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    }
+  };
+})();
+
 // 두 앱(집품현황/트럭현황) 공용 토스트 알림 — 생성/출력 완료 등 짧은 완료
 // 안내에 사용. app.js/truck.js가 로드된 뒤(이벤트 핸들러 안에서) 호출되므로
 // 스크립트 로드 순서와 무관하게 안전하다.
@@ -137,6 +158,7 @@
         hideTimeoutId = setTimeout(function () {
           modal.classList.add("hidden");
           modal.classList.remove("flex");
+          if (window.unlockBodyScroll) window.unlockBodyScroll();
         }, 200);
         resolve(result);
       }
@@ -144,6 +166,12 @@
       function onCancel() { cleanup(false); }
       okBtn.addEventListener("click", onOk);
       cancelBtn.addEventListener("click", onCancel);
+
+      // 연달아 호출되는 경우(예: 재출력 확인 → 출력완료 확인) 위의 clearTimeout이
+      // 이전 호출의 hide(및 그 안의 unlock)를 이미 취소시켰으므로, 실제로 hidden
+      // 상태였을 때만 새로 잠가야 카운트가 어긋나지 않는다.
+      var wasHidden = modal.classList.contains("hidden");
+      if (wasHidden && window.lockBodyScroll) window.lockBodyScroll();
 
       modal.classList.remove("hidden");
       modal.classList.add("flex");

@@ -52,6 +52,8 @@ const truckUploadModal = document.getElementById('truckUploadModal');
 const truckUploadModalBox = document.getElementById('truckUploadModalBox');
 
 function openTruckUploadModal() {
+    if (!truckUploadModal.classList.contains('hidden')) return;
+    if (window.lockBodyScroll) window.lockBodyScroll();
     truckUploadModal.classList.remove('hidden');
     truckUploadModal.classList.add('flex');
     requestAnimationFrame(() => {
@@ -61,11 +63,13 @@ function openTruckUploadModal() {
 }
 
 function closeTruckUploadModal() {
+    if (truckUploadModal.classList.contains('opacity-0')) return;
     truckUploadModal.classList.add('opacity-0');
     truckUploadModalBox.classList.add('scale-95');
     setTimeout(() => {
         truckUploadModal.classList.remove('flex');
         truckUploadModal.classList.add('hidden');
+        if (window.unlockBodyScroll) window.unlockBodyScroll();
     }, 200);
 }
 
@@ -853,9 +857,10 @@ function executePrint() {
     }
 
     const printArea = document.getElementById('truckPrintArea');
-    // 주기출력이 #truckPrintArea에 남겨뒀을 수 있는 named page 지정을 정리
-    // (그쪽은 인쇄 완료 후 스스로 되돌리지만, 방어적으로 한 번 더 초기화).
+    // 주기출력이 #truckPrintArea/#truckApp에 남겨뒀을 수 있는 named page 지정을
+    // 정리(그쪽은 인쇄 완료 후 스스로 되돌리지만, 방어적으로 한 번 더 초기화).
     printArea.style.page = '';
+    document.getElementById('truckApp').style.page = '';
 
     // Common header (한 번만 출력): 유의사항 + 상차제한
     let html = '';
@@ -913,10 +918,11 @@ function executePrint() {
         }
     });
 
-    // Trigger Print
+    // Trigger Print — 다른 6개 인쇄 흐름과 동일하게 printWithConfirm을 거쳐
+    // "출력을 완료하셨나요?" 확인 후에만 성공 토스트가 뜨도록 통일(되돌릴 상태가
+    // 없는 흐름이라 onConfirmed 콜백은 생략, 성공 토스트는 printWithConfirm이 자체 처리).
     setTimeout(() => {
-        window.print();
-        showToast('출력이 완료되었습니다.');
+        window.printWithConfirm();
     }, 300);
 }
 
@@ -1237,12 +1243,15 @@ function openCycleGenModal() {
 
     renderCycleGenCompanyList();
 
-    cycleGenModal.classList.remove('hidden');
-    cycleGenModal.classList.add('flex');
-    setTimeout(() => {
-        cycleGenModal.classList.remove('opacity-0');
-        cycleGenModalBox.classList.remove('scale-95');
-    }, 10);
+    if (cycleGenModal.classList.contains('hidden')) {
+        if (window.lockBodyScroll) window.lockBodyScroll();
+        cycleGenModal.classList.remove('hidden');
+        cycleGenModal.classList.add('flex');
+        setTimeout(() => {
+            cycleGenModal.classList.remove('opacity-0');
+            cycleGenModalBox.classList.remove('scale-95');
+        }, 10);
+    }
 }
 
 function renderCycleGenCompanyList() {
@@ -1283,11 +1292,13 @@ function toggleSelectAllGenCompanies() {
 }
 
 function closeCycleGenModal() {
+    if (cycleGenModal.classList.contains('opacity-0')) return;
     cycleGenModal.classList.add('opacity-0');
     cycleGenModalBox.classList.add('scale-95');
     setTimeout(() => {
         cycleGenModal.classList.remove('flex');
         cycleGenModal.classList.add('hidden');
+        if (window.unlockBodyScroll) window.unlockBodyScroll();
     }, 200);
 }
 
@@ -1396,6 +1407,7 @@ function executeCyclePrint() {
     const printArea = document.getElementById('truckPrintArea');
     // 주기출력이 남겨뒀을 수 있는 named page 지정을 정리(방어적 초기화).
     printArea.style.page = '';
+    document.getElementById('truckApp').style.page = '';
 
     // CT 소모/행 초기화는 인쇄창이 닫힌 뒤 자체 확인모달에서 실제 출력을
     // 확인받은 다음에만 반영한다(취소해도 CT가 이미 소모돼버리던 버그 수정) —
@@ -1546,20 +1558,25 @@ function openCyclePrintModal() {
     setCyclePrintAlignActive('.cycle-print-align-h-btn', 'alignH', settings.alignH);
     setCyclePrintAlignActive('.cycle-print-align-v-btn', 'alignV', settings.alignV);
 
-    cyclePrintModal.classList.remove('hidden');
-    cyclePrintModal.classList.add('flex');
-    setTimeout(() => {
-        cyclePrintModal.classList.remove('opacity-0');
-        cyclePrintModalBox.classList.remove('scale-95');
-    }, 10);
+    if (cyclePrintModal.classList.contains('hidden')) {
+        if (window.lockBodyScroll) window.lockBodyScroll();
+        cyclePrintModal.classList.remove('hidden');
+        cyclePrintModal.classList.add('flex');
+        setTimeout(() => {
+            cyclePrintModal.classList.remove('opacity-0');
+            cyclePrintModalBox.classList.remove('scale-95');
+        }, 10);
+    }
 }
 
 function closeCyclePrintModal() {
+    if (cyclePrintModal.classList.contains('opacity-0')) return;
     cyclePrintModal.classList.add('opacity-0');
     cyclePrintModalBox.classList.add('scale-95');
     setTimeout(() => {
         cyclePrintModal.classList.remove('flex');
         cyclePrintModal.classList.add('hidden');
+        if (window.unlockBodyScroll) window.unlockBodyScroll();
     }, 200);
 }
 
@@ -1619,6 +1636,10 @@ function executeTruckCyclePrint() {
     // 왼쪽 끝에 붙어버린다.
     printArea.innerHTML = `<div class="truck-cycle-print-content" style="justify-content:${justifyContent};align-items:${alignItems};text-align:${textAlign};font-size:${settings.fontSize}pt;font-weight:${settings.fontBold ? 'bold' : 'normal'};height:${contentHeight};width:${contentWidth};">${escapeTruckCyclePrintText(text)}</div>`;
     printArea.style.page = 'truck-cycle-note';
+    // #truckApp도 같은 named page로 맞춰야 앞쪽 형제 서브뷰(page:auto)와의 경계에서
+    // 강제 페이지 나눔(빈 첫 페이지)이 발생하지 않는다 — 정적 CSS(#pickApp/#truckApp
+    // { page: ... })가 처리하는 pick-label/truck-a4와 달리 이 값은 동적이라 직접 동기화.
+    document.getElementById('truckApp').style.page = 'truck-cycle-note';
 
     closeCyclePrintModal();
 
@@ -1634,6 +1655,7 @@ function executeTruckCyclePrint() {
         window.removeEventListener('afterprint', finishTruckCyclePrint);
         truckCyclePrintInProgress = false;
         printArea.style.page = '';
+        document.getElementById('truckApp').style.page = ''; // 정적 CSS(#truckApp{page:truck-a4})로 복귀
     }
     window.addEventListener('afterprint', finishTruckCyclePrint);
     setTimeout(finishTruckCyclePrint, 20000);
