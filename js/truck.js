@@ -932,7 +932,7 @@ function truckSwitchView(view) {
     const navCycleBtn = document.getElementById('navCycleBtn');
 
     const activeClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors bg-white text-indigo-700 shadow-sm";
-    const inactiveClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors bg-indigo-500/25 text-indigo-50 hover:bg-indigo-500/40";
+    const inactiveClass = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white";
 
     if (view === 'cycle') {
         homeView.classList.add('hidden');

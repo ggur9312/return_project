@@ -76,8 +76,11 @@
   var pickSubnav = document.getElementById("pickSidebarSubnav");
   var truckSubnav = document.getElementById("truckSidebarSubnav");
   var TOP_BASE = "w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors ";
-  var TOP_ACTIVE = "bg-white text-indigo-700 shadow-sm";
-  var TOP_INACTIVE = "bg-indigo-500/40 text-white hover:bg-indigo-500/60";
+  var TOP_ACTIVE = "bg-indigo-600 text-white shadow-sm";
+  var TOP_INACTIVE = "text-slate-300 hover:bg-slate-700/70 hover:text-white";
+  var SUBNAV_BASE = "grid transition-[grid-template-rows] duration-300 ease-in-out ";
+  var SUBNAV_OPEN = "grid-rows-[1fr]";
+  var SUBNAV_CLOSED = "grid-rows-[0fr]";
 
   function apply(view) {
     dashboardApp.classList.toggle("hidden", view !== "dashboard");
@@ -86,8 +89,8 @@
     dashboardBtn.className = TOP_BASE + (view === "dashboard" ? TOP_ACTIVE : TOP_INACTIVE);
     pickBtn.className = TOP_BASE + (view === "pick" ? TOP_ACTIVE : TOP_INACTIVE);
     truckBtn.className = TOP_BASE + (view === "truck" ? TOP_ACTIVE : TOP_INACTIVE);
-    pickSubnav.classList.toggle("hidden", view !== "pick");
-    truckSubnav.classList.toggle("hidden", view !== "truck");
+    pickSubnav.className = SUBNAV_BASE + (view === "pick" ? SUBNAV_OPEN : SUBNAV_CLOSED);
+    truckSubnav.className = SUBNAV_BASE + (view === "truck" ? SUBNAV_OPEN : SUBNAV_CLOSED);
     try { localStorage.setItem(STORAGE_KEY, view); } catch (e) {}
     // 대시보드의 존/층 막대그래프는 집품현황의 state.rows를 사용하는데, 대시보드가
     // 숨겨진 동안은 refreshAll()이 렌더를 건너뛰므로 돌아올 때 다시 그려 따라잡는다.
