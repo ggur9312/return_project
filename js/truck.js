@@ -1455,17 +1455,18 @@ function renderCycleGenCompanyList() {
     }
 
     // 같은 업체가 여러 그룹번호로(또는 여러 날짜로) 나뉘어 있을 수 있어(빈GT가 다를 수 있음)
-    // 그룹(행) 단위로 그대로 보여준다. 여러 날짜가 동시에 보일 수 있으니 업체명 옆에 날짜를
-    // 작게 같이 표시해 어느 날짜 소속인지 구분되게 한다.
+    // 그룹(행) 단위로 그대로 보여준다. 여러 날짜가 동시에 보일 수 있으니 맨 앞 생성일시 칸으로
+    // 어느 날짜 소속인지 구분되게 한다.
     listEl.innerHTML = flatRows.map(({ date, idx, row }) => {
         const emptyGt = row.inputs.emptyGt;
         const exp32 = (Math.round((emptyGt / 32) * 10) / 10).toFixed(1);
         const exp24 = (Math.round((emptyGt / 24) * 10) / 10).toFixed(1);
         return `
-        <div class="grid grid-cols-[1.25rem_1fr_4.5rem_4.5rem_4.5rem_5rem_5rem_5.5rem] gap-2 items-center py-1.5" data-company-row data-date="${date}">
+        <div class="grid grid-cols-[5.5rem_1.25rem_1fr_5rem_4.5rem_4.5rem_5rem_5rem_5.5rem] gap-2 items-center py-1.5" data-company-row data-date="${date}">
+            <span class="text-slate-500 text-xs">${date}</span>
             <label class="contents cursor-pointer">
                 <input type="checkbox" value="${idx}" class="cGenCompanyCheckbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                <span class="truncate text-slate-700">${row.company}<span class="ml-1.5 text-[10px] font-normal text-slate-400">${date}</span></span>
+                <span class="text-slate-700">${row.company}</span>
             </label>
             <span class="text-center text-slate-500">${row.inputs.palette}</span>
             <span class="text-right tabular-nums text-slate-500">${emptyGt}</span>
