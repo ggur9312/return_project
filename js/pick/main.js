@@ -54,6 +54,8 @@
   var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
   var splitBalanced = Pick.splitBalanced;
   var renderWorkerGroupCards = Pick.renderWorkerGroupCards;
+  var createRowDragMoveController = Pick.createRowDragMoveController;
+  var moveRowsBetweenGroups = Pick.moveRowsBetweenGroups;
   var handleExtractFile = Pick.handleExtractFile;
   var mergeExtractedIntoHome = Pick.mergeExtractedIntoHome;
   var resetExtractPreview = Pick.resetExtractPreview;
@@ -153,11 +155,21 @@
     renderCustomAssignPreview();
   }
 
+  var customAssignRowDragController = createRowDragMoveController({
+    containerEl: els.customAssignPreviewContainer,
+    rowSelector: ".assign-drag-row",
+    dropZoneSelector: ".assign-drop-zone",
+    onDrop: function (fromKey, toKey, rowIds) {
+      moveRowsBetweenGroups(customAssignGroups, fromKey, toKey, rowIds);
+      renderCustomAssignPreview();
+    }
+  });
+
   function renderCustomAssignPreview() {
     renderWorkerGroupCards(els.customAssignPreviewContainer, customAssignGroups, customAssignActiveWorkerIdx, function (newIdx) {
       customAssignActiveWorkerIdx = newIdx;
       renderCustomAssignPreview();
-    });
+    }, customAssignRowDragController);
   }
 
   function confirmCustomAssignment() {

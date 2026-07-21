@@ -644,6 +644,161 @@
     });
   }
 
+  // 행 드래그 다중선택 + 드래그이동(다른 작업자 카드로 드롭) 컨트롤러 팩토리.
+  // 홈 화면의 드래그 범위선택(home-table.js)과 같은 방식(네이티브 HTML5 DnD 아님,
+  // mousedown+document mousemove+document mouseup 수동 추적)이지만, 여기는 선택한
+  // 행 뭉치를 "다른 작업자 카드 위로 드롭"까지 다룬다는 점이 다르다. 집품 할당
+  // 페이지(#assignView)/집품 할당 모달(#assignCreateModal)/커스텀 할당 모달
+  // (#customAssignModal) 세 곳이 각자 독립된 인스턴스로 만들어 쓴다 — row/dropzone이
+  // 실제로 어떤 배열을 어떻게 자르고 붙이는지는 전부 onDrop 콜백에 위임하고, 이
+  // 팩토리는 마우스 이벤트 상태기계 + 선택/드롭대상 시각효과만 담당한다.
+  function createRowDragMoveController(options) {
+    // options: {
+    //   containerEl,            // mousedown 위임을 걸 고정 컨테이너(재렌더에도 안 바뀜)
+    //   rowSelector,             // 선택 가능한 <tr> 마커 클래스 셀렉터
+    //   dropZoneSelector,        // 드롭 대상(작업자 카드) 마커 클래스 셀렉터
+    //   onDrop(fromGroupKey, toGroupKey, rowIds),  // 실제 데이터 이동 + 재렌더링
+    //   selectedRowClass,        // 기본 "bg-emerald-100"
+    //   hoverClassToSuppress,    // 선택된 행에서 꺼줄 hover 유틸(선택)
+    //   getBadgeLabel(count)     // 기본 "N개 이동중"
+    // }
+    var selectedRowClass = options.selectedRowClass || "bg-emerald-100";
+    var DRAG_THRESHOLD = 6;
+    var markedIds = new Set();
+    var groupKey = null;
+    var anchorId = null;
+    var rowOrder = null;
+    var mode = "idle"; // idle | pending-select | pending-carry | select | carry
+    var downPos = null;
+    var badgeEl = null;
+    var hoveredDropZone = null;
+
+    function rowGroupKey(tr) {
+      var host = tr.closest("[data-group-key]");
+      return host ? host.dataset.groupKey : null;
+    }
+    function rowsInGroup(key) {
+      return Array.prototype.filter.call(
+        options.containerEl.querySelectorAll(options.rowSelector),
+        function (tr) { return rowGroupKey(tr) === key; }
+      );
+    }
+    function paintSelection() {
+      Array.prototype.forEach.call(options.containerEl.querySelectorAll(options.rowSelector), function (tr) {
+        var marked = markedIds.has(tr.dataset.rowId);
+        tr.classList.toggle(selectedRowClass, marked);
+        if (options.hoverClassToSuppress) tr.classList.toggle(options.hoverClassToSuppress, !marked);
+      });
+    }
+    function applyRange(fromId, toId) {
+      var order = rowOrder || rowsInGroup(groupKey).map(function (tr) { return tr.dataset.rowId; });
+      var lo = order.indexOf(fromId), hi = order.indexOf(toId);
+      if (lo === -1 || hi === -1) return;
+      if (lo > hi) { var t = lo; lo = hi; hi = t; }
+      markedIds = new Set(order.slice(lo, hi + 1));
+      paintSelection();
+    }
+    function removeBadge() {
+      if (badgeEl) { badgeEl.remove(); badgeEl = null; }
+    }
+    function setDropHover(dz) {
+      if (hoveredDropZone === dz) return;
+      if (hoveredDropZone) hoveredDropZone.classList.remove("assign-drag-dropzone-hover");
+      hoveredDropZone = dz;
+      if (hoveredDropZone) hoveredDropZone.classList.add("assign-drag-dropzone-hover");
+    }
+    function clearSelection() {
+      markedIds = new Set();
+      groupKey = null;
+      anchorId = null;
+      rowOrder = null;
+      paintSelection();
+      removeBadge();
+      setDropHover(null);
+      mode = "idle";
+    }
+    function ensureBadge() {
+      if (badgeEl) return;
+      badgeEl = document.createElement("div");
+      badgeEl.className = "assign-drag-badge fixed z-[200] bg-slate-900 text-white text-xs px-3 py-1.5 rounded-full shadow-lg pointer-events-none";
+      document.body.appendChild(badgeEl);
+    }
+    function updateBadge(x, y) {
+      if (!badgeEl) return;
+      var label = options.getBadgeLabel ? options.getBadgeLabel(markedIds.size) : (markedIds.size + "개 이동중");
+      badgeEl.textContent = label;
+      badgeEl.style.left = (x + 12) + "px";
+      badgeEl.style.top = (y + 12) + "px";
+    }
+    function overThreshold(e) {
+      var dx = e.clientX - downPos.x, dy = e.clientY - downPos.y;
+      return (dx * dx + dy * dy) >= (DRAG_THRESHOLD * DRAG_THRESHOLD);
+    }
+
+    options.containerEl.addEventListener("mousedown", function (e) {
+      if (e.target.closest("select,input,button")) return;
+      var tr = e.target.closest(options.rowSelector);
+      if (!tr) return;
+      e.preventDefault();
+      var id = tr.dataset.rowId;
+      var key = rowGroupKey(tr);
+      downPos = { x: e.clientX, y: e.clientY };
+
+      if (markedIds.size > 1 && markedIds.has(id) && key === groupKey) {
+        mode = "pending-carry"; // 움직이지 않으면 클릭으로 취급해 선택 유지, 움직이면 carry로 전환
+        return;
+      }
+      if (key !== groupKey) { markedIds = new Set(); }
+      groupKey = key;
+      rowOrder = rowsInGroup(key).map(function (t) { return t.dataset.rowId; });
+      anchorId = id;
+      markedIds = new Set([id]);
+      paintSelection();
+      mode = "pending-select";
+    });
+
+    document.addEventListener("mousemove", function (e) {
+      if (mode === "idle") return;
+      if (mode === "pending-select" || mode === "pending-carry") {
+        if (!overThreshold(e)) return;
+        mode = mode === "pending-select" ? "select" : "carry";
+        if (mode === "carry") ensureBadge();
+      }
+      if (mode === "select") {
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        var tr = el && el.closest(options.rowSelector);
+        if (tr && rowGroupKey(tr) === groupKey) applyRange(anchorId, tr.dataset.rowId);
+      } else if (mode === "carry") {
+        updateBadge(e.clientX, e.clientY);
+        var hitEl = document.elementFromPoint(e.clientX, e.clientY);
+        var dz = hitEl && hitEl.closest(options.dropZoneSelector);
+        if (dz && dz.dataset.dropKey === groupKey) dz = null; // 자기 카드 위는 유효한 드롭 대상이 아님
+        setDropHover(dz);
+      }
+    });
+
+    document.addEventListener("mouseup", function (e) {
+      if (mode === "carry") {
+        removeBadge();
+        var hitEl = document.elementFromPoint(e.clientX, e.clientY);
+        var dz = hitEl && hitEl.closest(options.dropZoneSelector);
+        setDropHover(null);
+        if (dz && dz.dataset.dropKey !== groupKey) {
+          var rowIds = Array.from(markedIds);
+          var fromKey = groupKey;
+          var toKey = dz.dataset.dropKey;
+          clearSelection();
+          options.onDrop(fromKey, toKey, rowIds);
+          return;
+        }
+      }
+      mode = "idle";
+      downPos = null;
+    });
+
+    return { clearSelection: clearSelection };
+  }
+
   // 필터바처럼 별도 영역에서 여러 정렬 기준을 명시적으로 추가/삭제/방향 전환하는
   // 컨트롤러 팩토리 — 홈과 커스텀 할당 모달이 각자의 정렬 규칙 배열/컨테이너로
   // 독립적으로 인스턴스화한다. 홈은 테이블 헤더 클릭(setupSortLabels)과도 같은
@@ -1067,14 +1222,14 @@
     }).length;
     var sortCount = state.sortRules.length;
     var badges = [
-      '<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">필터 적용 ' + filteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(filteredRows).toLocaleString("ko-KR") + '개</span>',
-      '<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-slate-100 text-slate-600 border border-slate-200">전체 ' + unfilteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(unfilteredRows).toLocaleString("ko-KR") + '개</span>'
+      '<span class="inline-block px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">필터 적용 ' + filteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(filteredRows).toLocaleString("ko-KR") + '개</span>',
+      '<span class="inline-block px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">전체 ' + unfilteredRows.length.toLocaleString("ko-KR") + '행 · ' + sumQty(unfilteredRows).toLocaleString("ko-KR") + '개</span>'
     ];
     if (filterCount > 0) {
-      badges.push('<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-amber-50 text-amber-700 border border-amber-100">필터 ' + filterCount + '개</span>');
+      badges.push('<span class="inline-block px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">필터 ' + filterCount + '개</span>');
     }
     if (sortCount > 0) {
-      badges.push('<span class="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-100">정렬 ' + sortCount + '개</span>');
+      badges.push('<span class="inline-block px-2.5 py-0.5 rounded-full text-[13px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">정렬 ' + sortCount + '개</span>');
     }
     els.filterQtySummary.innerHTML = badges.join("");
   }
@@ -1312,6 +1467,7 @@
     // 화면으로 이동할 때는 항상 명시적으로 해제한다(Pick.refreshAll()의 암묵적
     // 초기화는 홈이 보일 때만 실행되어 이 경우를 놓친다).
     if (view !== "home") Pick.clearHomeSelection();
+    if (view !== "assign" && Pick.assignRowDragController) Pick.assignRowDragController.clearSelection();
     els.homeView.classList.toggle("hidden", view !== "home");
     els.assignView.classList.toggle("hidden", view !== "assign");
     els.extractView.classList.toggle("hidden", view !== "extract");
@@ -1359,6 +1515,8 @@
 
   // --- 공용 모달 트랜지션 헬퍼 (열기/닫기 시 페이드+스케일) ---
   function openModalWithTransition(modalEl, boxEl) {
+    if (!modalEl.classList.contains("hidden")) return; // 이미 열려 있음 — 중복 호출 시 배경 스크롤 잠금 카운트가 어긋나는 것 방지
+    if (window.lockBodyScroll) window.lockBodyScroll();
     modalEl.classList.remove("hidden");
     modalEl.classList.add("flex");
     requestAnimationFrame(function () {
@@ -1368,11 +1526,13 @@
   }
 
   function closeModalWithTransition(modalEl, boxEl) {
+    if (modalEl.classList.contains("opacity-0")) return; // 이미 닫히는 중 — 중복 호출 시 잠금 해제가 중복되는 것 방지
     modalEl.classList.add("opacity-0");
     if (boxEl) boxEl.classList.add("scale-95");
     setTimeout(function () {
       modalEl.classList.add("hidden");
       modalEl.classList.remove("flex");
+      if (window.unlockBodyScroll) window.unlockBodyScroll();
     }, 200);
   }
 
@@ -1441,6 +1601,7 @@
   Pick.getFilteredRows = getFilteredRows;
   Pick.getAssignBaseRows = getAssignBaseRows;
   Pick.updateSortHeaderClasses = updateSortHeaderClasses;
+  Pick.createRowDragMoveController = createRowDragMoveController;
   Pick.createSortBarController = createSortBarController;
   Pick.homeSortBarController = homeSortBarController;
   Pick.createFilterBarController = createFilterBarController;

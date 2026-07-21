@@ -7,6 +7,7 @@
   var closeModalWithTransition = Pick.closeModalWithTransition;
   var compareValues = Pick.compareValues;
   var createFilterBarController = Pick.createFilterBarController;
+  var createRowDragMoveController = Pick.createRowDragMoveController;
   var createSortBarController = Pick.createSortBarController;
   var els = Pick.els;
   var escapeHtml = Pick.escapeHtml;
@@ -288,7 +289,7 @@
         : "";
       var rowBg = i % 2 === 1 ? "bg-slate-50/60" : "bg-white";
       return (
-        '<tr class="' + rowBg + ' hover:bg-indigo-50/40 transition-colors">' +
+        '<tr class="assign-drag-row ' + rowBg + ' hover:bg-indigo-50/40 transition-colors" data-row-id="' + escapeHtml(r.id) + '">' +
         ASSIGN_DETAIL_COLUMNS.map(function (col) {
           if (col.key === "quantity") {
             return '<td class="px-3 py-2.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
@@ -313,7 +314,7 @@
       '<table class="w-full border-collapse text-left text-xs table-fixed">' +
       colgroupHtml +
       '<thead><tr class="bg-slate-100 border-b border-slate-200 text-xs font-bold text-slate-600">' + headHtml + "</tr></thead>" +
-      '<tbody class="divide-y divide-slate-100">' + bodyHtml + "</tbody>" +
+      '<tbody class="divide-y divide-slate-100" data-group-key="' + workerIdx + '">' + bodyHtml + "</tbody>" +
       "</table></div>"
     );
   }
@@ -519,6 +520,7 @@
   ];
 
   function renderAssignPanel() {
+    if (assignRowDragController) assignRowDragController.clearSelection();
     var cfg = state.assignConfigs.find(function (c) { return c.id === state.assignActiveId; });
     if (!cfg) {
       els.assignTableContainer.innerHTML = "";
@@ -572,7 +574,7 @@
       var accent = WORKER_CARD_ACCENTS[idx % WORKER_CARD_ACCENTS.length];
       var outlineBtn = "inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
       return (
-        '<div class="bg-white border-t border-r border-b border-slate-200 border-l-4 ' + accent.rail + ' rounded-2xl shadow-md overflow-hidden">' +
+        '<div class="assign-drop-zone bg-white border-t border-r border-b border-slate-200 border-l-4 ' + accent.rail + ' rounded-2xl shadow-md overflow-hidden" data-drop-key="' + idx + '">' +
         '<div class="px-5 py-3 ' + accent.header + ' border-b space-y-2">' +
         '<div class="flex items-center justify-between flex-wrap gap-2">' +
         '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) +
@@ -720,6 +722,43 @@
 
   }
 
+  // 드래그로 다중선택한 행들을 다른 작업자 카드에 한번에 드롭했을 때의 이동 처리 —
+  // renderAssignPanel()은 활성 config 하나의 카드만 화면에 그리므로(다른 config는
+  // 아예 DOM에 없음) 드롭 대상은 항상 같은 cfg 안의 다른 작업자다. 같은 cfg 안
+  // 이동이라 GT 키("cfgId:rowId")가 안 바뀌어, 위 단일행 <select> 핸들러와 달리
+  // 재매핑이 필요 없다.
+  function handleAssignRowDrop(fromKey, toKey, rowIds) {
+    var cfg = getActiveAssignConfig();
+    if (!cfg || !cfg.workerGroups) return;
+    var fromIdx = parseInt(fromKey, 10);
+    var toIdx = parseInt(toKey, 10);
+    var fromGroup = cfg.workerGroups[fromIdx];
+    var toGroup = cfg.workerGroups[toIdx];
+    if (!fromGroup || !toGroup) return;
+    var idSet = new Set(rowIds);
+    var moved = [];
+    for (var i = fromGroup.length - 1; i >= 0; i--) {
+      if (fromGroup[i] && idSet.has(fromGroup[i].id)) moved.unshift(fromGroup.splice(i, 1)[0]);
+    }
+    if (!moved.length) return;
+    var insertedCount = insertRowsSortedByZone(toGroup, moved);
+    if (insertedCount < moved.length && window.showToast) {
+      window.showToast("이미 대상 작업자에게 있던 행은 병합했습니다.", "info");
+    }
+    saveAssignState();
+    renderAssignPanel();
+    if (window.showToast) window.showToast(moved.length + "개 행을 작업자 " + (toIdx + 1) + "로 이동했습니다.");
+  }
+
+  var assignRowDragController = createRowDragMoveController({
+    containerEl: els.assignTableContainer,
+    rowSelector: ".assign-drag-row",
+    dropZoneSelector: ".assign-drop-zone",
+    selectedRowClass: "assign-drag-row-selected",
+    hoverClassToSuppress: "hover:bg-indigo-50/40",
+    onDrop: handleAssignRowDrop
+  });
+
   function removeAssignWorker(cfg) {
     if (cfg.count <= 1) return;
     // GT 키가 이제 행 id 기준이라(작업자 인덱스 무관) 병합해도 기존 매칭이 그대로 유지됨 —
@@ -825,7 +864,7 @@
         ? '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">할당됨</span>'
         : '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-50 text-slate-400 border border-slate-200">미할당</span>';
       return (
-        '<tr class="border-b border-slate-100 last:border-b-0">' +
+        '<tr class="assign-drag-row border-b border-slate-100 last:border-b-0" data-row-id="' + escapeHtml(r.id) + '">' +
         ASSIGN_DETAIL_COLUMNS.map(function (col) {
           if (col.key === "quantity") {
             return '<td class="px-2 py-1.5 text-right tabular-nums text-slate-700">' + Number(r.quantity || 0).toLocaleString("ko-KR") + "</td>";
@@ -847,7 +886,7 @@
       '<div class="overflow-x-auto">' +
       '<table class="w-full border-collapse text-left text-xs min-w-max">' +
       '<thead><tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500">' + headHtml + "</tr></thead>" +
-      '<tbody class="divide-y divide-slate-100">' + bodyHtml + "</tbody>" +
+      '<tbody class="divide-y divide-slate-100" data-group-key="' + workerIdx + '">' + bodyHtml + "</tbody>" +
       "</table></div>"
     );
   }
@@ -858,7 +897,8 @@
   // 재배정(select change) 시 splice/push로 직접 변경한다(호출자 쪽 변수도 같은 배열
   // 객체이므로 별도 동기화 없이 자동 반영됨). activeIdx 변경은 mutate 대신 콜백으로
   // 위임해 호출자가 자기 모듈 변수를 갱신한 뒤 다시 이 함수를 호출하게 한다.
-  function renderWorkerGroupCards(container, groups, activeIdx, onActiveIdxChange) {
+  function renderWorkerGroupCards(container, groups, activeIdx, onActiveIdxChange, dragController) {
+    if (dragController) dragController.clearSelection();
     if (!groups) {
       container.innerHTML = "";
       return;
@@ -879,7 +919,7 @@
       if (activeIdx !== null && activeIdx !== idx) return "";
       var total = rows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
       return (
-        '<div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-3">' +
+        '<div class="assign-drop-zone bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-3" data-drop-key="' + idx + '">' +
         '<div class="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200">' +
         '<div class="text-sm font-bold text-slate-900">작업자 ' + (idx + 1) + "</div>" +
         '<div class="text-xs font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + rows.length + "장</div>" +
@@ -907,16 +947,44 @@
         var row = groups[fromIdx][rowIdx];
         groups[fromIdx].splice(rowIdx, 1);
         groups[toIdx].push(row);
-        renderWorkerGroupCards(container, groups, activeIdx, onActiveIdxChange);
+        renderWorkerGroupCards(container, groups, activeIdx, onActiveIdxChange, dragController);
       });
     });
   }
+
+  // 미리보기(#assignCreateModal/#customAssignModal)에서 드래그로 다중선택한 행들을
+  // 다른 작업자 카드로 옮길 때 쓰는 배열 조작 — 위 select change 핸들러의 단일행
+  // splice/push를 다중행으로 확장한 것(아직 config로 확정되지 않은 in-memory
+  // 배열이라 zone 정렬 없이 push만 하는 것도 기존과 동일).
+  function moveRowsBetweenGroups(groups, fromKey, toKey, rowIds) {
+    var fromIdx = parseInt(fromKey, 10);
+    var toIdx = parseInt(toKey, 10);
+    var fromGroup = groups[fromIdx];
+    var toGroup = groups[toIdx];
+    if (!fromGroup || !toGroup) return;
+    var idSet = new Set(rowIds);
+    var moved = [];
+    for (var i = fromGroup.length - 1; i >= 0; i--) {
+      if (fromGroup[i] && idSet.has(fromGroup[i].id)) moved.unshift(fromGroup.splice(i, 1)[0]);
+    }
+    toGroup.push.apply(toGroup, moved);
+  }
+
+  var assignPreviewRowDragController = createRowDragMoveController({
+    containerEl: els.assignPreviewContainer,
+    rowSelector: ".assign-drag-row",
+    dropZoneSelector: ".assign-drop-zone",
+    onDrop: function (fromKey, toKey, rowIds) {
+      moveRowsBetweenGroups(assignPreviewGroups, fromKey, toKey, rowIds);
+      renderAssignPreview();
+    }
+  });
 
   function renderAssignPreview() {
     renderWorkerGroupCards(els.assignPreviewContainer, assignPreviewGroups, assignPreviewActiveWorkerIdx, function (newIdx) {
       assignPreviewActiveWorkerIdx = newIdx;
       renderAssignPreview();
-    });
+    }, assignPreviewRowDragController);
   }
 
   function confirmAssignConfig() {
@@ -1008,6 +1076,7 @@
   Pick.assignSortBarController = assignSortBarController;
   Pick.initAssignPanelControllers = initAssignPanelControllers;
   Pick.renderAssignPanel = renderAssignPanel;
+  Pick.assignRowDragController = assignRowDragController;
   Pick.removeAssignWorker = removeAssignWorker;
   Pick.setAssignMsg = setAssignMsg;
   Pick.getSelectedAssignDates = getSelectedAssignDates;
@@ -1018,6 +1087,7 @@
   Pick.generateAssignPreview = generateAssignPreview;
   Pick.renderAssignPreviewRows = renderAssignPreviewRows;
   Pick.renderWorkerGroupCards = renderWorkerGroupCards;
+  Pick.moveRowsBetweenGroups = moveRowsBetweenGroups;
   Pick.renderAssignPreview = renderAssignPreview;
   Pick.confirmAssignConfig = confirmAssignConfig;
   Pick.resetAssignCreateModal = resetAssignCreateModal;
