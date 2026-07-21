@@ -472,11 +472,12 @@
         </section>
       </div>
     </section>
-    <section id="assignActionCard" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-center">
-      <button id="assignOpenModalBtn" class="w-full h-full min-h-[3.5rem] inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-base px-4 py-3 rounded-xl shadow-sm transition-all duration-150">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-        <span>집품 할당</span>
-      </button>
+    <section id="assignActionCard" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center gap-2">
+      <div class="bg-indigo-50 text-indigo-600 rounded-full p-2.5">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+      </div>
+      <p class="text-xs text-slate-500 leading-snug">선택한 데이터를<br>작업자에게 배정합니다</p>
+      <button id="assignOpenModalBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">집품 할당</button>
     </section>
   </div>
 
@@ -629,7 +630,7 @@
 
 </div>
 
-<div id="assignCreateModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center pt-4 pr-4 pb-4 pl-56 opacity-0 transition-opacity duration-200">
+<div id="assignCreateModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
   <div id="assignCreateModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-200">
     <div class="shrink-0 px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
       <h3 class="text-sm font-semibold text-slate-900">집품 할당 생성</h3>
@@ -665,7 +666,7 @@
 </div>
 
 
-<div id="customAssignModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center pt-4 pr-4 pb-4 pl-56 opacity-0 transition-opacity duration-200">
+<div id="customAssignModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
   <div id="customAssignModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-200">
     <div class="shrink-0 px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
       <h3 class="text-sm font-semibold text-slate-900">커스텀 할당 생성</h3>
