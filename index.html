@@ -139,7 +139,7 @@
       <div class="flex flex-col gap-1 pl-3 mb-1">
         <button id="navHomeBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors text-white">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-          <span>집품리스트 현황</span>
+          <span>집품 리스트 현황</span>
         </button>
         <button id="navAssignBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
@@ -147,7 +147,7 @@
         </button>
         <button id="navExtractBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4 4 4-4m-4-12v16M20 8l-4-4-4 4m4-4v16"/></svg>
-          <span>집품리스트 추출</span>
+          <span>집품 리스트 추출</span>
         </button>
       </div>
     </div>
@@ -162,11 +162,11 @@
       <div class="flex flex-col gap-1 pl-3 mb-1">
         <button id="truckNavHomeBtn" onclick="truckSwitchView('home')" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors text-white">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6m-6 4h4"></path></svg>
-          <span>트럭리스트 현황</span>
+          <span>트럭 리스트 현황</span>
         </button>
         <button id="navCycleBtn" onclick="truckSwitchView('cycle')" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-          <span>트럭주기</span>
+          <span>트럭 주기</span>
         </button>
       </div>
     </div>
@@ -347,15 +347,15 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h3 class="text-sm font-semibold text-slate-900 mb-4">층별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품리스트 현황 데이터 기준)</span> <span class="text-xs font-semibold text-indigo-600 tabular-nums ml-1">전체 수량 <span id="dashboardFloorTotalValue">0개</span></span></h3>
-        <div id="dashboardFloorEmptyState" class="p-10 text-center text-sm text-slate-400">집품리스트 현황에 데이터를 등록하면 층별 수량이 표시됩니다.</div>
+        <h3 class="text-sm font-semibold text-slate-900 mb-4">층별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품 리스트 현황 데이터 기준)</span> <span class="text-xs font-semibold text-indigo-600 tabular-nums ml-1">전체 수량 <span id="dashboardFloorTotalValue">0개</span></span></h3>
+        <div id="dashboardFloorEmptyState" class="p-10 text-center text-sm text-slate-400">집품 리스트 현황에 데이터를 등록하면 층별 수량이 표시됩니다.</div>
         <div id="dashboardFloorChartWrap" class="hidden h-72">
           <canvas id="dashboardFloorChart"></canvas>
         </div>
       </div>
       <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h3 class="text-sm font-semibold text-slate-900 mb-4">존별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품리스트 현황 데이터 기준)</span></h3>
-        <div id="dashboardZoneEmptyState" class="p-10 text-center text-sm text-slate-400">집품리스트 현황에 데이터를 등록하면 존별 수량이 표시됩니다.</div>
+        <h3 class="text-sm font-semibold text-slate-900 mb-4">존별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품 리스트 현황 데이터 기준)</span></h3>
+        <div id="dashboardZoneEmptyState" class="p-10 text-center text-sm text-slate-400">집품 리스트 현황에 데이터를 등록하면 존별 수량이 표시됩니다.</div>
         <div id="dashboardZoneChartWrap" class="hidden h-72">
           <canvas id="dashboardZoneChart"></canvas>
         </div>
@@ -377,7 +377,7 @@
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품리스트 현황</h1>
+          <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품 리스트 현황</h1>
           <p class="text-xs text-slate-500 mt-0.5">엑셀 업로드·붙여넣기로 등록한 집품 데이터를 관리합니다.</p>
         </div>
       </div>
@@ -566,7 +566,7 @@
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4 4 4-4m-4-12v16M20 8l-4-4-4 4m4-4v16"/></svg>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품리스트 추출</h1>
+          <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품 리스트 추출</h1>
           <p class="text-xs text-slate-500 mt-0.5">엑셀 2개 시트를 대조해 집품대기 데이터를 추출합니다.</p>
         </div>
       </div>
@@ -574,8 +574,8 @@
 
     <div class="print:hidden max-w-[1600px] mx-auto px-8 py-8 space-y-6">
     <div id="extractDropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
-      <h2 class="text-sm font-semibold text-slate-900 mb-1">집품리스트 추출용 엑셀 업로드</h2>
-      <p class="text-xs text-slate-500 mb-3">시트1: 집품리스트(그룹번호~수량, 상태="집품대기"인 행) · 시트2: A~N열 원본 데이터(N열="집품대기"인 행의 H열 업체명과 시트1 업체명을 대조)</p>
+      <h2 class="text-sm font-semibold text-slate-900 mb-1">집품 리스트 추출용 엑셀 업로드</h2>
+      <p class="text-xs text-slate-500 mb-3">시트1: 집품 리스트(그룹번호~수량, 상태="집품대기"인 행) · 시트2: A~N열 원본 데이터(N열="집품대기"인 행의 H열 업체명과 시트1 업체명을 대조)</p>
       <input type="file" id="extractFileInput" accept=".xlsx,.xls" hidden>
       <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="extractFileSelectBtn">파일 선택</button>
       <span id="extractFileName" class="ml-3 text-xs text-slate-500"></span>
@@ -593,7 +593,7 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
           <span>초기화</span>
         </button>
-        <button id="extractMergeBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" disabled>집품리스트 병합</button>
+        <button id="extractMergeBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" disabled>집품 리스트 병합</button>
       </div>
     </div>
 
@@ -802,7 +802,7 @@
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6m-6 4h4"></path></svg>
                     </div>
                     <div>
-                        <h1 class="text-xl font-bold text-slate-900 tracking-tight">트럭리스트 현황</h1>
+                        <h1 class="text-xl font-bold text-slate-900 tracking-tight">트럭 리스트 현황</h1>
                         <p class="text-xs text-slate-500 mt-0.5">트럭 운송 데이터를 업로드하고 날짜별로 관리합니다.</p>
                     </div>
                 </div>
@@ -899,7 +899,7 @@
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </div>
                     <div>
-                        <h1 class="text-xl font-bold text-slate-900 tracking-tight">트럭주기</h1>
+                        <h1 class="text-xl font-bold text-slate-900 tracking-tight">트럭 주기</h1>
                         <p class="text-xs text-slate-500 mt-0.5">CT 바코드로 트럭 주기를 생성하고 라벨을 출력합니다.</p>
                     </div>
                 </div>
@@ -933,12 +933,12 @@
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <h3 class="text-lg font-bold text-slate-900">업체별 트럭 주기</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">트럭리스트 현황에서 업로드한 생성일시별로 업체를 선택해 주기(수량)를 생성하고, CT 바코드를 매칭합니다.</p>
+                        <p class="text-xs text-slate-500 mt-0.5">트럭 리스트 현황에서 업로드한 생성일시별로 업체를 선택해 주기(수량)를 생성하고, CT 바코드를 매칭합니다.</p>
                     </div>
                     <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
                         <button onclick="clearCycleData()" class="shrink-0 inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            <span>트럭주기 초기화</span>
+                            <span>트럭 주기 초기화</span>
                         </button>
                         <button onclick="openCycleGenModal()" class="shrink-0 inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -1258,7 +1258,7 @@
 <div id="homeUploadModal" class="hidden print:hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 opacity-0 transition-opacity duration-200">
   <div id="homeUploadModalBox" class="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-200">
     <div class="shrink-0 px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl flex justify-between items-center">
-      <h3 class="text-sm font-semibold text-slate-900">집품리스트 데이터 업로드</h3>
+      <h3 class="text-sm font-semibold text-slate-900">집품 리스트 데이터 업로드</h3>
       <button id="homeUploadCloseBtn" type="button" class="text-slate-400 hover:text-slate-600 focus:outline-none">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>

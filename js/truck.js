@@ -1128,12 +1128,12 @@ async function clearCtPool() {
 }
 
 async function clearCycleData() {
-    if (!(await window.confirmModal('생성된 트럭주기 데이터를 모두 초기화하시겠습니까?'))) return;
+    if (!(await window.confirmModal('생성된 트럭 주기 데이터를 모두 초기화하시겠습니까?'))) return;
     truckCycleData = {};
     activeCycleDate = null;
     renderCycleDateTabs();
     saveState();
-    showToast('트럭주기 데이터가 초기화되었습니다.', 'info');
+    showToast('트럭 주기 데이터가 초기화되었습니다.', 'info');
 }
 
 
@@ -1147,7 +1147,7 @@ function renderCycleDateTabs() {
     tabsContainer.innerHTML = '';
 
     if (sortedDates.length === 0) {
-        tabsContainer.innerHTML = `<span class="text-sm text-slate-400">트럭리스트 현황에서 엑셀 데이터를 먼저 업로드해주세요.</span>`;
+        tabsContainer.innerHTML = `<span class="text-sm text-slate-400">트럭 리스트 현황에서 엑셀 데이터를 먼저 업로드해주세요.</span>`;
         document.getElementById('cycleTableContainer').innerHTML = '';
         activeCycleDate = null;
         saveState();
@@ -1316,7 +1316,7 @@ function openCycleGenModal() {
     const sortedDates = Object.keys(globalProcessedData).sort();
 
     if (sortedDates.length === 0) {
-        showToast('먼저 트럭리스트 현황에서 엑셀 데이터를 업로드해주세요.', 'error');
+        showToast('먼저 트럭 리스트 현황에서 엑셀 데이터를 업로드해주세요.', 'error');
         return;
     }
 
