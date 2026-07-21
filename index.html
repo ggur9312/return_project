@@ -22,6 +22,12 @@
      지연 없이 즉시 반영됨(전체를 transition-all로 걸면 드래그가 밀려서 따라옴) */
   #calcWidget { transition: opacity 150ms ease, transform 150ms ease; }
   .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+  /* 집품 할당 행 드래그선택+드래그이동(core.js의 createRowDragMoveController) —
+     결과 화면 표 행은 이미 지브라 줄무늬 배경 유틸이 붙어있어 단순 bg-emerald-100
+     토글은 Tailwind 클래스 우선순위에 좌우돼 신뢰할 수 없다. !important 전용
+     클래스로 확실히 이기게 한다. */
+  .assign-drag-row-selected { background-color: #d1fae5 !important; }
+  .assign-drag-dropzone-hover { box-shadow: inset 0 0 0 2px #6366f1; }
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: translateY(0); }
