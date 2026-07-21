@@ -466,9 +466,9 @@
         <section class="flex items-center gap-2 flex-wrap" id="sortBar">
           <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">정렬</span>
           <div id="sortRulesContainer" class="flex flex-wrap gap-2"></div>
-          <button id="sortAddBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
+          <button id="sortAddBtn" type="button" class="inline-flex items-center gap-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
           <button id="sortResetBtn" type="button" class="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">정렬 초기화</button>
-          <button id="sortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
+          <button id="sortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-lime-50 hover:bg-lime-100 text-lime-700 border border-lime-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
         </section>
       </div>
     </section>
@@ -557,9 +557,9 @@
       <section class="flex items-center gap-2 flex-wrap" id="assignSortBar">
         <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">정렬</span>
         <div id="assignSortRulesContainer" class="flex flex-wrap gap-2"></div>
-        <button id="assignSortAddBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
+        <button id="assignSortAddBtn" type="button" class="inline-flex items-center gap-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
         <button id="assignSortResetBtn" type="button" class="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">정렬 초기화</button>
-        <button id="assignSortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
+        <button id="assignSortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-lime-50 hover:bg-lime-100 text-lime-700 border border-lime-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
       </section>
     </div>
 
@@ -960,16 +960,16 @@
                 </div>
 
                 <div id="cycleActionsToolbar" class="hidden flex flex-nowrap items-center gap-2 overflow-x-auto">
-                    <button onclick="autoMatchCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="autoMatchCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                         <span>미사용 CT 자동 매칭</span>
                     </button>
-                    <button onclick="resetCycleCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="resetCycleCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                         <span>CT 바코드 초기화</span>
                     </button>
-                    <button onclick="resetCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="resetCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                         <span>순번 초기화</span>
                     </button>
-                    <button onclick="recalcCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="recalcCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                         <span>순번 재계산</span>
                     </button>
                     <button onclick="executeCyclePrint()" class="shrink-0 ml-auto inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
