@@ -27,8 +27,8 @@
   var DASHBOARD_STORAGE_KEY = "pickListDashboardData";
   var DASHBOARD_DATE_TAB_KEY = "pickListDashboardDateTab";
 
-  // C=내부반출번호, D=생성일시, H=업체명, J=반출요청수량, K=집품완료 수량, L=반출완료 수량, N=상태값
-  var COL = { exportNo: 2, createdAt: 3, company: 7, qtyTotal: 9, qtyPicked: 10, qtyLoaded: 11, status: 13 };
+  // A=그룹번호, C=내부반출번호, D=생성일시, H=업체명, J=반출요청수량, K=집품완료 수량, L=반출완료 수량, N=상태값
+  var COL = { groupNo: 0, exportNo: 2, createdAt: 3, company: 7, qtyTotal: 9, qtyPicked: 10, qtyLoaded: 11, status: 13 };
 
   function toNumber(v) {
     var n = Number(String(v === undefined || v === null ? "" : v).replace(/,/g, "").trim());
@@ -47,6 +47,7 @@
       var status = cellStr(row, COL.status);
       if (!status) continue;
       rows.push({
+        groupNo: cellStr(row, COL.groupNo),
         exportNo: cellStr(row, COL.exportNo),
         createdAt: cellStr(row, COL.createdAt),
         company: cellStr(row, COL.company),
@@ -228,9 +229,17 @@
 
   function computeDashboardCompanyLists(rows) {
     function companiesFor(status) {
-      var set = {};
-      rows.forEach(function (r) { if (r.status === status && r.company) set[r.company] = true; });
-      return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, "ko-KR"); });
+      var seen = {};
+      var list = [];
+      rows.forEach(function (r) {
+        if (r.status !== status || !r.company) return;
+        var key = (r.groupNo || "") + "|" + r.company;
+        if (seen[key]) return;
+        seen[key] = true;
+        list.push({ groupNo: r.groupNo || "", company: r.company });
+      });
+      list.sort(function (a, b) { return a.company.localeCompare(b.company, "ko-KR") || a.groupNo.localeCompare(b.groupNo, "ko-KR"); });
+      return list;
     }
     return {
       pending: companiesFor("집품대기"),
@@ -383,14 +392,16 @@
     });
   }
 
-  function renderCompanyList(containerEl, countEl, companies) {
-    countEl.textContent = companies.length + "개";
-    if (!companies.length) {
+  function renderCompanyList(containerEl, countEl, list) {
+    countEl.textContent = list.length + "개";
+    if (!list.length) {
       containerEl.innerHTML = '<div class="h-24 flex items-center justify-center"><p class="text-xs text-slate-400">해당 업체 없음</p></div>';
       return;
     }
-    containerEl.innerHTML = companies.map(function (name) {
-      return '<div class="px-4 py-2 text-xs text-slate-700">' + escapeHtml(name) + "</div>";
+    containerEl.innerHTML = list.map(function (item) {
+      return '<div class="px-4 py-2 text-xs text-slate-700">' +
+        (item.groupNo ? '<span class="text-slate-400">' + escapeHtml(item.groupNo) + '</span><span class="mx-1 text-slate-300">·</span>' : "") +
+        escapeHtml(item.company) + "</div>";
     }).join("");
   }
 
