@@ -33,6 +33,10 @@
   "use strict";
   var openModalCount = 0;
   window.lockBodyScroll = function () {
+    if (openModalCount === 0) {
+      var scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      if (scrollbarWidth > 0) document.body.style.paddingRight = scrollbarWidth + "px";
+    }
     openModalCount++;
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
@@ -42,6 +46,7 @@
     if (openModalCount === 0) {
       document.documentElement.style.overflow = "";
       document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
     }
   };
 })();

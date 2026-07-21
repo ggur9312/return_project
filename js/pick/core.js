@@ -672,6 +672,9 @@
     var downPos = null;
     var badgeEl = null;
     var hoveredDropZone = null;
+    var lastRangeToId = null;
+    var pendingRafId = null;
+    var lastMoveEvent = null;
 
     function rowGroupKey(tr) {
       var host = tr.closest("[data-group-key]");
@@ -712,6 +715,8 @@
       groupKey = null;
       anchorId = null;
       rowOrder = null;
+      lastRangeToId = null;
+      if (pendingRafId !== null) { cancelAnimationFrame(pendingRafId); pendingRafId = null; }
       paintSelection();
       removeBadge();
       setDropHover(null);
@@ -753,11 +758,12 @@
       rowOrder = rowsInGroup(key).map(function (t) { return t.dataset.rowId; });
       anchorId = id;
       markedIds = new Set([id]);
+      lastRangeToId = id;
       paintSelection();
       mode = "pending-select";
     });
 
-    document.addEventListener("mousemove", function (e) {
+    function processMove(e) {
       if (mode === "idle") return;
       if (mode === "pending-select" || mode === "pending-carry") {
         if (!overThreshold(e)) return;
@@ -767,7 +773,10 @@
       if (mode === "select") {
         var el = document.elementFromPoint(e.clientX, e.clientY);
         var tr = el && el.closest(options.rowSelector);
-        if (tr && rowGroupKey(tr) === groupKey) applyRange(anchorId, tr.dataset.rowId);
+        if (tr && rowGroupKey(tr) === groupKey && tr.dataset.rowId !== lastRangeToId) {
+          lastRangeToId = tr.dataset.rowId;
+          applyRange(anchorId, lastRangeToId);
+        }
       } else if (mode === "carry") {
         updateBadge(e.clientX, e.clientY);
         var hitEl = document.elementFromPoint(e.clientX, e.clientY);
@@ -775,6 +784,19 @@
         if (dz && dz.dataset.dropKey === groupKey) dz = null; // 자기 카드 위는 유효한 드롭 대상이 아님
         setDropHover(dz);
       }
+    }
+
+    // 원본 mousemove 이벤트마다(고주사율 마우스는 초당 수백~천 회) 매번 처리하면
+    // elementFromPoint/전체 행 재도색이 그만큼 반복돼 버벅인다 — 프레임당 최대 1회로
+    // 묶어서 처리(가장 최근 좌표만 사용, 프레임 사이 이벤트는 병합).
+    document.addEventListener("mousemove", function (e) {
+      if (mode === "idle") return;
+      lastMoveEvent = e;
+      if (pendingRafId !== null) return;
+      pendingRafId = requestAnimationFrame(function () {
+        pendingRafId = null;
+        if (lastMoveEvent) processMove(lastMoveEvent);
+      });
     });
 
     document.addEventListener("mouseup", function (e) {
