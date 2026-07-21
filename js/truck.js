@@ -586,6 +586,8 @@ function renderDashboard(data) {
 
             tableRowsHtml += `
                 <tr id="row-${safeTabDate}-${itemIdx}" class="hover:bg-slate-50/80 transition-colors border-b border-slate-100 ${pickingClass}">
+                    <td class="px-5 py-3 font-semibold text-slate-900 whitespace-nowrap">${item.groupNo}</td>
+                    <td class="px-5 py-3 font-medium text-slate-700 whitespace-nowrap">${item.company}</td>
                     <td class="px-3 py-2 text-center">
                         <label class="relative inline-flex items-center cursor-pointer" title="집품중">
                             <input type="checkbox" ${item.picking ? 'checked' : ''} onchange="toggleItemPicking('${date}', ${itemIdx}, this.checked)" class="sr-only peer">
@@ -593,8 +595,6 @@ function renderDashboard(data) {
                             <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
                         </label>
                     </td>
-                    <td class="px-5 py-3 font-semibold text-slate-900 whitespace-nowrap">${item.groupNo}</td>
-                    <td class="px-5 py-3 font-medium text-slate-700 whitespace-nowrap">${item.company}</td>
                     <td class="px-3 py-2 w-32">
                         <select onchange="updateInputValue('${date}', ${itemIdx}, 'palette', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <option value="KPP" ${sKpp}>KPP</option>
@@ -628,9 +628,9 @@ function renderDashboard(data) {
                 <table class="w-full border-collapse text-left min-w-max">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
-                            <th class="px-3 py-3">집품중</th>
                             <th class="px-5 py-3 text-left">그룹번호</th>
                             <th class="px-5 py-3 text-left">업체명</th>
+                            <th class="px-3 py-3">집품중</th>
                             <th class="px-3 py-3 text-left">팔레트 종류</th>
                             <th class="px-3 py-3">빈 GT</th>
                             <th class="px-3 py-3">팔레트 집품</th>
