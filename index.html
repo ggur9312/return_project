@@ -944,18 +944,30 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                             <span>생성</span>
                         </button>
-                        <button onclick="autoMatchCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
-                            <span>미사용 CT 자동 매칭</span>
-                        </button>
-                        <button onclick="executeCyclePrint()" class="shrink-0 inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                            <span>출력</span>
-                        </button>
                         <button onclick="openCyclePrintModal()" class="shrink-0 ml-auto inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                             <span>주기출력</span>
                         </button>
                     </div>
+                </div>
+
+                <div id="cycleActionsToolbar" class="hidden flex flex-nowrap items-center gap-2 overflow-x-auto">
+                    <button onclick="autoMatchCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                        <span>미사용 CT 자동 매칭</span>
+                    </button>
+                    <button onclick="executeCyclePrint()" class="shrink-0 inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        <span>출력</span>
+                    </button>
+                    <button onclick="resetCycleCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                        <span>CT 바코드 초기화</span>
+                    </button>
+                    <button onclick="resetCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                        <span>순번초기화</span>
+                    </button>
+                    <button onclick="recalcCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                        <span>순번 재계산</span>
+                    </button>
                 </div>
 
                 <div class="border-b border-slate-200 pb-1">
@@ -1064,8 +1076,11 @@
             </div>
             <div class="p-6 space-y-4">
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">생성일시 선택</label>
-                    <select id="cGenDate" onchange="renderCycleGenCompanyList()" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-sm font-semibold text-slate-700">생성일시</label>
+                        <span class="text-xs text-slate-400">Ctrl(⌘)+클릭으로 여러 날짜를 선택할 수 있어요</span>
+                    </div>
+                    <div id="cGenDateTabsContainer" class="flex flex-wrap gap-2"></div>
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-1">
@@ -1073,9 +1088,10 @@
                         <button type="button" onclick="toggleSelectAllGenCompanies()" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">전체 선택/해제</button>
                     </div>
                     <p class="text-xs text-slate-400 mb-2">업체를 체크하고 각 업체별 수량을 입력하세요.</p>
-                    <div class="grid grid-cols-[1.25rem_1fr_4.5rem_4.5rem_5rem_5rem_5.5rem] gap-2 items-center px-3 py-2 text-xs font-bold text-slate-500 bg-slate-100 border border-b-0 border-slate-200 rounded-t-lg">
+                    <div class="grid grid-cols-[1.25rem_1fr_4.5rem_4.5rem_4.5rem_5rem_5rem_5.5rem] gap-2 items-center px-3 py-2 text-xs font-bold text-slate-500 bg-slate-100 border border-b-0 border-slate-200 rounded-t-lg">
                         <span></span>
                         <span>업체명</span>
+                        <span class="text-center">팔레트 종류</span>
                         <span class="text-right">빈GT</span>
                         <span class="text-right">팔레트집품</span>
                         <span class="text-right">32BOX</span>
