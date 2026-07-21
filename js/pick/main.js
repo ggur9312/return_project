@@ -52,6 +52,7 @@
   var updateStatusBadgeMap = Pick.updateStatusBadgeMap;
   var getCreatedDate = Pick.getCreatedDate;
   var nextCustomAssignSeq = Pick.nextCustomAssignSeq;
+  var resetCustomAssignSeq = Pick.resetCustomAssignSeq;
   var getAssignedRowIdSet = Pick.getAssignedRowIdSet;
   var splitBalanced = Pick.splitBalanced;
   var renderWorkerGroupCards = Pick.renderWorkerGroupCards;
@@ -323,6 +324,7 @@
     state.assignConfigs = [];
     state.assignActiveId = null;
     state.assignActiveWorkerIdx = null;
+    resetCustomAssignSeq();
     saveAssignState();
     renderAssignTabs();
     if (window.showToast) window.showToast("집품 할당이 모두 삭제되었습니다.");

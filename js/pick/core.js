@@ -40,6 +40,13 @@
     return customAssignSeq;
   }
 
+  // 집품 할당 전체 삭제 시 커스텀 할당 번호("커스텀 1", "커스텀 2" ...)도
+  // 함께 초기화해서, 다음에 새로 만드는 커스텀 할당이 다시 1부터 시작하게 한다.
+  function resetCustomAssignSeq() {
+    customAssignSeq = 0;
+    Pick.customAssignSeq = 0;
+  }
+
   // 커스텀 할당 구분 번호("커스텀 1", "커스텀 2" ...) 발급 — rowIdSeq와 동일한 패턴으로,
   // loadAssignState()에서 구버전 데이터(customSeq 없음)에 생성 순서대로 백필하며
   // 기존 최대값보다 큰 값에서 시작하도록 보정한다. 삭제로 인해 번호가 밀려 재배정되지
@@ -1581,6 +1588,7 @@
   Pick.rowIdSeq = rowIdSeq;
   Pick.nextRowId = nextRowId;
   Pick.nextCustomAssignSeq = nextCustomAssignSeq;
+  Pick.resetCustomAssignSeq = resetCustomAssignSeq;
   Pick.customAssignSeq = customAssignSeq;
   Pick.STORAGE_KEY = STORAGE_KEY;
   Pick.SORT_RULES_KEY = SORT_RULES_KEY;
