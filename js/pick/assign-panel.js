@@ -202,7 +202,7 @@
       var tabBtn = document.createElement("button");
       tabBtn.className = isActive ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
       var dates = cfg.createdDates || [];
-      var tabLabel = cfg.custom ? ("커스텀 " + cfg.customSeq) : (escapeHtml(cfg.floorInput) + "층 · " + cfg.count + "명");
+      var tabLabel = cfg.custom ? ("커스텀 " + cfg.customSeq + " · " + cfg.count + "명") : (escapeHtml(cfg.floorInput) + "층 · " + cfg.count + "명");
       tabBtn.innerHTML =
         "<span>" + tabLabel +
         (dates.length ? " · " + escapeHtml(dates.join(", ")) : "") + "</span>" +
@@ -244,7 +244,7 @@
   function buildAssignMoveOptionsHtml(cfgId, workerIdx) {
     return state.assignConfigs.map(function (c) {
       var groupCount = (c.workerGroups && c.workerGroups.length) || c.count || 1;
-      var label = c.custom ? ("커스텀 " + c.customSeq) : (c.floorInput + "층 · " + c.count + "명");
+      var label = c.custom ? ("커스텀 " + c.customSeq + " · " + c.count + "명") : (c.floorInput + "층 · " + c.count + "명");
       if (c.createdDates && c.createdDates.length) label += " · " + c.createdDates.join(", ");
       var opts = "";
       for (var w = 0; w < groupCount; w++) {

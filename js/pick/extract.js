@@ -82,7 +82,7 @@
         var data = new Uint8Array(e.target.result);
         var wb = XLSX.read(data, { type: "array" });
         if (wb.SheetNames.length < 2) {
-          setExtractStatusMsg("엑셀 파일에 시트가 2개 이상 있어야 합니다(시트1: 집품리스트, 시트2: A~N열 원본 데이터).", "error");
+          setExtractStatusMsg("엑셀 파일에 시트가 2개 이상 있어야 합니다(시트1: 집품 리스트, 시트2: A~N열 원본 데이터).", "error");
           return;
         }
         var sheet1Matrix = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: "" });

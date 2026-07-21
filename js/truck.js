@@ -586,11 +586,15 @@ function renderDashboard(data) {
 
             tableRowsHtml += `
                 <tr id="row-${safeTabDate}-${itemIdx}" class="hover:bg-slate-50/80 transition-colors border-b border-slate-100 ${pickingClass}">
-                    <td class="px-3 py-2 text-center">
-                        <input type="checkbox" ${item.picking ? 'checked' : ''} onchange="toggleItemPicking('${date}', ${itemIdx}, this.checked)" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500" title="집품중">
-                    </td>
                     <td class="px-5 py-3 font-semibold text-slate-900 whitespace-nowrap">${item.groupNo}</td>
                     <td class="px-5 py-3 font-medium text-slate-700 whitespace-nowrap">${item.company}</td>
+                    <td class="px-3 py-2 text-center">
+                        <label class="relative inline-flex items-center cursor-pointer" title="집품중">
+                            <input type="checkbox" ${item.picking ? 'checked' : ''} onchange="toggleItemPicking('${date}', ${itemIdx}, this.checked)" class="sr-only peer">
+                            <div class="w-9 h-5 bg-slate-200 rounded-full peer-checked:bg-amber-500 transition-colors"></div>
+                            <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+                        </label>
+                    </td>
                     <td class="px-3 py-2 w-32">
                         <select onchange="updateInputValue('${date}', ${itemIdx}, 'palette', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             <option value="KPP" ${sKpp}>KPP</option>
@@ -624,9 +628,9 @@ function renderDashboard(data) {
                 <table class="w-full border-collapse text-left min-w-max">
                     <thead>
                         <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 text-center">
-                            <th class="px-3 py-3">집품중</th>
                             <th class="px-5 py-3 text-left">그룹번호</th>
                             <th class="px-5 py-3 text-left">업체명</th>
+                            <th class="px-3 py-3">집품중</th>
                             <th class="px-3 py-3 text-left">팔레트 종류</th>
                             <th class="px-3 py-3">빈 GT</th>
                             <th class="px-3 py-3">팔레트 집품</th>
@@ -1041,6 +1045,7 @@ function truckSwitchView(view) {
 let ctPool = [];            // [{ code: string, used: boolean }] - CT 바코드 데이터 풀 (모든 날짜 공통)
 let truckCycleData = {};    // { [date]: [{ company, seq, ct, checked }] } - 날짜별 생성된 트럭 주기 행
 let activeCycleDate = null; // 트럭주기 생성 모달에서 마지막으로 사용한 날짜(기본 선택값)
+let cGenActiveDateTabs = []; // 트럭주기 생성 모달의 날짜 탭 다중선택 상태(빈 배열 = "전체")
 
 
 /* ================================================================
@@ -1124,12 +1129,12 @@ async function clearCtPool() {
 }
 
 async function clearCycleData() {
-    if (!(await window.confirmModal('생성된 트럭주기 데이터를 모두 초기화하시겠습니까?'))) return;
+    if (!(await window.confirmModal('생성된 트럭 주기 데이터를 모두 초기화하시겠습니까?'))) return;
     truckCycleData = {};
     activeCycleDate = null;
     renderCycleDateTabs();
     saveState();
-    showToast('트럭주기 데이터가 초기화되었습니다.', 'info');
+    showToast('트럭 주기 데이터가 초기화되었습니다.', 'info');
 }
 
 
@@ -1143,8 +1148,9 @@ function renderCycleDateTabs() {
     tabsContainer.innerHTML = '';
 
     if (sortedDates.length === 0) {
-        tabsContainer.innerHTML = `<span class="text-sm text-slate-400">트럭리스트 현황에서 엑셀 데이터를 먼저 업로드해주세요.</span>`;
+        tabsContainer.innerHTML = `<span class="text-sm text-slate-400">트럭 리스트 현황에서 엑셀 데이터를 먼저 업로드해주세요.</span>`;
         document.getElementById('cycleTableContainer').innerHTML = '';
+        document.getElementById('cycleActionsToolbar').classList.add('hidden');
         activeCycleDate = null;
         saveState();
         return;
@@ -1171,6 +1177,11 @@ function renderCycleTable() {
             flatRows.push({ date, idx, ...row });
         });
     });
+
+    // 미사용 CT 자동매칭/출력/CT 바코드 초기화/순번초기화/순번 재계산 버튼은 트럭
+    // 주기가 실제로 생성돼 있을 때만 의미가 있으므로, 데이터 유무에 따라 토글.
+    const toolbarEl = document.getElementById('cycleActionsToolbar');
+    if (toolbarEl) toolbarEl.classList.toggle('hidden', flatRows.length === 0);
 
     if (flatRows.length === 0) {
         container.innerHTML = `
@@ -1277,6 +1288,58 @@ function deleteCycleRow(date, index) {
     }
 }
 
+function hasCycleData() {
+    return Object.keys(truckCycleData).some(date => (truckCycleData[date] || []).length > 0);
+}
+
+// CT 바코드만 초기화(narrow reset) — clearCycleData()와 달리 행 자체(company/seq/checked)는
+// 그대로 두고 .ct만 비우고 ctPool에 돌려준다. clearCtPool()/clearCycleData()의 "전체 초기화"
+// 확인모달 -> 비우기 -> 재렌더 -> saveState -> 토스트 패턴을 그대로 따름.
+async function resetCycleCt() {
+    const allRows = Object.values(truckCycleData).flat();
+    if (allRows.length === 0) return;
+    if (!(await window.confirmModal('모든 행의 CT 바코드를 초기화하시겠습니까?'))) return;
+    allRows.forEach(row => {
+        if (row.ct && row.ct.trim() !== '') releaseCtToPool(row.ct);
+        row.ct = '';
+    });
+    renderCycleTable();
+    renderCtAvailableList();
+    saveState();
+    showToast('CT 바코드가 초기화되었습니다.', 'info');
+}
+
+// 순번만 비운다(재계산이 아니라 완전 초기화) — 재계산은 아래 recalcCycleSeq()가 별도로 담당.
+async function resetCycleSeq() {
+    const allRows = Object.values(truckCycleData).flat();
+    if (allRows.length === 0) return;
+    if (!(await window.confirmModal('모든 행의 순번을 초기화하시겠습니까?'))) return;
+    allRows.forEach(row => { row.seq = ''; });
+    renderCycleTable();
+    saveState();
+    showToast('순번이 초기화되었습니다.', 'info');
+}
+
+// 생성 시점 규칙("{그룹크기}-{순서}")을 날짜+업체별로 묶어 지금 남아있는 행 기준으로
+// 다시 적용 — 생성 후 행을 추가/삭제해 순번이 어긋났을 때 다시 맞추는 용도.
+async function recalcCycleSeq() {
+    const allRows = Object.values(truckCycleData).flat();
+    if (allRows.length === 0) return;
+    if (!(await window.confirmModal('모든 행의 순번을 다시 계산해서 매기시겠습니까?'))) return;
+    Object.keys(truckCycleData).forEach(date => {
+        const groups = {};
+        (truckCycleData[date] || []).forEach(row => {
+            (groups[row.company] = groups[row.company] || []).push(row);
+        });
+        Object.values(groups).forEach(group => {
+            group.forEach((row, i) => { row.seq = `${group.length}-${i + 1}`; });
+        });
+    });
+    renderCycleTable();
+    saveState();
+    showToast('순번이 재계산되었습니다.');
+}
+
 
 /* ================================================================
    SECTION 17-1: CT 풀 상태 보정 (사용가능 <-> 사용중 전환)
@@ -1308,18 +1371,62 @@ function consumeCtFromPool(code) {
 const cycleGenModal = document.getElementById('cycleGenModal');
 const cycleGenModalBox = document.getElementById('cycleGenModalBox');
 
+// 집품현황 홈의 날짜탭(js/pick/core.js의 renderDateTabs)/대시보드 날짜탭(js/pick/dashboard.js의
+// renderDashboardDateTabs)과 같은 Ctrl/Cmd+클릭 다중선택 관례를 그대로 복제(공유하지 않고
+// 화면마다 자기 사본을 둠) — js/truck.js는 window.Pick과 무관한 별도 전역 스코프라 그 팩토리를
+// 가져다 쓸 수 없다. 일반 클릭은 그 날짜 하나만 선택, Ctrl/Cmd+클릭은 다중선택에 토글.
+function renderCGenDateTabs() {
+    const container = document.getElementById('cGenDateTabsContainer');
+    const dates = Object.keys(globalProcessedData).sort();
+    const activeClass = "px-4 py-2.5 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100 flex items-center space-x-2 transition-all duration-200";
+    const inactiveClass = "px-4 py-2.5 text-sm font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center space-x-2 transition-all duration-200";
+    container.innerHTML = '';
+
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.className = !cGenActiveDateTabs.length ? activeClass : inactiveClass;
+    allBtn.innerHTML = '<span>전체</span>';
+    allBtn.addEventListener('click', () => {
+        cGenActiveDateTabs = [];
+        saveState();
+        renderCGenDateTabs();
+        renderCycleGenCompanyList();
+    });
+    container.appendChild(allBtn);
+
+    dates.forEach(date => {
+        const isActive = cGenActiveDateTabs.includes(date);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = isActive ? activeClass : inactiveClass;
+        btn.innerHTML = `<span>${date}</span>`;
+        btn.addEventListener('click', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                cGenActiveDateTabs = isActive
+                    ? cGenActiveDateTabs.filter(d => d !== date)
+                    : cGenActiveDateTabs.concat([date]);
+            } else {
+                cGenActiveDateTabs = [date];
+            }
+            saveState();
+            renderCGenDateTabs();
+            renderCycleGenCompanyList();
+        });
+        container.appendChild(btn);
+    });
+}
+
 function openCycleGenModal() {
     const sortedDates = Object.keys(globalProcessedData).sort();
 
     if (sortedDates.length === 0) {
-        showToast('먼저 트럭리스트 현황에서 엑셀 데이터를 업로드해주세요.', 'error');
+        showToast('먼저 트럭 리스트 현황에서 엑셀 데이터를 업로드해주세요.', 'error');
         return;
     }
 
-    const dateSelect = document.getElementById('cGenDate');
-    const defaultDate = (activeCycleDate && sortedDates.includes(activeCycleDate)) ? activeCycleDate : sortedDates[0];
-    dateSelect.innerHTML = sortedDates.map(d => `<option value="${d}" ${d === defaultDate ? 'selected' : ''}>${d}</option>`).join('');
-
+    // 이전에 선택했던 날짜가 그 사이 삭제됐을 수 있어(트럭리스트 현황에서 날짜별 삭제) 정리.
+    cGenActiveDateTabs = cGenActiveDateTabs.filter(d => sortedDates.includes(d));
+    renderCGenDateTabs();
     renderCycleGenCompanyList();
 
     if (cycleGenModal.classList.contains('hidden')) {
@@ -1334,28 +1441,36 @@ function openCycleGenModal() {
 }
 
 function renderCycleGenCompanyList() {
-    const date = document.getElementById('cGenDate').value;
     const listEl = document.getElementById('cGenCompanyList');
-    const rows = globalProcessedData[date] || [];
+    const selectedDates = (cGenActiveDateTabs.length ? cGenActiveDateTabs.slice() : Object.keys(globalProcessedData)).sort();
 
-    if (rows.length === 0) {
+    const flatRows = [];
+    selectedDates.forEach(date => {
+        (globalProcessedData[date] || []).forEach((row, idx) => flatRows.push({ date, idx, row }));
+    });
+
+    if (flatRows.length === 0) {
         listEl.innerHTML = `<span class="text-xs text-slate-400">선택한 날짜에 업체 데이터가 없습니다.</span>`;
         return;
     }
 
-    // 같은 업체가 여러 그룹번호로 나뉘어 있을 수 있어(빈GT가 그룹마다 다를 수 있음) 그룹(행) 단위로 그대로 보여준다.
-    listEl.innerHTML = rows.map((d, idx) => {
-        const emptyGt = d.inputs.emptyGt;
+    // 같은 업체가 여러 그룹번호로(또는 여러 날짜로) 나뉘어 있을 수 있어(빈GT가 다를 수 있음)
+    // 그룹(행) 단위로 그대로 보여준다. 여러 날짜가 동시에 보일 수 있으니 맨 앞 생성일시 칸으로
+    // 어느 날짜 소속인지 구분되게 한다.
+    listEl.innerHTML = flatRows.map(({ date, idx, row }) => {
+        const emptyGt = row.inputs.emptyGt;
         const exp32 = (Math.round((emptyGt / 32) * 10) / 10).toFixed(1);
         const exp24 = (Math.round((emptyGt / 24) * 10) / 10).toFixed(1);
         return `
-        <div class="grid grid-cols-[1.25rem_1fr_4.5rem_4.5rem_5rem_5rem_5.5rem] gap-2 items-center py-1.5" data-company-row>
+        <div class="grid grid-cols-[5.5rem_1.25rem_1fr_5rem_4.5rem_4.5rem_5rem_5rem_5.5rem] gap-2 items-center py-1.5" data-company-row data-date="${date}">
+            <span class="text-slate-500 text-xs">${date}</span>
             <label class="contents cursor-pointer">
                 <input type="checkbox" value="${idx}" class="cGenCompanyCheckbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
-                <span class="truncate text-slate-700">${d.company}</span>
+                <span class="text-slate-700">${row.company}</span>
             </label>
+            <span class="text-center text-slate-500">${row.inputs.palette}</span>
             <span class="text-right tabular-nums text-slate-500">${emptyGt}</span>
-            <span class="text-right tabular-nums text-slate-500">${d.inputs.palettePick}P</span>
+            <span class="text-right tabular-nums text-slate-500">${row.inputs.palettePick}P</span>
             <span class="text-right tabular-nums text-slate-500">${exp32}P</span>
             <span class="text-right tabular-nums text-slate-500">${exp24}P</span>
             <input type="number" min="1" value="1" onfocus="this.select()" class="cGenCompanyQty w-14 mx-auto bg-white border border-slate-200 rounded-md px-2 py-1 text-sm text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -1382,21 +1497,17 @@ function closeCycleGenModal() {
 }
 
 function confirmGenerateCycle() {
-    const date = document.getElementById('cGenDate').value;
-
-    if (!date) {
-        showToast('생성일시를 선택해주세요.', 'error');
-        return;
-    }
-
-    const dateRows = globalProcessedData[date] || [];
+    // 날짜 탭이 다중선택을 지원하므로, 이제 행마다 자기 data-date를 들고 다녀야
+    // 어느 날짜의 globalProcessedData/truckCycleData에 속하는지 알 수 있다.
     const companyRows = document.querySelectorAll('#cGenCompanyList [data-company-row]');
     const selections = Array.from(companyRows)
         .map(row => {
+            const date = row.dataset.date;
             const checkbox = row.querySelector('.cGenCompanyCheckbox');
             const qtyInput = row.querySelector('.cGenCompanyQty');
-            const sourceRow = dateRows[parseInt(checkbox.value)];
+            const sourceRow = (globalProcessedData[date] || [])[parseInt(checkbox.value)];
             return {
+                date: date,
                 company: sourceRow ? sourceRow.company : '',
                 checked: checkbox.checked,
                 qty: parseInt(qtyInput.value) || 0
@@ -1413,12 +1524,12 @@ function confirmGenerateCycle() {
         return;
     }
 
-    if (!truckCycleData[date]) {
-        truckCycleData[date] = [];
-    }
-
     let totalCount = 0;
-    selections.forEach(({ company, qty }) => {
+    const affectedDates = new Set();
+    selections.forEach(({ date, company, qty }) => {
+        if (!truckCycleData[date]) {
+            truckCycleData[date] = [];
+        }
         for (let i = 1; i <= qty; i++) {
             truckCycleData[date].push({
                 company: company,
@@ -1428,9 +1539,10 @@ function confirmGenerateCycle() {
             });
         }
         totalCount += qty;
+        affectedDates.add(date);
     });
 
-    activeCycleDate = date;
+    if (affectedDates.size === 1) activeCycleDate = [...affectedDates][0];
     renderCycleDateTabs();
     closeCycleGenModal();
     showToast(`업체 ${selections.length}곳, 총 ${totalCount}건의 트럭 주기가 생성되었습니다.`);
@@ -1755,7 +1867,7 @@ function saveState() {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
             globalProcessedData, activeTabDate,
-            truckCycleData, ctPool, activeCycleDate
+            truckCycleData, ctPool, activeCycleDate, cGenActiveDateTabs
         }));
     } catch (e) {
         console.warn('상태 저장 실패(localStorage)', e);
@@ -1772,6 +1884,7 @@ function loadState() {
         truckCycleData = saved.truckCycleData || {};
         ctPool = saved.ctPool || [];
         activeCycleDate = saved.activeCycleDate || null;
+        cGenActiveDateTabs = saved.cGenActiveDateTabs || [];
 
         if (Object.keys(globalProcessedData).length > 0) {
             document.getElementById('truckEmptyState').classList.add('hidden');
