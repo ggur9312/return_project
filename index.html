@@ -415,15 +415,15 @@
     </div>
     <div id="floorPanelSummary" class="hidden text-xs text-slate-500 mt-2"></div>
     <div id="floorPanelBody" class="mt-4">
-      <div class="flex items-center gap-5 flex-wrap mb-4">
-        <label class="text-sm text-slate-600 flex items-center gap-2">총 투입 인원
-          <input type="number" id="laborInput" min="0" step="1" placeholder="예: 10" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        </label>
-      </div>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div id="floorSectionsGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div class="border border-slate-200 rounded-xl p-4">
           <div class="flex items-center justify-between gap-2 flex-wrap mb-3">
-            <h3 class="text-xs font-semibold text-slate-700">전체 수량 (필터 미적용)</h3>
+            <div class="flex items-center gap-2">
+              <h3 class="text-xs font-semibold text-slate-700">전체 수량 (필터 미적용)</h3>
+              <label class="flex items-center gap-1 text-[11px] text-slate-500">투입인원
+                <input type="number" id="laborInputUnfiltered" min="0" step="1" placeholder="0" class="w-14 bg-slate-50 border border-slate-200 rounded-md px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </label>
+            </div>
             <div class="text-xs text-slate-500 flex items-center gap-3">
               <span>합계 <span id="floorUnfilteredQty" class="font-bold tabular-nums text-slate-900">0개</span></span>
               <span>1인당 <span id="floorPerPersonQtyUnfiltered" class="font-bold tabular-nums text-slate-900">-</span></span>
@@ -431,9 +431,14 @@
           </div>
           <div id="floorBarsUnfiltered" class="flex flex-col gap-2"></div>
         </div>
-        <div class="border border-slate-200 rounded-xl p-4">
+        <div id="floorFilteredCard" class="border border-slate-200 rounded-xl p-4">
           <div class="flex items-center justify-between gap-2 flex-wrap mb-3">
-            <h3 class="text-xs font-semibold text-slate-700">필터 적용 수량</h3>
+            <div class="flex items-center gap-2">
+              <h3 class="text-xs font-semibold text-slate-700">필터 적용 수량</h3>
+              <label class="flex items-center gap-1 text-[11px] text-slate-500">투입인원
+                <input type="number" id="laborInputFiltered" min="0" step="1" placeholder="0" class="w-14 bg-slate-50 border border-slate-200 rounded-md px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              </label>
+            </div>
             <div class="text-xs text-slate-500 flex items-center gap-3">
               <span>합계 <span id="floorTotalQty" class="font-bold tabular-nums text-slate-900">0개</span></span>
               <span>1인당 <span id="floorPerPersonQty" class="font-bold tabular-nums text-slate-900">-</span></span>

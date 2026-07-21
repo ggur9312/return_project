@@ -17,6 +17,7 @@
   var LABEL_MARGIN_RIGHT_KEY = Pick.LABEL_MARGIN_RIGHT_KEY;
   var LABEL_MARGIN_TOP_KEY = Pick.LABEL_MARGIN_TOP_KEY;
   var LABOR_STORAGE_KEY = Pick.LABOR_STORAGE_KEY;
+  var LABOR_STORAGE_KEY_FILTERED = Pick.LABOR_STORAGE_KEY_FILTERED;
   var STORAGE_KEY = Pick.STORAGE_KEY;
   var applyCardCollapsed = Pick.applyCardCollapsed;
   var closeModalWithTransition = Pick.closeModalWithTransition;
@@ -282,8 +283,13 @@
     renderFloorPanel(getFilteredRows(), getDateScopedRows());
   }, 200);
 
-  els.laborInput.addEventListener("input", function () {
-    localStorage.setItem(LABOR_STORAGE_KEY, els.laborInput.value);
+  els.laborInputUnfiltered.addEventListener("input", function () {
+    localStorage.setItem(LABOR_STORAGE_KEY, els.laborInputUnfiltered.value);
+    debouncedRenderFloorPanel();
+  });
+
+  els.laborInputFiltered.addEventListener("input", function () {
+    localStorage.setItem(LABOR_STORAGE_KEY_FILTERED, els.laborInputFiltered.value);
     debouncedRenderFloorPanel();
   });
 
@@ -542,7 +548,8 @@
   loadGtState();
   (function () { var margin = loadLabelMargin(); applyGtLabelPageStyle(margin.right, margin.bottom, margin.left, margin.top); })();
   applyCardCollapsed(loadFloorPanelCollapsed(), els.floorPanelToggleLabel, els.floorPanelToggleIcon, els.floorPanelBody, els.floorPanelSummary);
-  els.laborInput.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
+  els.laborInputUnfiltered.value = localStorage.getItem(LABOR_STORAGE_KEY) || "";
+  els.laborInputFiltered.value = localStorage.getItem(LABOR_STORAGE_KEY_FILTERED) || "";
   // switchView()는 내부에서 Pick.refreshAll()을 호출하는데, 그 export(아래)는
   // 초기화 시퀀스보다 뒤에 실행되므로 init 중에는 switchView를 호출하지 않고
   // (기존 관례) 로컬 refreshAll()을 직접 호출한다 — 기본 진입 화면은

@@ -50,6 +50,7 @@
   var SORT_RULES_KEY = "pickListSortRules";
   var ZONE_O_PRIORITY_KEY = "pickListZoneOPriority";
   var LABOR_STORAGE_KEY = "pickListLaborInput";
+  var LABOR_STORAGE_KEY_FILTERED = "pickListLaborInputFiltered";
   var ASSIGN_CONFIGS_KEY = "pickListAssignConfigs";
   var ASSIGN_ACTIVE_KEY = "pickListAssignActiveId";
   var DATE_TAB_KEY = "pickListActiveDateTab";
@@ -111,7 +112,10 @@
     statusMsg: document.getElementById("statusMsg"),
     resetBtn: document.getElementById("resetBtn"),
     pickActiveFileInfo: document.getElementById("pickActiveFileInfo"),
-    laborInput: document.getElementById("laborInput"),
+    laborInputUnfiltered: document.getElementById("laborInputUnfiltered"),
+    laborInputFiltered: document.getElementById("laborInputFiltered"),
+    floorSectionsGrid: document.getElementById("floorSectionsGrid"),
+    floorFilteredCard: document.getElementById("floorFilteredCard"),
     floorTotalQty: document.getElementById("floorTotalQty"),
     floorUnfilteredQty: document.getElementById("floorUnfilteredQty"),
     floorPerPersonQty: document.getElementById("floorPerPersonQty"),
@@ -1376,18 +1380,29 @@
   }
 
   function renderFloorPanel(rows, unfilteredRows) {
-    var labor = parseFloat(els.laborInput.value);
+    // 필터가 안 걸려 있으면 rows === unfilteredRows(둘 다 동일 집합)라, "필터 적용
+    // 수량" 카드를 아예 숨긴다 — 총 투입인원도 전체수량 카드 것만 의미가 있음.
+    var filterActive = hasActiveFilter();
+    els.floorFilteredCard.classList.toggle("hidden", !filterActive);
+    els.floorSectionsGrid.classList.toggle("lg:grid-cols-2", filterActive);
 
-    var filteredResult = buildFloorSectionResult(rows, labor);
-    els.floorTotalQty.textContent = filteredResult.totalQty.toLocaleString("ko-KR") + "개";
-    els.floorPerPersonQty.textContent = filteredResult.perPersonText;
-    els.floorBars.innerHTML = filteredResult.barsHtml;
-    els.floorPanelSummary.textContent = filteredResult.summaryText;
-
-    var unfilteredResult = buildFloorSectionResult(unfilteredRows, labor);
+    var laborUnfiltered = parseFloat(els.laborInputUnfiltered.value);
+    var unfilteredResult = buildFloorSectionResult(unfilteredRows, laborUnfiltered);
     els.floorUnfilteredQty.textContent = unfilteredResult.totalQty.toLocaleString("ko-KR") + "개";
     els.floorPerPersonQtyUnfiltered.textContent = unfilteredResult.perPersonText;
     els.floorBarsUnfiltered.innerHTML = unfilteredResult.barsHtml;
+    // 접힌 상태 요약줄은 필터가 걸려 있으면 필터 적용 수량 기준, 아니면(둘이 같은
+    // 집합이라) 전체 수량 기준 — 필터 미적용일 땐 filteredResult 자체를 안 만드므로.
+    els.floorPanelSummary.textContent = unfilteredResult.summaryText;
+
+    if (filterActive) {
+      var laborFiltered = parseFloat(els.laborInputFiltered.value);
+      var filteredResult = buildFloorSectionResult(rows, laborFiltered);
+      els.floorTotalQty.textContent = filteredResult.totalQty.toLocaleString("ko-KR") + "개";
+      els.floorPerPersonQty.textContent = filteredResult.perPersonText;
+      els.floorBars.innerHTML = filteredResult.barsHtml;
+      els.floorPanelSummary.textContent = filteredResult.summaryText;
+    }
   }
 
   // 접기/펼치기 카드 공용 헬퍼(층별 카드, 업로드 카드) — 라벨/아이콘/본문(+선택적 요약줄)을
@@ -1571,6 +1586,7 @@
   Pick.SORT_RULES_KEY = SORT_RULES_KEY;
   Pick.ZONE_O_PRIORITY_KEY = ZONE_O_PRIORITY_KEY;
   Pick.LABOR_STORAGE_KEY = LABOR_STORAGE_KEY;
+  Pick.LABOR_STORAGE_KEY_FILTERED = LABOR_STORAGE_KEY_FILTERED;
   Pick.ASSIGN_CONFIGS_KEY = ASSIGN_CONFIGS_KEY;
   Pick.ASSIGN_ACTIVE_KEY = ASSIGN_ACTIVE_KEY;
   Pick.DATE_TAB_KEY = DATE_TAB_KEY;
