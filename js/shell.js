@@ -38,14 +38,16 @@
       if (scrollbarWidth > 0) document.body.style.paddingRight = scrollbarWidth + "px";
     }
     openModalCount++;
+    // html/body 양쪽에 동시에 overflow:hidden을 걸면(과거엔 이렇게 했었음) 크로미움에서
+    // #appSidebar/서브뷰 헤더의 position:sticky 계산이 깨져, 실제 스크롤 위치는 그대로인데도
+    // 그 위치만큼(-scrollY) 위로 순간 이동해 보이는 버그가 있었다 — html 하나에만 걸어도
+    // 스크롤은 똑같이 막히므로(document.scrollingElement가 documentElement), body 쪽은 건드리지 않는다.
     document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
   };
   window.unlockBodyScroll = function () {
     openModalCount = Math.max(0, openModalCount - 1);
     if (openModalCount === 0) {
       document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
       document.body.style.paddingRight = "";
     }
   };
