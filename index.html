@@ -112,7 +112,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
 
-<div id="toastContainer" class="print:hidden fixed top-4 right-4 z-[110] space-y-2 pointer-events-none max-w-sm w-full"></div>
+<div id="toastContainer" class="print:hidden fixed top-24 right-4 z-[110] space-y-2 pointer-events-none max-w-sm w-full"></div>
 
 <div id="pageLoadingOverlay" class="print:hidden hidden fixed inset-0 z-[200] flex items-center justify-center bg-white/60 backdrop-blur-sm opacity-0 transition-opacity duration-200 pointer-events-none">
   <svg class="w-8 h-8 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -466,9 +466,9 @@
         <section class="flex items-center gap-2 flex-wrap" id="sortBar">
           <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">정렬</span>
           <div id="sortRulesContainer" class="flex flex-wrap gap-2"></div>
-          <button id="sortAddBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
+          <button id="sortAddBtn" type="button" class="inline-flex items-center gap-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
           <button id="sortResetBtn" type="button" class="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">정렬 초기화</button>
-          <button id="sortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
+          <button id="sortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-lime-50 hover:bg-lime-100 text-lime-700 border border-lime-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
         </section>
       </div>
     </section>
@@ -531,9 +531,9 @@
         <div class="flex items-center gap-2">
           <button id="gtSaveBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">GT 데이터 저장</button>
           <button id="gtClearBtn" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">GT 데이터 초기화</button>
-          <button id="gtPrintBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">GT 출력</button>
-          <button id="customLabelBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">커스텀 라벨 출력</button>
-          <button id="labelMarginSettingsBtn" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">라벨 여백 설정</button>
+          <button id="gtPrintBtn" class="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">GT 출력</button>
+          <button id="customLabelBtn" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">커스텀 라벨 출력</button>
+          <button id="labelMarginSettingsBtn" class="bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border border-yellow-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">라벨 여백 설정</button>
         </div>
         <span class="text-sm text-slate-500">사용 가능 GT: <span id="gtAvailableCount" class="font-bold text-indigo-600">0</span>건</span>
       </div>
@@ -557,9 +557,9 @@
       <section class="flex items-center gap-2 flex-wrap" id="assignSortBar">
         <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">정렬</span>
         <div id="assignSortRulesContainer" class="flex flex-wrap gap-2"></div>
-        <button id="assignSortAddBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
+        <button id="assignSortAddBtn" type="button" class="inline-flex items-center gap-1 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">+ 정렬 기준 추가</button>
         <button id="assignSortResetBtn" type="button" class="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">정렬 초기화</button>
-        <button id="assignSortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
+        <button id="assignSortZoneOPriorityBtn" type="button" class="inline-flex items-center gap-1 bg-lime-50 hover:bg-lime-100 text-lime-700 border border-lime-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors">72·73층 O존 우선 정렬</button>
       </section>
     </div>
 
@@ -658,6 +658,10 @@
       </div>
       <div id="assignPreviewContainer" class="space-y-3"></div>
     </div>
+    <div id="assignPreviewSelectionBar" class="hidden shrink-0 px-6 py-2 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+      <span id="assignPreviewSelectionSummary" class="text-xs font-medium text-slate-600"></span>
+      <button id="assignPreviewSelectionClearBtn" type="button" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">선택 해제</button>
+    </div>
     <div class="shrink-0 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex gap-2">
       <button id="assignConfirmBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">확정</button>
       <button id="assignCancelBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">취소</button>
@@ -680,6 +684,10 @@
         <input type="number" id="customAssignCountInput" min="1" step="1" value="1" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
       </label>
       <div id="customAssignPreviewContainer" class="space-y-3"></div>
+    </div>
+    <div id="customAssignPreviewSelectionBar" class="hidden shrink-0 px-6 py-2 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+      <span id="customAssignPreviewSelectionSummary" class="text-xs font-medium text-slate-600"></span>
+      <button id="customAssignPreviewSelectionClearBtn" type="button" class="text-xs font-medium text-indigo-600 hover:text-indigo-700">선택 해제</button>
     </div>
     <div class="shrink-0 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex gap-2">
       <button id="customAssignConfirmBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">확정</button>
@@ -960,16 +968,16 @@
                 </div>
 
                 <div id="cycleActionsToolbar" class="hidden flex flex-nowrap items-center gap-2 overflow-x-auto">
-                    <button onclick="autoMatchCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="autoMatchCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                         <span>미사용 CT 자동 매칭</span>
                     </button>
-                    <button onclick="resetCycleCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="resetCycleCt()" class="shrink-0 inline-flex items-center space-x-1.5 bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                         <span>CT 바코드 초기화</span>
                     </button>
-                    <button onclick="resetCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="resetCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                         <span>순번 초기화</span>
                     </button>
-                    <button onclick="recalcCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
+                    <button onclick="recalcCycleSeq()" class="shrink-0 inline-flex items-center space-x-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
                         <span>순번 재계산</span>
                     </button>
                     <button onclick="executeCyclePrint()" class="shrink-0 ml-auto inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">
@@ -1197,6 +1205,11 @@
   <span id="homeSelectionSummary" class="text-sm font-semibold"></span>
   <button id="homeSelectionAssignBtn" type="button" class="text-xs font-medium bg-white text-indigo-600 hover:bg-indigo-50 rounded-full px-3 py-1 transition-colors">할당</button>
   <button id="homeSelectionClearBtn" type="button" class="text-xs font-medium bg-white/20 hover:bg-white/30 rounded-full px-3 py-1 transition-colors">선택 해제</button>
+</div>
+
+<div id="assignSelectionBar" class="hidden print:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-3 bg-indigo-600 text-white rounded-full shadow-2xl px-5 py-2.5">
+  <span id="assignSelectionSummary" class="text-sm font-semibold"></span>
+  <button id="assignSelectionClearBtn" type="button" class="text-xs font-medium bg-white/20 hover:bg-white/30 rounded-full px-3 py-1 transition-colors">선택 해제</button>
 </div>
 
 

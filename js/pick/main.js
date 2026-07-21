@@ -58,6 +58,8 @@
   var renderWorkerGroupCards = Pick.renderWorkerGroupCards;
   var createRowDragMoveController = Pick.createRowDragMoveController;
   var moveRowsBetweenGroups = Pick.moveRowsBetweenGroups;
+  var assignRowDragController = Pick.assignRowDragController;
+  var assignPreviewRowDragController = Pick.assignPreviewRowDragController;
   var handleExtractFile = Pick.handleExtractFile;
   var mergeExtractedIntoHome = Pick.mergeExtractedIntoHome;
   var resetExtractPreview = Pick.resetExtractPreview;
@@ -143,6 +145,7 @@
 
   function closeCustomAssignModal() {
     closeModalWithTransition(els.customAssignModal, els.customAssignModalBox);
+    customAssignRowDragController.clearSelection();
   }
 
   function updateCustomAssignPreview() {
@@ -157,6 +160,18 @@
     renderCustomAssignPreview();
   }
 
+  // #customAssignModal 미리보기 안에서 드래그선택 시 나오는 요약 바 — assign-panel.js의
+  // assignPreviewRowDragController/updateAssignPreviewSelectionBar와 같은 패턴, 모달 안
+  // 미리보기 영역과 확정/취소 버튼 사이에 고정 표시된다.
+  function updateCustomAssignPreviewSelectionBar(count) {
+    if (!count) {
+      els.customAssignPreviewSelectionBar.classList.add("hidden");
+      return;
+    }
+    els.customAssignPreviewSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행";
+    els.customAssignPreviewSelectionBar.classList.remove("hidden");
+  }
+
   var customAssignRowDragController = createRowDragMoveController({
     containerEl: els.customAssignPreviewContainer,
     rowSelector: ".assign-drag-row",
@@ -164,7 +179,8 @@
     onDrop: function (fromKey, toKey, rowIds) {
       moveRowsBetweenGroups(customAssignGroups, fromKey, toKey, rowIds);
       renderCustomAssignPreview();
-    }
+    },
+    onSelectionChange: updateCustomAssignPreviewSelectionBar
   });
 
   function renderCustomAssignPreview() {
@@ -353,6 +369,10 @@
   els.customAssignCloseBtn.addEventListener("click", closeCustomAssignModal);
 
   els.homeSelectionClearBtn.addEventListener("click", clearHomeSelection);
+
+  els.assignSelectionClearBtn.addEventListener("click", function () { assignRowDragController.clearSelection(); });
+  els.assignPreviewSelectionClearBtn.addEventListener("click", function () { assignPreviewRowDragController.clearSelection(); });
+  els.customAssignPreviewSelectionClearBtn.addEventListener("click", function () { customAssignRowDragController.clearSelection(); });
 
   // 체크박스가 아니라 1회성 버튼 — 누른 순간에만 O존 우선 정렬을 적용하고,
   // 이후 다른 조작으로 인한 재렌더링에는 영향을 주지 않도록 곧바로 플래그를 되돌린다.

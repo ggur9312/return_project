@@ -572,7 +572,9 @@
       var zoneList = Array.from(new Set(detailRows.map(function (r) { return r.zone; }).filter(Boolean))).join(", ");
       var isPrinted = !!(cfg.printedWorkerIdx && cfg.printedWorkerIdx[idx]);
       var accent = WORKER_CARD_ACCENTS[idx % WORKER_CARD_ACCENTS.length];
-      var outlineBtn = "inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
+      var automatchBtnCls = "inline-flex items-center gap-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
+      var gtResetBtnCls = "inline-flex items-center gap-1.5 bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
+      var sparePrintBtnCls = "inline-flex items-center gap-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors";
       return (
         '<div class="assign-drop-zone bg-white border-t border-r border-b border-slate-200 border-l-4 ' + accent.rail + ' rounded-2xl shadow-md overflow-hidden" data-drop-key="' + idx + '">' +
         '<div class="px-5 py-3 ' + accent.header + ' border-b space-y-2">' +
@@ -583,9 +585,9 @@
         '<div class="text-sm font-bold text-indigo-600">합계 ' + total.toLocaleString("ko-KR") + "개 · " + detailRows.length + "장</div>" +
         "</div>" +
         '<div class="flex items-center justify-end flex-wrap gap-2">' +
-        '<button type="button" class="assign-automatch-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
-        '<button type="button" class="assign-gt-reset-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
-        '<button type="button" class="assign-spare-print-btn ' + outlineBtn + '" data-worker-idx="' + idx + '">여분 출력</button>' +
+        '<button type="button" class="assign-automatch-btn ' + automatchBtnCls + '" data-worker-idx="' + idx + '">미사용 GT 자동매칭</button>' +
+        '<button type="button" class="assign-gt-reset-btn ' + gtResetBtnCls + '" data-worker-idx="' + idx + '">GT 바코드 초기화</button>' +
+        '<button type="button" class="assign-spare-print-btn ' + sparePrintBtnCls + '" data-worker-idx="' + idx + '">여분 출력</button>' +
         '<button type="button" class="assign-print-btn bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs px-3 py-1.5 rounded-lg shadow-sm transition-all duration-150" data-worker-idx="' + idx + '">출력</button>' +
         (groups.length > 1 ? '<button type="button" class="assign-delete-worker-btn bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-xs px-3 py-1.5 rounded-lg transition-colors" data-worker-idx="' + idx + '">삭제</button>' : "") +
         "</div>" +
@@ -750,13 +752,26 @@
     if (window.showToast) window.showToast(moved.length + "개 행을 작업자 " + (toIdx + 1) + "로 이동했습니다.");
   }
 
+  // #assignView 자체의 드래그선택 요약 바 — 홈 화면의 #homeSelectionBar와 같은 위치/스타일의
+  // 페이지 레벨 플로팅 바지만, 여기서는 "할당" 버튼이 필요 없어(이미 할당 화면 안이므로)
+  // 요약 문구 + 선택 해제 버튼만 보여준다.
+  function updateAssignSelectionBar(count) {
+    if (!count) {
+      els.assignSelectionBar.classList.add("hidden");
+      return;
+    }
+    els.assignSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행";
+    els.assignSelectionBar.classList.remove("hidden");
+  }
+
   var assignRowDragController = createRowDragMoveController({
     containerEl: els.assignTableContainer,
     rowSelector: ".assign-drag-row",
     dropZoneSelector: ".assign-drop-zone",
     selectedRowClass: "assign-drag-row-selected",
     hoverClassToSuppress: "hover:bg-indigo-50/40",
-    onDrop: handleAssignRowDrop
+    onDrop: handleAssignRowDrop,
+    onSelectionChange: updateAssignSelectionBar
   });
 
   function removeAssignWorker(cfg) {
@@ -970,6 +985,17 @@
     toGroup.push.apply(toGroup, moved);
   }
 
+  // #assignCreateModal 미리보기 안에서 드래그선택 시 나오는 요약 바 — 모달 밖으로
+  // 플로팅되지 않고 모달 안, 미리보기 영역과 확정/취소 버튼 사이에 고정 표시된다.
+  function updateAssignPreviewSelectionBar(count) {
+    if (!count) {
+      els.assignPreviewSelectionBar.classList.add("hidden");
+      return;
+    }
+    els.assignPreviewSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행";
+    els.assignPreviewSelectionBar.classList.remove("hidden");
+  }
+
   var assignPreviewRowDragController = createRowDragMoveController({
     containerEl: els.assignPreviewContainer,
     rowSelector: ".assign-drag-row",
@@ -977,7 +1003,8 @@
     onDrop: function (fromKey, toKey, rowIds) {
       moveRowsBetweenGroups(assignPreviewGroups, fromKey, toKey, rowIds);
       renderAssignPreview();
-    }
+    },
+    onSelectionChange: updateAssignPreviewSelectionBar
   });
 
   function renderAssignPreview() {
@@ -1016,6 +1043,7 @@
     assignPreviewMeta = null;
     assignPreviewActiveWorkerIdx = null;
     setAssignMsg("", null);
+    assignPreviewRowDragController.clearSelection();
     renderAssignPreview();
   }
 
@@ -1077,6 +1105,7 @@
   Pick.initAssignPanelControllers = initAssignPanelControllers;
   Pick.renderAssignPanel = renderAssignPanel;
   Pick.assignRowDragController = assignRowDragController;
+  Pick.assignPreviewRowDragController = assignPreviewRowDragController;
   Pick.removeAssignWorker = removeAssignWorker;
   Pick.setAssignMsg = setAssignMsg;
   Pick.getSelectedAssignDates = getSelectedAssignDates;

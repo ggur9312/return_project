@@ -132,6 +132,15 @@
     homeSelectionSummary: document.getElementById("homeSelectionSummary"),
     homeSelectionAssignBtn: document.getElementById("homeSelectionAssignBtn"),
     homeSelectionClearBtn: document.getElementById("homeSelectionClearBtn"),
+    assignSelectionBar: document.getElementById("assignSelectionBar"),
+    assignSelectionSummary: document.getElementById("assignSelectionSummary"),
+    assignSelectionClearBtn: document.getElementById("assignSelectionClearBtn"),
+    assignPreviewSelectionBar: document.getElementById("assignPreviewSelectionBar"),
+    assignPreviewSelectionSummary: document.getElementById("assignPreviewSelectionSummary"),
+    assignPreviewSelectionClearBtn: document.getElementById("assignPreviewSelectionClearBtn"),
+    customAssignPreviewSelectionBar: document.getElementById("customAssignPreviewSelectionBar"),
+    customAssignPreviewSelectionSummary: document.getElementById("customAssignPreviewSelectionSummary"),
+    customAssignPreviewSelectionClearBtn: document.getElementById("customAssignPreviewSelectionClearBtn"),
     floorBars: document.getElementById("floorBars"),
     floorBarsUnfiltered: document.getElementById("floorBarsUnfiltered"),
     floorPanelToggleBtn: document.getElementById("floorPanelToggleBtn"),
@@ -672,6 +681,7 @@
     //   selectedRowClass,        // 기본 "bg-emerald-100"
     //   hoverClassToSuppress,    // 선택된 행에서 꺼줄 hover 유틸(선택)
     //   getBadgeLabel(count)     // 기본 "N개 이동중"
+    //   onSelectionChange(count) // 선택된 행 수가 바뀔 때마다 호출(선택) — 요약 바 갱신용
     // }
     var selectedRowClass = options.selectedRowClass || "bg-emerald-100";
     var DRAG_THRESHOLD = 6;
@@ -703,6 +713,7 @@
         tr.classList.toggle(selectedRowClass, marked);
         if (options.hoverClassToSuppress) tr.classList.toggle(options.hoverClassToSuppress, !marked);
       });
+      if (options.onSelectionChange) options.onSelectionChange(markedIds.size);
     }
     function applyRange(fromId, toId) {
       var order = rowOrder || rowsInGroup(groupKey).map(function (tr) { return tr.dataset.rowId; });
