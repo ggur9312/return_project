@@ -16,10 +16,14 @@
   ];
 
   var AGG_COLUMN = { key: "groupCompanyTotal", label: "업체 총수량", type: "number" };
+  // 같은 층(72/73을 "7층"으로 합치지 않고 정확한 층 코드 단위)에서 그 업체가 차지하는
+  // 서로 다른 존의 개수 — 수량이 많아도 한 존에 몰려 있으면 이동이 적고, 수량이
+  // 적어도 여러 존에 흩어져 있으면 이동이 많다는 걸 필터·정렬로 바로 확인하기 위함.
+  var ZONE_COUNT_COLUMN = { key: "companyZoneCount", label: "업체 존 개수", type: "number" };
   // 실제 행 필드가 아니라 Pick.getAssignedRowIdSet()(main.js)으로 렌더링 시점에
   // 계산되는 파생 컬럼 — groupCompanyTotal과 동일한 패턴으로 ALL_COLUMNS에만 추가한다.
   var ASSIGNED_COLUMN = { key: "assigned", label: "할당여부", type: "string" };
-  var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN, ASSIGNED_COLUMN]);
+  var ALL_COLUMNS = COLUMNS.concat([AGG_COLUMN, ZONE_COUNT_COLUMN, ASSIGNED_COLUMN]);
 
   var LABEL_BARCODE_OPTS = { fontSize: 25, height: 42, width: 1.3 };
 
@@ -88,6 +92,7 @@
   var initialFilters = {};
   COLUMNS.forEach(function (c) { initialFilters[c.key] = null; }); // null = 전체 허용(필터 없음)
   initialFilters[AGG_COLUMN.key] = null;
+  initialFilters[ZONE_COUNT_COLUMN.key] = null;
 
   var state = {
     rows: [],
@@ -570,22 +575,43 @@
     return map;
   }
 
+  // 같은 층(getFloor 기준 — 72/73을 "7층"으로 합치지 않고 정확한 층 코드 단위)에서
+  // 그 업체가 차지하는 서로 다른 존의 개수. 수량이 많아도 한 존에 몰려 있으면
+  // 이동이 적고, 수량이 적어도 여러 존에 흩어져 있으면 이동이 많다는 걸 보여준다.
+  function computeCompanyZoneCounts(rows) {
+    var zoneSets = {};
+    rows.forEach(function (r) {
+      var k = getFloor(r.zone) + "" + r.company;
+      if (!zoneSets[k]) zoneSets[k] = new Set();
+      zoneSets[k].add(r.zone);
+    });
+    var counts = {};
+    Object.keys(zoneSets).forEach(function (k) { counts[k] = zoneSets[k].size; });
+    return counts;
+  }
+
   // 헤더 필터 드롭다운의 후보값 목록 — 엑셀 자동필터처럼, key 자신의 필터를 뺀
-  // 나머지 모든 활성 필터(원본 9개 컬럼 + 파생 groupCompanyTotal 컬럼)를 반영해서
-  // 계산한다. 그래야 존 필터를 걸면 수량 필터 후보값이 그 존에 실제 존재하는
+  // 나머지 모든 활성 필터(원본 9개 컬럼 + 파생 groupCompanyTotal/companyZoneCount 컬럼)를
+  // 반영해서 계산한다. 그래야 존 필터를 걸면 수량 필터 후보값이 그 존에 실제 존재하는
   // 수량으로만 좁혀지는 식의 캐스케이딩이 된다.
   function getCandidateValues(key) {
     var exceptRegular = filterRowsExceptKey(getDateScopedRows(), COLUMNS, state.filters, key);
     var gcMap = computeGroupCompanyTotals(exceptRegular);
+    var zcMap = computeCompanyZoneCounts(exceptRegular);
     var assignedRowIds = Pick.getAssignedRowIdSet();
     var withAgg = exceptRegular.map(function (r) {
       var clone = Object.assign({}, r);
       clone.groupCompanyTotal = gcMap[r.groupNo + "" + r.company];
+      clone.companyZoneCount = zcMap[getFloor(r.zone) + "" + r.company];
       clone.assigned = assignedRowIds.has(r.id) ? "할당됨" : "미할당";
       return clone;
     });
     if (key === AGG_COLUMN.key) {
       return uniqueValuesFrom(withAgg, function (r) { return r.groupCompanyTotal; })
+        .sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
+    }
+    if (key === ZONE_COUNT_COLUMN.key) {
+      return uniqueValuesFrom(withAgg, function (r) { return r.companyZoneCount; })
         .sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
     }
     if (key === ASSIGNED_COLUMN.key) {
@@ -595,6 +621,10 @@
     var rowsForKey = (aggFilterSet === null || aggFilterSet === undefined)
       ? withAgg
       : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var zoneCountFilterSet = state.filters[ZONE_COUNT_COLUMN.key];
+    if (zoneCountFilterSet !== null && zoneCountFilterSet !== undefined) {
+      rowsForKey = rowsForKey.filter(function (r) { return zoneCountFilterSet.has(String(r.companyZoneCount)); });
+    }
     var assignedFilterSet = state.filters[ASSIGNED_COLUMN.key];
     if (assignedFilterSet !== null && assignedFilterSet !== undefined) {
       rowsForKey = rowsForKey.filter(function (r) { return assignedFilterSet.has(r.assigned); });
@@ -607,16 +637,18 @@
     return values;
   }
 
-  // 컬럼 필터 + 집계(groupCompanyTotal)/할당여부 필터를 baseRows 위에 적용 — 홈 화면
-  // (날짜 탭으로 스코프된 행)과 집품 할당(날짜 탭과 무관, 자체 생성일자 선택)이
-  // 서로 다른 baseRows로 재사용
+  // 컬럼 필터 + 집계(groupCompanyTotal/companyZoneCount)/할당여부 필터를 baseRows 위에
+  // 적용 — 홈 화면(날짜 탭으로 스코프된 행)과 집품 할당(날짜 탭과 무관, 자체 생성일자
+  // 선택)이 서로 다른 baseRows로 재사용
   function computeFilteredRows(baseRows) {
     var preFiltered = getPreFilteredRowsFrom(baseRows);
     var gcMap = computeGroupCompanyTotals(preFiltered);
+    var zcMap = computeCompanyZoneCounts(preFiltered);
     var assignedRowIds = Pick.getAssignedRowIdSet();
     var withAgg = preFiltered.map(function (r) {
       var clone = Object.assign({}, r);
       clone.groupCompanyTotal = gcMap[r.groupNo + "" + r.company];
+      clone.companyZoneCount = zcMap[getFloor(r.zone) + "" + r.company];
       clone.assigned = assignedRowIds.has(r.id) ? "할당됨" : "미할당";
       return clone;
     });
@@ -624,6 +656,10 @@
     var filtered = (aggFilterSet === null || aggFilterSet === undefined)
       ? withAgg
       : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+    var zoneCountFilterSet = state.filters[ZONE_COUNT_COLUMN.key];
+    if (zoneCountFilterSet !== null && zoneCountFilterSet !== undefined) {
+      filtered = filtered.filter(function (r) { return zoneCountFilterSet.has(String(r.companyZoneCount)); });
+    }
     var assignedFilterSet = state.filters[ASSIGNED_COLUMN.key];
     if (assignedFilterSet !== null && assignedFilterSet !== undefined) {
       filtered = filtered.filter(function (r) { return assignedFilterSet.has(r.assigned); });
