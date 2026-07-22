@@ -6,6 +6,7 @@
   var ASSIGN_TAB_INACTIVE = Pick.ASSIGN_TAB_INACTIVE;
   var closeModalWithTransition = Pick.closeModalWithTransition;
   var compareValues = Pick.compareValues;
+  var compareZoneWithOPriority = Pick.compareZoneWithOPriority;
   var createFilterBarController = Pick.createFilterBarController;
   var createRowDragMoveController = Pick.createRowDragMoveController;
   var createSortBarController = Pick.createSortBarController;
@@ -17,7 +18,6 @@
   var getCandidateValues = Pick.getCandidateValues;
   var getCreatedDate = Pick.getCreatedDate;
   var getFloor = Pick.getFloor;
-  var getSortedRows = Pick.getSortedRows;
   var insertRowsSortedByZone = Pick.insertRowsSortedByZone;
   var openModalWithTransition = Pick.openModalWithTransition;
   var saveAssignState = Pick.saveAssignState;
@@ -172,19 +172,53 @@
     return groups;
   }
 
-  // 화면에 표시되는 정렬(state.sortRules, O존 우선 옵션 포함)을 그대로 반영해
-  // 정렬된 순서의 행 하나하나를 아이템 하나로 만든다 — 존 단위로 미리 묶지
-  // 않기 때문에 splitBalanced가 필요하면 같은 존도 인접한 두 사람 사이에서
-  // 나눠 배정할 수 있어(전체 순서는 그대로 유지되므로 오름차순 보장), 존 개수가
-  // 인원수 이하라도 수량 균형을 맞출 여지가 생긴다.
+  // 집품 할당(정식 생성) 전용 고정 정렬 — 홈 화면의 현재 정렬 설정(state.sortRules/
+  // zoneOPriority)과 무관하게 항상 존 오름차순(72·73층은 O존 우선) → 수량
+  // 내림차순으로 나눈다. 필터(state.filters)는 getAssignBaseRows()가 그대로 반영.
+  function getAssignFixedSortedRows() {
+    return getAssignBaseRows().slice().sort(function (a, b) {
+      var z = compareZoneWithOPriority(a.zone, b.zone);
+      if (z !== 0) return z;
+      return (b.quantity || 0) - (a.quantity || 0);
+    });
+  }
+
+  // 정렬된 순서(getAssignFixedSortedRows)의 행 하나하나를 아이템 하나로 만든다 —
+  // 존 단위로 미리 묶지 않기 때문에 splitBalanced가 필요하면 같은 존도 인접한
+  // 두 사람 사이에서 나눠 배정할 수 있어(전체 순서는 그대로 유지되므로 오름차순
+  // 보장), 존 개수가 인원수 이하라도 수량 균형을 맞출 여지가 생긴다.
   function getAssignRowItems(floorInput, selectedDates) {
-    var rows = getSortedRows(getAssignBaseRows());
+    var rows = getAssignFixedSortedRows();
     var items = [];
     rows.forEach(function (r) {
       if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
       var floorCode = getFloor(r.zone);
       if (floorCode.indexOf(floorInput) !== 0) return;
       items.push({ zone: r.zone || "(미지정)", qty: (r.quantity || 0), rows: [r] });
+    });
+    return items;
+  }
+
+  // 존 정렬 순서를 그대로 따라가며 같은 업체의 행을 전부 하나의 아이템으로 묶는다 —
+  // 아이템 위치는 그 업체가 처음 등장한 존의 위치를 그대로 쓰므로, splitBalanced에
+  // 넣었을 때 업체가 작업자 사이에서 쪼개지지 않는다(아이템은 항상 통째로만 이동).
+  function getAssignCompanyItems(floorInput, selectedDates) {
+    var rows = getAssignFixedSortedRows();
+    var items = [];
+    var itemByCompany = {};
+    rows.forEach(function (r) {
+      if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
+      var floorCode = getFloor(r.zone);
+      if (floorCode.indexOf(floorInput) !== 0) return;
+      var key = r.company || "";
+      var item = itemByCompany[key];
+      if (!item) {
+        item = { company: key, zone: r.zone || "(미지정)", qty: 0, rows: [] };
+        itemByCompany[key] = item;
+        items.push(item);
+      }
+      item.qty += (r.quantity || 0);
+      item.rows.push(r);
     });
     return items;
   }
@@ -827,6 +861,20 @@
   var assignPreviewGroups = null;
   var assignPreviewMeta = null; // { floorInput, count, selectedDates } — 확정 시 config에 함께 저장
   var assignPreviewActiveWorkerIdx = null; // 미리보기 탭(전체/작업자 N) 상태
+  var assignPreviewMode = "balanced"; // "balanced"(균등 할당) | "company"(업체별 할당)
+
+  function setAssignPreviewMode(mode) {
+    assignPreviewMode = mode;
+    renderAssignModeButtons();
+  }
+
+  var ASSIGN_MODE_BTN_ACTIVE = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100 flex items-center gap-2 transition-all duration-200";
+  var ASSIGN_MODE_BTN_INACTIVE = "px-3 py-1.5 text-xs font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-all duration-200";
+
+  function renderAssignModeButtons() {
+    els.assignModeBalancedBtn.className = assignPreviewMode === "balanced" ? ASSIGN_MODE_BTN_ACTIVE : ASSIGN_MODE_BTN_INACTIVE;
+    els.assignModeCompanyBtn.className = assignPreviewMode === "company" ? ASSIGN_MODE_BTN_ACTIVE : ASSIGN_MODE_BTN_INACTIVE;
+  }
 
   function generateAssignPreview() {
     var floorInput = trim(els.assignFloorInput.value);
@@ -847,11 +895,29 @@
     // 미리보기 생성 시점의 존/행 데이터를 스냅샷으로 고정 — 이후 홈 화면 필터가 바뀌어도
     // 확정된 배정은 유지됨(재조회하지 않음). 행 단위 균형 분배(splitBalanced) 결과를
     // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
-    var items = getAssignRowItems(floorInput, selectedDates);
-    var groups = splitBalanced(items, count);
-    assignPreviewGroups = groups.map(function (g) {
-      return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
-    });
+    var groups;
+    if (assignPreviewMode === "company") {
+      // 업체 클러스터를 전역 등장 순서 기준으로 짝수/홀수 번갈아 뒤집어, 층 전체를
+      // 하나의 연속된 지그재그 경로로 만든다(1번째 업체 정순 → 2번째 역순 → 3번째 정순 …).
+      // splitBalanced는 이 경로를 인원수만큼 순서대로 자르기만 하므로(아이템=업체 전체가
+      // 통째로만 이동해 쪼개지지 않고, 상대 순서도 바뀌지 않음), 작업자 안에서 업체 간
+      // 전환은 물론 작업자와 작업자 사이의 경계도 함께 매끄럽게 이어진다 — 따라서 분리
+      // 후 작업자 그룹을 다시 반전하는 후처리는 하지 않는다(이미 지그재그된 구간을 통째로
+      // 뒤집으면 방향이 도로 깨짐).
+      var companyItems = getAssignCompanyItems(floorInput, selectedDates);
+      companyItems.forEach(function (it, idx) {
+        if (idx % 2 === 1) it.rows.reverse();
+      });
+      groups = splitBalanced(companyItems, count).map(function (g) {
+        return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
+      });
+    } else {
+      var items = getAssignRowItems(floorInput, selectedDates);
+      groups = splitBalanced(items, count).map(function (g) {
+        return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
+      });
+    }
+    assignPreviewGroups = groups;
     assignPreviewMeta = { floorInput: floorInput, count: count, selectedDates: selectedDates };
     assignPreviewActiveWorkerIdx = null;
     setAssignMsg("", null);
@@ -1042,6 +1108,8 @@
     assignPreviewGroups = null;
     assignPreviewMeta = null;
     assignPreviewActiveWorkerIdx = null;
+    assignPreviewMode = "balanced";
+    renderAssignModeButtons();
     setAssignMsg("", null);
     assignPreviewRowDragController.clearSelection();
     renderAssignPreview();
@@ -1114,6 +1182,7 @@
   Pick.assignPreviewMeta = assignPreviewMeta;
   Pick.assignPreviewActiveWorkerIdx = assignPreviewActiveWorkerIdx;
   Pick.generateAssignPreview = generateAssignPreview;
+  Pick.setAssignPreviewMode = setAssignPreviewMode;
   Pick.renderAssignPreviewRows = renderAssignPreviewRows;
   Pick.renderWorkerGroupCards = renderWorkerGroupCards;
   Pick.moveRowsBetweenGroups = moveRowsBetweenGroups;

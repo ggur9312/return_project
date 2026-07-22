@@ -9,6 +9,7 @@
   var openAssignCreateModal = Pick.openAssignCreateModal;
   var renderAssignPanel = Pick.renderAssignPanel;
   var renderAssignTabs = Pick.renderAssignTabs;
+  var setAssignPreviewMode = Pick.setAssignPreviewMode;
   var FLOOR_PANEL_COLLAPSED_KEY = Pick.FLOOR_PANEL_COLLAPSED_KEY;
   var LABEL_MARGIN_BOTTOM_KEY = Pick.LABEL_MARGIN_BOTTOM_KEY;
   var LABEL_MARGIN_DEFAULT = Pick.LABEL_MARGIN_DEFAULT;
@@ -316,6 +317,12 @@
   els.assignOpenModalBtn.addEventListener("click", function () {
     clearHomeSelection();
     openAssignCreateModal();
+  });
+  els.assignModeBalancedBtn.addEventListener("click", function () {
+    setAssignPreviewMode("balanced");
+  });
+  els.assignModeCompanyBtn.addEventListener("click", function () {
+    setAssignPreviewMode("company");
   });
   els.assignPreviewBtn.addEventListener("click", async function () {
     if (hasActiveFilter()) {
