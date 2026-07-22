@@ -752,13 +752,26 @@
     if (window.showToast) window.showToast(moved.length + "개 행을 작업자 " + (toIdx + 1) + "로 이동했습니다.");
   }
 
+  // #assignView 자체의 드래그선택 요약 바 — 홈 화면의 #homeSelectionBar와 같은 위치/스타일의
+  // 페이지 레벨 플로팅 바지만, 여기서는 "할당" 버튼이 필요 없어(이미 할당 화면 안이므로)
+  // 요약 문구 + 선택 해제 버튼만 보여준다.
+  function updateAssignSelectionBar(count) {
+    if (!count) {
+      els.assignSelectionBar.classList.add("hidden");
+      return;
+    }
+    els.assignSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행";
+    els.assignSelectionBar.classList.remove("hidden");
+  }
+
   var assignRowDragController = createRowDragMoveController({
     containerEl: els.assignTableContainer,
     rowSelector: ".assign-drag-row",
     dropZoneSelector: ".assign-drop-zone",
     selectedRowClass: "assign-drag-row-selected",
     hoverClassToSuppress: "hover:bg-indigo-50/40",
-    onDrop: handleAssignRowDrop
+    onDrop: handleAssignRowDrop,
+    onSelectionChange: updateAssignSelectionBar
   });
 
   function removeAssignWorker(cfg) {
@@ -972,6 +985,17 @@
     toGroup.push.apply(toGroup, moved);
   }
 
+  // #assignCreateModal 미리보기 안에서 드래그선택 시 나오는 요약 바 — 모달 밖으로
+  // 플로팅되지 않고 모달 안, 미리보기 영역과 확정/취소 버튼 사이에 고정 표시된다.
+  function updateAssignPreviewSelectionBar(count) {
+    if (!count) {
+      els.assignPreviewSelectionBar.classList.add("hidden");
+      return;
+    }
+    els.assignPreviewSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행";
+    els.assignPreviewSelectionBar.classList.remove("hidden");
+  }
+
   var assignPreviewRowDragController = createRowDragMoveController({
     containerEl: els.assignPreviewContainer,
     rowSelector: ".assign-drag-row",
@@ -979,7 +1003,8 @@
     onDrop: function (fromKey, toKey, rowIds) {
       moveRowsBetweenGroups(assignPreviewGroups, fromKey, toKey, rowIds);
       renderAssignPreview();
-    }
+    },
+    onSelectionChange: updateAssignPreviewSelectionBar
   });
 
   function renderAssignPreview() {
@@ -1018,6 +1043,7 @@
     assignPreviewMeta = null;
     assignPreviewActiveWorkerIdx = null;
     setAssignMsg("", null);
+    assignPreviewRowDragController.clearSelection();
     renderAssignPreview();
   }
 
@@ -1079,6 +1105,7 @@
   Pick.initAssignPanelControllers = initAssignPanelControllers;
   Pick.renderAssignPanel = renderAssignPanel;
   Pick.assignRowDragController = assignRowDragController;
+  Pick.assignPreviewRowDragController = assignPreviewRowDragController;
   Pick.removeAssignWorker = removeAssignWorker;
   Pick.setAssignMsg = setAssignMsg;
   Pick.getSelectedAssignDates = getSelectedAssignDates;
