@@ -1148,7 +1148,7 @@ function renderCycleDateTabs() {
     tabsContainer.innerHTML = '';
 
     if (sortedDates.length === 0) {
-        tabsContainer.innerHTML = `<span class="text-sm text-slate-400">트럭 리스트 현황에서 엑셀 데이터를 먼저 업로드해주세요.</span>`;
+        tabsContainer.innerHTML = `<span class="text-sm text-slate-400">트럭 리스트에서 엑셀 데이터를 먼저 업로드해주세요.</span>`;
         document.getElementById('cycleTableContainer').innerHTML = '';
         document.getElementById('cycleActionsToolbar').classList.add('hidden');
         activeCycleDate = null;
@@ -1420,7 +1420,7 @@ function openCycleGenModal() {
     const sortedDates = Object.keys(globalProcessedData).sort();
 
     if (sortedDates.length === 0) {
-        showToast('먼저 트럭 리스트 현황에서 엑셀 데이터를 업로드해주세요.', 'error');
+        showToast('먼저 트럭 리스트에서 엑셀 데이터를 업로드해주세요.', 'error');
         return;
     }
 
