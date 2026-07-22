@@ -887,13 +887,19 @@
     // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
     var groups;
     if (assignPreviewMode === "company") {
-      // 업체 단위 아이템을 splitBalanced에 넣으면 아이템(=업체 전체)이 통째로만
-      // 이동하므로 업체가 작업자 사이에서 쪼개지지 않는다. 홀수 번째(2, 4...) 작업자의
-      // 행 순서를 뒤집어, 이전 작업자가 끝난 지점 근처에서 다음 작업자가 이어받게 한다.
+      // 업체 클러스터를 전역 등장 순서 기준으로 짝수/홀수 번갈아 뒤집어, 층 전체를
+      // 하나의 연속된 지그재그 경로로 만든다(1번째 업체 정순 → 2번째 역순 → 3번째 정순 …).
+      // splitBalanced는 이 경로를 인원수만큼 순서대로 자르기만 하므로(아이템=업체 전체가
+      // 통째로만 이동해 쪼개지지 않고, 상대 순서도 바뀌지 않음), 작업자 안에서 업체 간
+      // 전환은 물론 작업자와 작업자 사이의 경계도 함께 매끄럽게 이어진다 — 따라서 분리
+      // 후 작업자 그룹을 다시 반전하는 후처리는 하지 않는다(이미 지그재그된 구간을 통째로
+      // 뒤집으면 방향이 도로 깨짐).
       var companyItems = getAssignCompanyItems(floorInput, selectedDates);
-      groups = splitBalanced(companyItems, count).map(function (g, idx) {
-        var flatRows = g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
-        return idx % 2 === 1 ? flatRows.slice().reverse() : flatRows;
+      companyItems.forEach(function (it, idx) {
+        if (idx % 2 === 1) it.rows.reverse();
+      });
+      groups = splitBalanced(companyItems, count).map(function (g) {
+        return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
       });
     } else {
       var items = getAssignRowItems(floorInput, selectedDates);
