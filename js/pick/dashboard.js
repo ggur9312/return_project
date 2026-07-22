@@ -209,9 +209,12 @@
     // 같은 컬럼(반출까지 진행된 누적량)으로 합산한다.
     var shipped = sumByStatus(rows, ["상차완료", "반출완료"], qtyLoadedOf);
 
-    var loadTotal = sumByStatus(rows, ["상차준비완료", "상차중"], qtyPickedOf);
-    // 남은 상차 수량 — 상차준비완료/상차중 두 상태 모두 동일하게 (K-L)로 통일.
+    // 전체 수량 — 상차준비완료/상차중/상차완료/반출완료 4개 상태 모두의 K열(집품완료 수량) 합계.
+    var loadTotal = sumByStatus(rows, ["상차준비완료", "상차중", "상차완료", "반출완료"], qtyPickedOf);
+    // 남은 상차 수량 — 상차준비완료/상차중 두 상태만 (K-L)로 계산(기존과 동일, 변경 없음).
     var loadRemaining = sumByStatus(rows, ["상차준비완료", "상차중"], qtyRemainLoadOf);
+    // 완료 수량 — 상차중/상차완료/반출완료 3개 상태(상차준비완료 제외)의 L열(반출완료 수량) 합계.
+    var loadCompleted = sumByStatus(rows, ["상차중", "상차완료", "반출완료"], qtyLoadedOf);
 
     return {
       assignWaiting: assignWaiting,
@@ -223,7 +226,8 @@
       loading: loading,
       shipped: shipped,
       loadTotal: loadTotal,
-      loadRemaining: loadRemaining
+      loadRemaining: loadRemaining,
+      loadCompleted: loadCompleted
     };
   }
 
@@ -443,7 +447,7 @@
       els.dashboardLoadRemainingPct.textContent = "전체 " + stats.loadTotal.toLocaleString("ko-KR") + "개 중 " + pct(stats.loadRemaining, stats.loadTotal) + " 남음";
 
       pickChartInstance = renderDonutChart(pickChartInstance, els.dashboardPickChart, stats.pickRemaining, stats.pickTotal - stats.pickRemaining, "#4f46e5");
-      loadChartInstance = renderDonutChart(loadChartInstance, els.dashboardLoadChart, stats.loadRemaining, stats.loadTotal - stats.loadRemaining, "#0891b2");
+      loadChartInstance = renderDonutChart(loadChartInstance, els.dashboardLoadChart, stats.loadRemaining, stats.loadCompleted, "#0891b2");
 
       renderDashboardCompanyLists(scoped);
     }
