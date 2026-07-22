@@ -6,6 +6,7 @@
   var ASSIGN_TAB_INACTIVE = Pick.ASSIGN_TAB_INACTIVE;
   var closeModalWithTransition = Pick.closeModalWithTransition;
   var compareValues = Pick.compareValues;
+  var compareZoneWithOPriority = Pick.compareZoneWithOPriority;
   var createFilterBarController = Pick.createFilterBarController;
   var createRowDragMoveController = Pick.createRowDragMoveController;
   var createSortBarController = Pick.createSortBarController;
@@ -17,7 +18,6 @@
   var getCandidateValues = Pick.getCandidateValues;
   var getCreatedDate = Pick.getCreatedDate;
   var getFloor = Pick.getFloor;
-  var getSortedRows = Pick.getSortedRows;
   var insertRowsSortedByZone = Pick.insertRowsSortedByZone;
   var openModalWithTransition = Pick.openModalWithTransition;
   var saveAssignState = Pick.saveAssignState;
@@ -172,13 +172,23 @@
     return groups;
   }
 
-  // 화면에 표시되는 정렬(state.sortRules, O존 우선 옵션 포함)을 그대로 반영해
-  // 정렬된 순서의 행 하나하나를 아이템 하나로 만든다 — 존 단위로 미리 묶지
-  // 않기 때문에 splitBalanced가 필요하면 같은 존도 인접한 두 사람 사이에서
-  // 나눠 배정할 수 있어(전체 순서는 그대로 유지되므로 오름차순 보장), 존 개수가
-  // 인원수 이하라도 수량 균형을 맞출 여지가 생긴다.
+  // 집품 할당(정식 생성) 전용 고정 정렬 — 홈 화면의 현재 정렬 설정(state.sortRules/
+  // zoneOPriority)과 무관하게 항상 존 오름차순(72·73층은 O존 우선) → 수량
+  // 내림차순으로 나눈다. 필터(state.filters)는 getAssignBaseRows()가 그대로 반영.
+  function getAssignFixedSortedRows() {
+    return getAssignBaseRows().slice().sort(function (a, b) {
+      var z = compareZoneWithOPriority(a.zone, b.zone);
+      if (z !== 0) return z;
+      return (b.quantity || 0) - (a.quantity || 0);
+    });
+  }
+
+  // 정렬된 순서(getAssignFixedSortedRows)의 행 하나하나를 아이템 하나로 만든다 —
+  // 존 단위로 미리 묶지 않기 때문에 splitBalanced가 필요하면 같은 존도 인접한
+  // 두 사람 사이에서 나눠 배정할 수 있어(전체 순서는 그대로 유지되므로 오름차순
+  // 보장), 존 개수가 인원수 이하라도 수량 균형을 맞출 여지가 생긴다.
   function getAssignRowItems(floorInput, selectedDates) {
-    var rows = getSortedRows(getAssignBaseRows());
+    var rows = getAssignFixedSortedRows();
     var items = [];
     rows.forEach(function (r) {
       if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
@@ -193,7 +203,7 @@
   // 아이템 위치는 그 업체가 처음 등장한 존의 위치를 그대로 쓰므로, splitBalanced에
   // 넣었을 때 업체가 작업자 사이에서 쪼개지지 않는다(아이템은 항상 통째로만 이동).
   function getAssignCompanyItems(floorInput, selectedDates) {
-    var rows = getSortedRows(getAssignBaseRows());
+    var rows = getAssignFixedSortedRows();
     var items = [];
     var itemByCompany = {};
     rows.forEach(function (r) {
