@@ -139,7 +139,7 @@
       <div class="flex flex-col gap-1 pl-3 mb-1">
         <button id="navHomeBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors text-white">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-          <span>집품 리스트 현황</span>
+          <span>집품 리스트</span>
         </button>
         <button id="navAssignBtn" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
@@ -162,7 +162,7 @@
       <div class="flex flex-col gap-1 pl-3 mb-1">
         <button id="truckNavHomeBtn" onclick="truckSwitchView('home')" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors text-white">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6m-6 4h4"></path></svg>
-          <span>트럭 리스트 현황</span>
+          <span>트럭 리스트</span>
         </button>
         <button id="navCycleBtn" onclick="truckSwitchView('cycle')" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors text-slate-300 hover:bg-slate-700/70 hover:text-white">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -347,15 +347,15 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h3 class="text-sm font-semibold text-slate-900 mb-4">층별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품 리스트 현황 데이터 기준)</span> <span class="text-xs font-semibold text-indigo-600 tabular-nums ml-1">전체 수량 <span id="dashboardFloorTotalValue">0개</span></span></h3>
-        <div id="dashboardFloorEmptyState" class="p-10 text-center text-sm text-slate-400">집품 리스트 현황에 데이터를 등록하면 층별 수량이 표시됩니다.</div>
+        <h3 class="text-sm font-semibold text-slate-900 mb-4">층별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품 리스트 데이터 기준)</span> <span class="text-xs font-semibold text-indigo-600 tabular-nums ml-1">전체 수량 <span id="dashboardFloorTotalValue">0개</span></span></h3>
+        <div id="dashboardFloorEmptyState" class="p-10 text-center text-sm text-slate-400">집품 리스트에 데이터를 등록하면 층별 수량이 표시됩니다.</div>
         <div id="dashboardFloorChartWrap" class="hidden h-72">
           <canvas id="dashboardFloorChart"></canvas>
         </div>
       </div>
       <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h3 class="text-sm font-semibold text-slate-900 mb-4">존별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품 리스트 현황 데이터 기준)</span></h3>
-        <div id="dashboardZoneEmptyState" class="p-10 text-center text-sm text-slate-400">집품 리스트 현황에 데이터를 등록하면 존별 수량이 표시됩니다.</div>
+        <h3 class="text-sm font-semibold text-slate-900 mb-4">존별 수량 현황 <span class="text-xs text-slate-400 font-normal">(집품 리스트 데이터 기준)</span></h3>
+        <div id="dashboardZoneEmptyState" class="p-10 text-center text-sm text-slate-400">집품 리스트에 데이터를 등록하면 존별 수량이 표시됩니다.</div>
         <div id="dashboardZoneChartWrap" class="hidden h-72">
           <canvas id="dashboardZoneChart"></canvas>
         </div>
@@ -377,7 +377,7 @@
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품 리스트 현황</h1>
+          <h1 class="text-xl font-bold text-slate-900 tracking-tight">집품 리스트</h1>
           <p class="text-xs text-slate-500 mt-0.5">엑셀 업로드·붙여넣기로 등록한 집품 데이터를 관리합니다.</p>
         </div>
       </div>
@@ -818,7 +818,7 @@
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6m-6 4h4"></path></svg>
                     </div>
                     <div>
-                        <h1 class="text-xl font-bold text-slate-900 tracking-tight">트럭 리스트 현황</h1>
+                        <h1 class="text-xl font-bold text-slate-900 tracking-tight">트럭 리스트</h1>
                         <p class="text-xs text-slate-500 mt-0.5">트럭 운송 데이터를 업로드하고 날짜별로 관리합니다.</p>
                     </div>
                 </div>
@@ -949,7 +949,7 @@
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
                     <div>
                         <h3 class="text-lg font-bold text-slate-900">업체별 트럭 주기</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">트럭 리스트 현황에서 업로드한 생성일시별로 업체를 선택해 주기(수량)를 생성하고, CT 바코드를 매칭합니다.</p>
+                        <p class="text-xs text-slate-500 mt-0.5">트럭 리스트에서 업로드한 생성일시별로 업체를 선택해 주기(수량)를 생성하고, CT 바코드를 매칭합니다.</p>
                     </div>
                     <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
                         <button onclick="clearCycleData()" class="shrink-0 inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium text-sm px-4 py-2 rounded-lg transition-colors">
