@@ -897,18 +897,21 @@
     // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
     var groups;
     if (assignPreviewMode === "company") {
-      // 업체는 splitBalanced로 통째로(어느 업체가 어느 작업자에게) 배정하되, 각 작업자
-      // 그룹 안의 집품 순서는 존 오름차순(72·73층 O존 우선)으로 정렬한다 — 항상 앞으로만
-      // 진행해 뒤로 가는 구간이 없고, 한 작업자가 72·73을 다 맡아도 72 블록을 먼저 끝낸 뒤
-      // 73으로 넘어가 층이 중간에 섞이지 않는다. 한 업체의 행이 위치 순서상 다른 업체 행과
-      // 섞여 보일 수 있으나(위치 기반 집품), 배정 자체는 여전히 업체 단위라 한 업체는 한
-      // 작업자에게 통째로 간다. (예전엔 짝수/홀수 업체를 번갈아 reverse하는 "지그재그"로
-      // 연속 경로를 만들려 했으나, 오히려 업체 내부에서 뒤로 가는 구간을 만들어 제거했다.)
+      // 업체 클러스터를 전역 등장 순서 기준으로 짝수/홀수 번갈아 뒤집어, 층 전체를
+      // 하나의 연속된 지그재그 경로로 만든다(1번째 업체 정순 → 2번째 역순 → 3번째 정순 …).
+      // splitBalanced는 이 경로를 인원수만큼 순서대로 자르기만 하므로(아이템=업체 전체가
+      // 통째로만 이동해 쪼개지지 않고, 상대 순서도 바뀌지 않음), 작업자 안에서 업체 간
+      // 전환은 물론 작업자와 작업자 사이의 경계도 함께 매끄럽게 이어진다 — 따라서 분리
+      // 후 작업자 그룹을 다시 반전하는 후처리는 하지 않는다(이미 지그재그된 구간을 통째로
+      // 뒤집으면 방향이 도로 깨짐). 각 업체의 행이 한 덩어리로 묶여 보이는 대신 업체 사이
+      // 경계에서 존이 뒤로 가는 구간이 생길 수 있다 — 존 오름차순 정렬(위치 기반 집품)보다
+      // "업체별로 한 번에 집기"를 우선하는 사용자 선택에 따라 이 지그재그 방식을 유지한다.
       var companyItems = getAssignCompanyItems(floorInput, selectedDates);
+      companyItems.forEach(function (it, idx) {
+        if (idx % 2 === 1) it.rows.reverse();
+      });
       groups = splitBalanced(companyItems, count).map(function (g) {
-        var rows = g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
-        rows.sort(function (a, b) { return compareZoneWithOPriority(a.zone, b.zone); });
-        return rows;
+        return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
       });
     } else {
       var items = getAssignRowItems(floorInput, selectedDates);
