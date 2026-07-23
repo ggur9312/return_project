@@ -51,25 +51,15 @@
       return groups;
     }
 
-    // 서로 다른 존 1개당 "평균 수량"을 1존의 기준 비용으로 잡아 수량과 존 개수를
-    // 같은 단위로 환산한 결합 점수로 밸런싱 — 센터가 메자닌 구조라 계단/집품준비
-    // 시간 때문에 작업자를 층에 고정(연속구간 분할)하는 건 그대로 두되, 균형 기준을
-    // "장수(행 개수)"가 아니라 "이동량(서로 다른 존 개수)"으로 삼는다. 수량이 많아도
-    // 한 존에 몰려 있으면 이동이 적어 가볍게, 수량이 적어도 여러 존에 흩어져 있으면
-    // 이동이 많아 무겁게 계산되어, 흩어진 소량 업체가 한 작업자에게 몰리는 걸 막는다.
-    // (행 단위 아이템 — 균등/커스텀 할당 — 은 아이템마다 존이 1개라 이 점수가
-    // 수량+상수가 되어 분할 결과가 이전과 동일하게 유지된다.)
-    function itemZoneCount(it) {
-      if (!it.rows || !it.rows.length) return 0;
-      var seen = {};
-      it.rows.forEach(function (r) { seen[r.zone] = true; });
-      return Object.keys(seen).length;
-    }
+    // 장수(행 1개)당 "평균 수량"을 1행의 기준 비용으로 잡아 수량과 장수를 같은
+    // 단위로 환산한 결합 점수로 밸런싱 — 수량이 큰 존을 담당하면 자연히 장수가
+    // 줄고, 수량이 작은 존을 담당하면 장수가 늘어나는 방향으로 균형이 잡혀서,
+    // 수량만 많고 장수는 적은/그 반대인 불공평한 배분을 방지한다.
     var totalQty = items.reduce(function (s, it) { return s + it.qty; }, 0);
-    var totalZones = items.reduce(function (s, it) { return s + itemZoneCount(it); }, 0);
-    var unitQtyPerZone = totalZones ? totalQty / totalZones : 0;
+    var totalRows = items.reduce(function (s, it) { return s + (it.rows ? it.rows.length : 0); }, 0);
+    var unitQtyPerRow = totalRows ? totalQty / totalRows : 0;
     function itemScore(it) {
-      return it.qty + itemZoneCount(it) * unitQtyPerZone;
+      return it.qty + (it.rows ? it.rows.length : 0) * unitQtyPerRow;
     }
     var scores = items.map(itemScore);
 
@@ -209,27 +199,22 @@
     return items;
   }
 
-  // 존 정렬 순서를 그대로 따라가며 같은 업체의 행을 아이템으로 묶되, **층코드까지 키에
-  // 포함**해서 묶는다 — 한 층 안에서는 그 업체의 행이 통째로 한 아이템으로 유지되지만,
-  // 여러 층에 걸친 업체는 층 경계에서 층별로 나뉜다(72파트/73파트가 각각 별개 아이템).
-  // 아이템이 존 오름차순으로 만들어지므로 72층 아이템이 전부 앞, 73층 아이템이 전부 뒤에
-  // 놓여 flatten 시 층이 섞이지 않고, splitBalanced의 연속구간 분할상 72/73 경계 1명만
-  // 교차한다 — 층 걸친 업체를 층 경계에서 쪼개 각 층 작업자에게 주는 건 메자닌(계단)
-  // 규칙에 맞는 의도된 동작이다(층 단위로 묶지 않으면 한 업체가 72A→73A→72B처럼 다음 72
-  // 업체 앞에 73 행을 끌고 와 층이 중간에 섞인다).
+  // 존 정렬 순서를 그대로 따라가며 같은 업체의 행을 전부 하나의 아이템으로 묶는다 —
+  // 아이템 위치는 그 업체가 처음 등장한 존의 위치를 그대로 쓰므로, splitBalanced에
+  // 넣었을 때 업체가 작업자 사이에서 쪼개지지 않는다(아이템은 항상 통째로만 이동).
   function getAssignCompanyItems(floorInput, selectedDates) {
     var rows = getAssignFixedSortedRows();
     var items = [];
-    var itemByFloorCompany = {};
+    var itemByCompany = {};
     rows.forEach(function (r) {
       if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
       var floorCode = getFloor(r.zone);
       if (floorCode.indexOf(floorInput) !== 0) return;
-      var key = floorCode + "|" + (r.company || "");
-      var item = itemByFloorCompany[key];
+      var key = r.company || "";
+      var item = itemByCompany[key];
       if (!item) {
-        item = { company: r.company || "", zone: r.zone || "(미지정)", qty: 0, rows: [] };
-        itemByFloorCompany[key] = item;
+        item = { company: key, zone: r.zone || "(미지정)", qty: 0, rows: [] };
+        itemByCompany[key] = item;
         items.push(item);
       }
       item.qty += (r.quantity || 0);
