@@ -70,6 +70,7 @@
           return '<td class="' + tdBase + ' text-slate-700">' + escapeHtml(r[col.key]) + "</td>";
         }).join("") +
         '<td class="' + tdBase + ' text-right tabular-nums font-bold text-indigo-600 bg-indigo-50/30">' + Number(r.groupCompanyTotal || 0).toLocaleString("ko-KR") + "</td>" +
+        '<td class="' + tdBase + ' text-right tabular-nums font-bold text-indigo-600 bg-indigo-50/30">' + Number(r.companyZoneCount || 0) + "</td>" +
         '<td class="' + tdBase + '">' + assignedBadge + "</td>" +
         '<td class="px-3 py-2.5 text-center"><button type="button" class="home-row-delete-btn text-slate-300 hover:text-rose-500" title="삭제" data-row-id="' + escapeHtml(r.id) + '"><svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></td>' +
         "</tr>"
