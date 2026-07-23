@@ -865,6 +865,44 @@
   var assignPreviewGroups = null;
   var assignPreviewMeta = null; // { floorInput, count, selectedDates } — 확정 시 config에 함께 저장
   var assignPreviewActiveWorkerIdx = null; // 미리보기 탭(전체/작업자 N) 상태
+  var assignPreviewMode = "company"; // "company"(업체별=업체 통째) | "balanced"(이동 최적=행 단위)
+
+  function setAssignPreviewMode(mode) {
+    assignPreviewMode = mode;
+    renderAssignModeButtons();
+  }
+
+  var ASSIGN_MODE_BTN_ACTIVE = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100 flex items-center gap-2 transition-all duration-200";
+  var ASSIGN_MODE_BTN_INACTIVE = "px-3 py-1.5 text-xs font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-all duration-200";
+
+  function renderAssignModeButtons() {
+    els.assignModeCompanyBtn.className = assignPreviewMode === "company" ? ASSIGN_MODE_BTN_ACTIVE : ASSIGN_MODE_BTN_INACTIVE;
+    els.assignModeBalancedBtn.className = assignPreviewMode === "balanced" ? ASSIGN_MODE_BTN_ACTIVE : ASSIGN_MODE_BTN_INACTIVE;
+  }
+
+  // 층 단위 serpentine(보스트로페돈) — 존 오름차순 아이템을 층 블록으로 묶어 홀수번째
+  // 층 블록만 통째로 뒤집는다(아이템 순서 + 각 아이템의 rows). 82층 올림(A→…→O)/83층
+  // 내림(O→…→A)이 되어 존 순서상 82 꼭대기(82O) 뒤에 83 꼭대기(83O)가 와서, 경계
+  // 작업자가 82O→83O로 최단 이동한다(계단이 각 층 끝 O에 있다는 전제). 업체 통째
+  // (getAssignCompanyItems)/행 단위(getAssignRowItems) 아이템 둘 다에 동일 적용.
+  function applyFloorSerpentine(items) {
+    var floorBlocks = [];
+    var curFloor = null;
+    items.forEach(function (it) {
+      var f = getFloor(it.rows[0].zone);
+      if (f !== curFloor) { floorBlocks.push([]); curFloor = f; }
+      floorBlocks[floorBlocks.length - 1].push(it);
+    });
+    var out = [];
+    floorBlocks.forEach(function (blk, bi) {
+      if (bi % 2 === 1) {
+        blk.reverse();
+        blk.forEach(function (it) { it.rows.reverse(); });
+      }
+      blk.forEach(function (it) { out.push(it); });
+    });
+    return out;
+  }
 
   function generateAssignPreview() {
     var floorInput = trim(els.assignFloorInput.value);
@@ -883,33 +921,16 @@
       return;
     }
     // 미리보기 생성 시점의 존/행 데이터를 스냅샷으로 고정 — 이후 홈 화면 필터가 바뀌어도
-    // 확정된 배정은 유지됨(재조회하지 않음). 행 단위 균형 분배(splitBalanced) 결과를
-    // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
-    // 행 단위 최적 동선 + 층 단위 serpentine(보스트로페돈) — 단일 할당 방식.
-    // 행을 존 오름차순(getAssignFixedSortedRows)으로 아이템화하되 업체로 묶지 않는다 —
-    // 넓게 퍼진 업체(예: 82A·82F)도 존 순서상 자연히 쪼개져 지나가며 집히므로
-    // `82A→82F→82B` 같은 뒤로가기가 없다. 행 아이템은 이미 존 오름차순이라 같은 층끼리
-    // 연속으로 모여 있어, 층 블록으로 묶고 홀수번째 층 블록만 통째로 뒤집으면 82층은
-    // 올림(A→…→O)/83층은 내림(O→…→A)이 되어, 존 순서상 82 꼭대기(82O) 바로 뒤에 83
-    // 꼭대기(83O)가 와서 경계 작업자가 82O→83O로 매끄럽게 이어진다(계단이 각 층 끝 O에
-    // 있다는 전제). 층 분리(82 전부 앞·83 전부 뒤)·경계 1명 크로스·각 층 단일 방향 유지.
-    var rowItems = getAssignRowItems(floorInput, selectedDates);
-    var floorBlocks = [];
-    var curFloor = null;
-    rowItems.forEach(function (it) {
-      var f = getFloor(it.rows[0].zone);
-      if (f !== curFloor) { floorBlocks.push([]); curFloor = f; }
-      floorBlocks[floorBlocks.length - 1].push(it);
-    });
-    var serpItems = [];
-    floorBlocks.forEach(function (blk, bi) {
-      if (bi % 2 === 1) {
-        blk.reverse();
-        blk.forEach(function (it) { it.rows.reverse(); });
-      }
-      blk.forEach(function (it) { serpItems.push(it); });
-    });
-    var groups = splitBalanced(serpItems, count).map(function (g) {
+    // 확정된 배정은 유지됨(재조회하지 않음). 두 모드 모두 층 단위 serpentine(82O→83O)을
+    // 적용하고 splitBalanced로 균등 분배 — 차이는 아이템 소스뿐:
+    //  - 업체별(company): getAssignCompanyItems — 한 업체를 통째로 배정(층-분리). 한 업체씩
+    //    통에 담는 현장용. 넓게 퍼진 업체는 통째라 왔다갔다 있음(불가피).
+    //  - 이동 최적(balanced): getAssignRowItems — 행 단위(업체 쪼갬). 존 순서로만 집어 이동
+    //    최소(집으며 업체별로 분류하는 현장용), 넓은 업체 뒤로가기 0.
+    var items = assignPreviewMode === "company"
+      ? getAssignCompanyItems(floorInput, selectedDates)
+      : getAssignRowItems(floorInput, selectedDates);
+    var groups = splitBalanced(applyFloorSerpentine(items), count).map(function (g) {
       return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
     });
     assignPreviewGroups = groups;
@@ -1103,6 +1124,8 @@
     assignPreviewGroups = null;
     assignPreviewMeta = null;
     assignPreviewActiveWorkerIdx = null;
+    assignPreviewMode = "company";
+    renderAssignModeButtons();
     setAssignMsg("", null);
     assignPreviewRowDragController.clearSelection();
     renderAssignPreview();
@@ -1175,6 +1198,7 @@
   Pick.assignPreviewMeta = assignPreviewMeta;
   Pick.assignPreviewActiveWorkerIdx = assignPreviewActiveWorkerIdx;
   Pick.generateAssignPreview = generateAssignPreview;
+  Pick.setAssignPreviewMode = setAssignPreviewMode;
   Pick.renderAssignPreviewRows = renderAssignPreviewRows;
   Pick.renderWorkerGroupCards = renderWorkerGroupCards;
   Pick.moveRowsBetweenGroups = moveRowsBetweenGroups;
