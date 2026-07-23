@@ -318,11 +318,11 @@
     clearHomeSelection();
     openAssignCreateModal();
   });
-  els.assignModeBalancedBtn.addEventListener("click", function () {
-    setAssignPreviewMode("balanced");
-  });
   els.assignModeCompanyBtn.addEventListener("click", function () {
     setAssignPreviewMode("company");
+  });
+  els.assignModeBalancedBtn.addEventListener("click", function () {
+    setAssignPreviewMode("balanced");
   });
   els.assignPreviewBtn.addEventListener("click", async function () {
     if (hasActiveFilter()) {

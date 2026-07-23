@@ -865,7 +865,7 @@
   var assignPreviewGroups = null;
   var assignPreviewMeta = null; // { floorInput, count, selectedDates } — 확정 시 config에 함께 저장
   var assignPreviewActiveWorkerIdx = null; // 미리보기 탭(전체/작업자 N) 상태
-  var assignPreviewMode = "balanced"; // "balanced"(균등 할당) | "company"(업체별 할당)
+  var assignPreviewMode = "balanced"; // "balanced"(이동 최적=행 단위, 기본) | "company"(업체별=업체 통째)
 
   function setAssignPreviewMode(mode) {
     assignPreviewMode = mode;
@@ -876,8 +876,95 @@
   var ASSIGN_MODE_BTN_INACTIVE = "px-3 py-1.5 text-xs font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-all duration-200";
 
   function renderAssignModeButtons() {
-    els.assignModeBalancedBtn.className = assignPreviewMode === "balanced" ? ASSIGN_MODE_BTN_ACTIVE : ASSIGN_MODE_BTN_INACTIVE;
     els.assignModeCompanyBtn.className = assignPreviewMode === "company" ? ASSIGN_MODE_BTN_ACTIVE : ASSIGN_MODE_BTN_INACTIVE;
+    els.assignModeBalancedBtn.className = assignPreviewMode === "balanced" ? ASSIGN_MODE_BTN_ACTIVE : ASSIGN_MODE_BTN_INACTIVE;
+  }
+
+  // 층 단위 serpentine(보스트로페돈) — 존 오름차순 아이템을 층 블록으로 묶어 홀수번째
+  // 층 블록만 통째로 뒤집는다(아이템 순서 + 각 아이템의 rows). 82층 올림(A→…→O)/83층
+  // 내림(O→…→A)이 되어 존 순서상 82 꼭대기(82O) 뒤에 83 꼭대기(83O)가 와서, 경계
+  // 작업자가 82O→83O로 최단 이동한다(계단이 각 층 끝 O에 있다는 전제). 업체 통째
+  // (getAssignCompanyItems)/행 단위(getAssignRowItems) 아이템 둘 다에 동일 적용.
+  function applyFloorSerpentine(items) {
+    var floorBlocks = [];
+    var curFloor = null;
+    items.forEach(function (it) {
+      var f = getFloor(it.rows[0].zone);
+      if (f !== curFloor) { floorBlocks.push([]); curFloor = f; }
+      floorBlocks[floorBlocks.length - 1].push(it);
+    });
+    var out = [];
+    floorBlocks.forEach(function (blk, bi) {
+      if (bi % 2 === 1) {
+        blk.reverse();
+        blk.forEach(function (it) { it.rows.reverse(); });
+      }
+      blk.forEach(function (it) { out.push(it); });
+    });
+    return out;
+  }
+
+  // 업체별(company) 모드 전용 — 각 업체(아이템)를 "이전 업체가 끝난 존과 가까운 끝"에서
+  // 시작하도록 방향(오름/내림)을 greedy로 정해 업체 간 되돌아가기를 최소화한다(예: 앞
+  // 업체가 82O로 끝나면 다음 업체(82K·82O)를 82O부터 내려오게 뒤집음). 층 경계(82O→83O)는
+  // 그대로 보존 — 층 블록을 홀짝으로 번갈아(현행 serpentine과 동일한 진입 방향) 처리하고,
+  // "다음 층 블록이 있는 블록"의 마지막 업체는 그 층의 하이(존 rank 최대, 계단쪽)에서
+  // 끝나도록 강제해 다음 층 하이 진입과 이어지게 한다. 단일 층(첫이자 마지막 블록)은 마지막
+  // 업체 exit를 강제하지 않아 순수 greedy로 되돌아가기가 최소화된다.
+  function applyCompanySerpentine(items) {
+    if (items.length < 2) return items;
+    // 존 → rank(고정 정렬 순서상의 인덱스). 방향/거리 비교 기준(72·73 O-우선까지 자동 반영).
+    var rankMap = {};
+    var zoneList = [];
+    items.forEach(function (it) {
+      it.rows.forEach(function (r) {
+        var z = r.zone || "(미지정)";
+        if (rankMap[z] == null) { rankMap[z] = true; zoneList.push(z); }
+      });
+    });
+    zoneList.sort(function (a, b) { return compareZoneWithOPriority(a, b); });
+    zoneList.forEach(function (z, i) { rankMap[z] = i; });
+    function rank(z) { return rankMap[z] != null ? rankMap[z] : 0; }
+
+    // 층 블록 분할(아이템은 층 오름차순으로 들어옴)
+    var blocks = [];
+    var curFloor = null;
+    items.forEach(function (it) {
+      var f = getFloor(it.rows[0].zone);
+      if (f !== curFloor) { blocks.push([]); curFloor = f; }
+      blocks[blocks.length - 1].push(it);
+    });
+
+    var out = [];
+    blocks.forEach(function (blk, bi) {
+      var reversed = bi % 2 === 1;            // 홀수 층 블록: 업체 순서를 뒤집어 하이→로우 진입
+      var block = reversed ? blk.slice().reverse() : blk;
+      var isLastBlock = bi === blocks.length - 1;
+      var prevExit = reversed ? Infinity : -Infinity; // 진입측 시드(짝수=로우/음수, 홀수=하이/양수)
+      block.forEach(function (it, ci) {
+        var minRank = rank(it.rows[0].zone || "(미지정)");                     // rows는 고정 오름차순
+        var maxRank = rank(it.rows[it.rows.length - 1].zone || "(미지정)");
+        var ascStart = minRank, ascExit = maxRank;   // 오름: rows 그대로
+        var descStart = maxRank, descExit = minRank; // 내림: rows 뒤집기
+        var isFirstInBlock = ci === 0;
+        var isLastInBlock = ci === block.length - 1;
+        var descending;
+        if (isFirstInBlock) {
+          // 첫 업체: 진입측에서 시작(짝수=오름/로우, 홀수=내림/하이)
+          descending = reversed;
+        } else if (isLastInBlock && !isLastBlock) {
+          // 다음 층이 있는 블록의 마지막 업체: 층 경계(하이/로우)에서 끝나도록 강제
+          descending = reversed; // 짝수=오름(하이 exit), 홀수=내림(로우 exit)
+        } else {
+          // 내부 업체(및 마지막 블록의 마지막 업체): 이전 exit과 가까운 시작을 고르는 greedy
+          descending = Math.abs(descStart - prevExit) < Math.abs(ascStart - prevExit);
+        }
+        if (descending) it.rows.reverse();
+        prevExit = descending ? descExit : ascExit;
+        out.push(it);
+      });
+    });
+    return out;
   }
 
   function generateAssignPreview() {
@@ -897,42 +984,18 @@
       return;
     }
     // 미리보기 생성 시점의 존/행 데이터를 스냅샷으로 고정 — 이후 홈 화면 필터가 바뀌어도
-    // 확정된 배정은 유지됨(재조회하지 않음). 행 단위 균형 분배(splitBalanced) 결과를
-    // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
-    var groups;
-    if (assignPreviewMode === "company") {
-      // 층 단위 serpentine(보스트로페돈) — 층-분리된 업체 아이템(getAssignCompanyItems,
-      // 이미 존 오름차순이라 같은 층끼리 연속으로 모여 있음)을 층 블록으로 묶고, 홀수번째
-      // 층 블록만 통째로 뒤집는다(아이템 순서 + 각 아이템의 rows). 그러면 82층은 올림
-      // (A→…→O), 83층은 내림(O→…→A)이 되어, 존 순서상 82 꼭대기(82O) 바로 뒤에 83
-      // 꼭대기(83O)가 온다 → splitBalanced가 잘라도 경계 작업자가 82O→83O로 매끄럽게
-      // 이어져 계단 이동이 최소화된다(계단이 각 층 끝 O에 있다는 전제). 업체는 층별로
-      // 통째로 묶여 배정되고(층-분리), 각 층은 단일 방향이라 층 안 뒤로가기도 없다.
-      var companyItems = getAssignCompanyItems(floorInput, selectedDates);
-      var floorBlocks = [];
-      var curFloor = null;
-      companyItems.forEach(function (it) {
-        var f = getFloor(it.rows[0].zone); // 층-분리 덕에 아이템은 단일 층
-        if (f !== curFloor) { floorBlocks.push([]); curFloor = f; }
-        floorBlocks[floorBlocks.length - 1].push(it);
-      });
-      var serpItems = [];
-      floorBlocks.forEach(function (blk, bi) {
-        if (bi % 2 === 1) {
-          blk.reverse();
-          blk.forEach(function (it) { it.rows.reverse(); });
-        }
-        blk.forEach(function (it) { serpItems.push(it); });
-      });
-      groups = splitBalanced(serpItems, count).map(function (g) {
-        return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
-      });
-    } else {
-      var items = getAssignRowItems(floorInput, selectedDates);
-      groups = splitBalanced(items, count).map(function (g) {
-        return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
-      });
-    }
+    // 확정된 배정은 유지됨(재조회하지 않음). 두 모드 모두 층 경계(82O→83O)를 보존하고
+    // splitBalanced로 균등 분배 — 차이는 아이템 소스와 배치 방식:
+    //  - 업체별(company): getAssignCompanyItems(한 업체 통째, 층-분리) + applyCompanySerpentine
+    //    (업체를 인접-최단으로 뒤집어 업체 간 되돌아가기 최소, 한 업체씩 통에 담는 현장용).
+    //  - 이동 최적(balanced): getAssignRowItems(행 단위, 업체 쪼갬) + applyFloorSerpentine
+    //    (존 순서로만 집어 이동 최소, 집으며 업체별로 분류하는 현장용, 뒤로가기 0).
+    var arranged = assignPreviewMode === "company"
+      ? applyCompanySerpentine(getAssignCompanyItems(floorInput, selectedDates))
+      : applyFloorSerpentine(getAssignRowItems(floorInput, selectedDates));
+    var groups = splitBalanced(arranged, count).map(function (g) {
+      return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
+    });
     assignPreviewGroups = groups;
     assignPreviewMeta = { floorInput: floorInput, count: count, selectedDates: selectedDates };
     assignPreviewActiveWorkerIdx = null;
