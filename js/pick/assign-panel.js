@@ -199,22 +199,26 @@
     return items;
   }
 
-  // 존 정렬 순서를 그대로 따라가며 같은 업체의 행을 전부 하나의 아이템으로 묶는다 —
-  // 아이템 위치는 그 업체가 처음 등장한 존의 위치를 그대로 쓰므로, splitBalanced에
-  // 넣었을 때 업체가 작업자 사이에서 쪼개지지 않는다(아이템은 항상 통째로만 이동).
+  // 존 정렬 순서를 그대로 따라가며 같은 업체의 행을 아이템으로 묶되, **층코드까지 키에
+  // 포함**해서 묶는다 — 한 층 안에서는 그 업체의 행이 통째로 한 아이템으로 유지되지만,
+  // 82·83처럼 여러 층에 걸친 업체는 층 경계에서 층별로 나뉜다(82파트/83파트가 각각 별개
+  // 아이템). 아이템이 존 오름차순으로 만들어지므로 82층 아이템이 전부 앞·83층 아이템이
+  // 전부 뒤에 놓여, splitBalanced로 잘라도 82는 82끼리·83은 83끼리 배정되고 82/83 경계에
+  // 걸친 작업자 1명만 두 층을 오간다(층 걸친 업체를 통째로 두면 그 업체가 83 행을 82 블록
+  // 중간에 끌고 와 층이 섞이므로, 층 분리를 위해 층별로 나눈다 — 사용자 선택).
   function getAssignCompanyItems(floorInput, selectedDates) {
     var rows = getAssignFixedSortedRows();
     var items = [];
-    var itemByCompany = {};
+    var itemByFloorCompany = {};
     rows.forEach(function (r) {
       if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
       var floorCode = getFloor(r.zone);
       if (floorCode.indexOf(floorInput) !== 0) return;
-      var key = r.company || "";
-      var item = itemByCompany[key];
+      var key = floorCode + "|" + (r.company || "");
+      var item = itemByFloorCompany[key];
       if (!item) {
-        item = { company: key, zone: r.zone || "(미지정)", qty: 0, rows: [] };
-        itemByCompany[key] = item;
+        item = { company: r.company || "", zone: r.zone || "(미지정)", qty: 0, rows: [] };
+        itemByFloorCompany[key] = item;
         items.push(item);
       }
       item.qty += (r.quantity || 0);
@@ -897,18 +901,30 @@
     // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
     var groups;
     if (assignPreviewMode === "company") {
-      // 업체 클러스터를 전역 등장 순서 기준으로 짝수/홀수 번갈아 뒤집어, 층 전체를
-      // 하나의 연속된 지그재그 경로로 만든다(1번째 업체 정순 → 2번째 역순 → 3번째 정순 …).
-      // splitBalanced는 이 경로를 인원수만큼 순서대로 자르기만 하므로(아이템=업체 전체가
-      // 통째로만 이동해 쪼개지지 않고, 상대 순서도 바뀌지 않음), 작업자 안에서 업체 간
-      // 전환은 물론 작업자와 작업자 사이의 경계도 함께 매끄럽게 이어진다 — 따라서 분리
-      // 후 작업자 그룹을 다시 반전하는 후처리는 하지 않는다(이미 지그재그된 구간을 통째로
-      // 뒤집으면 방향이 도로 깨짐).
+      // 층 단위 serpentine(보스트로페돈) — 층-분리된 업체 아이템(getAssignCompanyItems,
+      // 이미 존 오름차순이라 같은 층끼리 연속으로 모여 있음)을 층 블록으로 묶고, 홀수번째
+      // 층 블록만 통째로 뒤집는다(아이템 순서 + 각 아이템의 rows). 그러면 82층은 올림
+      // (A→…→O), 83층은 내림(O→…→A)이 되어, 존 순서상 82 꼭대기(82O) 바로 뒤에 83
+      // 꼭대기(83O)가 온다 → splitBalanced가 잘라도 경계 작업자가 82O→83O로 매끄럽게
+      // 이어져 계단 이동이 최소화된다(계단이 각 층 끝 O에 있다는 전제). 업체는 층별로
+      // 통째로 묶여 배정되고(층-분리), 각 층은 단일 방향이라 층 안 뒤로가기도 없다.
       var companyItems = getAssignCompanyItems(floorInput, selectedDates);
-      companyItems.forEach(function (it, idx) {
-        if (idx % 2 === 1) it.rows.reverse();
+      var floorBlocks = [];
+      var curFloor = null;
+      companyItems.forEach(function (it) {
+        var f = getFloor(it.rows[0].zone); // 층-분리 덕에 아이템은 단일 층
+        if (f !== curFloor) { floorBlocks.push([]); curFloor = f; }
+        floorBlocks[floorBlocks.length - 1].push(it);
       });
-      groups = splitBalanced(companyItems, count).map(function (g) {
+      var serpItems = [];
+      floorBlocks.forEach(function (blk, bi) {
+        if (bi % 2 === 1) {
+          blk.reverse();
+          blk.forEach(function (it) { it.rows.reverse(); });
+        }
+        blk.forEach(function (it) { serpItems.push(it); });
+      });
+      groups = splitBalanced(serpItems, count).map(function (g) {
         return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
       });
     } else {
