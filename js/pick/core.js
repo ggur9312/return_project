@@ -591,19 +591,19 @@
   }
 
   // 헤더 필터 드롭다운의 후보값 목록 — 엑셀 자동필터처럼, key 자신의 필터를 뺀
-  // 나머지 모든 활성 필터(원본 9개 컬럼 + 파생 groupCompanyTotal/companyZoneCount 컬럼)를
-  // 반영해서 계산한다. 그래야 존 필터를 걸면 수량 필터 후보값이 그 존에 실제 존재하는
-  // 수량으로만 좁혀지는 식의 캐스케이딩이 된다.
-  // gcMap/zcMap은 반드시 "실제 컬럼 필터가 적용되기 전"인 getDateScopedRows() 전체에서
-  // 계산해야 한다 — computeFilteredRows()가 쓰는 것과 같은 스코프로 고정하지 않으면,
-  // 예를 들어 존 필터가 이미 걸린 상태에서 companyZoneCount 후보값을 그 좁혀진 행들만
-  // 가지고 다시 계산하게 되어 실제 적용 결과(computeFilteredRows)와 값이 어긋나고,
-  // 필터를 여러 개 쌓을 때 순서에 따라 행이 뜬금없이 사라지는 버그가 생긴다.
+  // 나머지 모든 활성 필터(원본 9개 컬럼)를 반영해서 계산한다. 그래야 존 필터를 걸면
+  // 수량 필터 후보값이 그 존에 실제 존재하는 수량으로만 좁혀지는 식의 캐스케이딩이 된다.
+  // gcMap/zcMap(파생 컬럼값)도 exceptRegular(다른 컬럼 필터가 적용된 스코프)에서 계산해
+  // 파생 컬럼 후보값·표시값이 현재 걸린 필터를 그대로 반영하도록 한다 — 사용자가 존=72를
+  // 걸면 "업체 총수량"은 그 존 안에서의 합(전체가 아니라)을 보기를 원하기 때문이다.
+  // (그 결과 파생 컬럼으로 먼저 필터를 걸고 다른 필터를 추가하면 파생값이 재계산돼
+  // 결과가 0건이 될 수 있는데, 이는 그 조합에 맞는 업체가 없다는 뜻으로 의도된 cascade
+  // 동작이다 — 예전에 이를 "버그"로 보고 전체 스코프로 고정했던 방침은 사용자 의도와
+  // 반대라 철회됐다.)
   function getCandidateValues(key) {
-    var scopeRows = getDateScopedRows();
-    var gcMap = computeGroupCompanyTotals(scopeRows);
-    var zcMap = computeCompanyZoneCounts(scopeRows);
-    var exceptRegular = filterRowsExceptKey(scopeRows, COLUMNS, state.filters, key);
+    var exceptRegular = filterRowsExceptKey(getDateScopedRows(), COLUMNS, state.filters, key);
+    var gcMap = computeGroupCompanyTotals(exceptRegular);
+    var zcMap = computeCompanyZoneCounts(exceptRegular);
     var assignedRowIds = Pick.getAssignedRowIdSet();
     var withAgg = exceptRegular.map(function (r) {
       var clone = Object.assign({}, r);
@@ -646,15 +646,14 @@
   // 컬럼 필터 + 집계(groupCompanyTotal/companyZoneCount)/할당여부 필터를 baseRows 위에
   // 적용 — 홈 화면(날짜 탭으로 스코프된 행)과 집품 할당(날짜 탭과 무관, 자체 생성일자
   // 선택)이 서로 다른 baseRows로 재사용
-  // gcMap/zcMap은 반드시 실제 컬럼 필터(preFiltered)가 아니라 baseRows 그대로에서
-  // 계산해야 한다 — preFiltered에서 계산하면 다른 컬럼 필터(예: 존)가 행을 먼저 좁힌
-  // 뒤에 총수량/존개수를 다시 계산하게 되어, 그 값이 필터 적용 여부에 따라 달라지는
-  // 모순이 생긴다(예: 존 필터로 한 존만 남은 뒤 zoneCount를 다시 세면 3→1이 되어,
-  // 이미 걸려 있던 companyZoneCount=3 필터와 더 이상 맞지 않아 행이 사라짐).
+  // gcMap/zcMap(파생 컬럼값)은 preFiltered(현재 걸린 컬럼 필터가 적용된 스코프)에서
+  // 계산한다 — 그래야 존=72 필터 후 테이블의 "업체 총수량"/"업체 존 개수"가 그 존
+  // 안에서의 값(전체가 아니라)을 반영한다. getCandidateValues와 같은 cascade 스코프를
+  // 써서 드롭다운 후보값과 실제 표시값이 일치한다.
   function computeFilteredRows(baseRows) {
-    var gcMap = computeGroupCompanyTotals(baseRows);
-    var zcMap = computeCompanyZoneCounts(baseRows);
     var preFiltered = getPreFilteredRowsFrom(baseRows);
+    var gcMap = computeGroupCompanyTotals(preFiltered);
+    var zcMap = computeCompanyZoneCounts(preFiltered);
     var assignedRowIds = Pick.getAssignedRowIdSet();
     var withAgg = preFiltered.map(function (r) {
       var clone = Object.assign({}, r);
