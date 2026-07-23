@@ -209,22 +209,27 @@
     return items;
   }
 
-  // 존 정렬 순서를 그대로 따라가며 같은 업체의 행을 전부 하나의 아이템으로 묶는다 —
-  // 아이템 위치는 그 업체가 처음 등장한 존의 위치를 그대로 쓰므로, splitBalanced에
-  // 넣었을 때 업체가 작업자 사이에서 쪼개지지 않는다(아이템은 항상 통째로만 이동).
+  // 존 정렬 순서를 그대로 따라가며 같은 업체의 행을 아이템으로 묶되, **층코드까지 키에
+  // 포함**해서 묶는다 — 한 층 안에서는 그 업체의 행이 통째로 한 아이템으로 유지되지만,
+  // 여러 층에 걸친 업체는 층 경계에서 층별로 나뉜다(72파트/73파트가 각각 별개 아이템).
+  // 아이템이 존 오름차순으로 만들어지므로 72층 아이템이 전부 앞, 73층 아이템이 전부 뒤에
+  // 놓여 flatten 시 층이 섞이지 않고, splitBalanced의 연속구간 분할상 72/73 경계 1명만
+  // 교차한다 — 층 걸친 업체를 층 경계에서 쪼개 각 층 작업자에게 주는 건 메자닌(계단)
+  // 규칙에 맞는 의도된 동작이다(층 단위로 묶지 않으면 한 업체가 72A→73A→72B처럼 다음 72
+  // 업체 앞에 73 행을 끌고 와 층이 중간에 섞인다).
   function getAssignCompanyItems(floorInput, selectedDates) {
     var rows = getAssignFixedSortedRows();
     var items = [];
-    var itemByCompany = {};
+    var itemByFloorCompany = {};
     rows.forEach(function (r) {
       if (selectedDates.indexOf(getCreatedDate(r)) === -1) return;
       var floorCode = getFloor(r.zone);
       if (floorCode.indexOf(floorInput) !== 0) return;
-      var key = r.company || "";
-      var item = itemByCompany[key];
+      var key = floorCode + "|" + (r.company || "");
+      var item = itemByFloorCompany[key];
       if (!item) {
-        item = { company: key, zone: r.zone || "(미지정)", qty: 0, rows: [] };
-        itemByCompany[key] = item;
+        item = { company: r.company || "", zone: r.zone || "(미지정)", qty: 0, rows: [] };
+        itemByFloorCompany[key] = item;
         items.push(item);
       }
       item.qty += (r.quantity || 0);
