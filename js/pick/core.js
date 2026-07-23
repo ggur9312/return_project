@@ -233,8 +233,6 @@
     assignOpenModalBtn: document.getElementById("assignOpenModalBtn"),
     assignCreateModal: document.getElementById("assignCreateModal"),
     assignCreateModalBox: document.getElementById("assignCreateModalBox"),
-    assignModeBalancedBtn: document.getElementById("assignModeBalancedBtn"),
-    assignModeCompanyBtn: document.getElementById("assignModeCompanyBtn"),
     assignFloorInput: document.getElementById("assignFloorInput"),
     assignCountInput: document.getElementById("assignCountInput"),
     assignPreviewBtn: document.getElementById("assignPreviewBtn"),
