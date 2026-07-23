@@ -901,20 +901,30 @@
     // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
     var groups;
     if (assignPreviewMode === "company") {
-      // 업체 클러스터를 전역 등장 순서 기준으로 짝수/홀수 번갈아 뒤집어, 층 전체를
-      // 하나의 연속된 지그재그 경로로 만든다(1번째 업체 정순 → 2번째 역순 → 3번째 정순 …).
-      // splitBalanced는 이 경로를 인원수만큼 순서대로 자르기만 하므로(아이템=업체 전체가
-      // 통째로만 이동해 쪼개지지 않고, 상대 순서도 바뀌지 않음), 작업자 안에서 업체 간
-      // 전환은 물론 작업자와 작업자 사이의 경계도 함께 매끄럽게 이어진다 — 따라서 분리
-      // 후 작업자 그룹을 다시 반전하는 후처리는 하지 않는다(이미 지그재그된 구간을 통째로
-      // 뒤집으면 방향이 도로 깨짐). 각 업체의 행이 한 덩어리로 묶여 보이는 대신 업체 사이
-      // 경계에서 존이 뒤로 가는 구간이 생길 수 있다 — 존 오름차순 정렬(위치 기반 집품)보다
-      // "업체별로 한 번에 집기"를 우선하는 사용자 선택에 따라 이 지그재그 방식을 유지한다.
+      // 층 단위 serpentine(보스트로페돈) — 층-분리된 업체 아이템(getAssignCompanyItems,
+      // 이미 존 오름차순이라 같은 층끼리 연속으로 모여 있음)을 층 블록으로 묶고, 홀수번째
+      // 층 블록만 통째로 뒤집는다(아이템 순서 + 각 아이템의 rows). 그러면 82층은 올림
+      // (A→…→O), 83층은 내림(O→…→A)이 되어, 존 순서상 82 꼭대기(82O) 바로 뒤에 83
+      // 꼭대기(83O)가 온다 → splitBalanced가 잘라도 경계 작업자가 82O→83O로 매끄럽게
+      // 이어져 계단 이동이 최소화된다(계단이 각 층 끝 O에 있다는 전제). 업체는 층별로
+      // 통째로 묶여 배정되고(층-분리), 각 층은 단일 방향이라 층 안 뒤로가기도 없다.
       var companyItems = getAssignCompanyItems(floorInput, selectedDates);
-      companyItems.forEach(function (it, idx) {
-        if (idx % 2 === 1) it.rows.reverse();
+      var floorBlocks = [];
+      var curFloor = null;
+      companyItems.forEach(function (it) {
+        var f = getFloor(it.rows[0].zone); // 층-분리 덕에 아이템은 단일 층
+        if (f !== curFloor) { floorBlocks.push([]); curFloor = f; }
+        floorBlocks[floorBlocks.length - 1].push(it);
       });
-      groups = splitBalanced(companyItems, count).map(function (g) {
+      var serpItems = [];
+      floorBlocks.forEach(function (blk, bi) {
+        if (bi % 2 === 1) {
+          blk.reverse();
+          blk.forEach(function (it) { it.rows.reverse(); });
+        }
+        blk.forEach(function (it) { serpItems.push(it); });
+      });
+      groups = splitBalanced(serpItems, count).map(function (g) {
         return g.reduce(function (acc, it) { return acc.concat(it.rows); }, []);
       });
     } else {
