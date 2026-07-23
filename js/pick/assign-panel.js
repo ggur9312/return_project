@@ -901,18 +901,20 @@
     // 바로 원본 데이터 행 단위로 펼쳐서, 미리보기에 존 요약이 아니라 실제 행이 보이게 한다.
     var groups;
     if (assignPreviewMode === "company") {
-      // 층 단위 serpentine(보스트로페돈) — 층-분리된 업체 아이템(getAssignCompanyItems,
-      // 이미 존 오름차순이라 같은 층끼리 연속으로 모여 있음)을 층 블록으로 묶고, 홀수번째
-      // 층 블록만 통째로 뒤집는다(아이템 순서 + 각 아이템의 rows). 그러면 82층은 올림
-      // (A→…→O), 83층은 내림(O→…→A)이 되어, 존 순서상 82 꼭대기(82O) 바로 뒤에 83
-      // 꼭대기(83O)가 온다 → splitBalanced가 잘라도 경계 작업자가 82O→83O로 매끄럽게
-      // 이어져 계단 이동이 최소화된다(계단이 각 층 끝 O에 있다는 전제). 업체는 층별로
-      // 통째로 묶여 배정되고(층-분리), 각 층은 단일 방향이라 층 안 뒤로가기도 없다.
-      var companyItems = getAssignCompanyItems(floorInput, selectedDates);
+      // 행 단위 최적 동선 + 층 단위 serpentine(보스트로페돈). 행을 존 오름차순
+      // (getAssignFixedSortedRows)으로 아이템화하되 **업체로 묶지 않는다** — 넓게 퍼진
+      // 업체(예: 82A·82F)도 존 순서상 자연히 쪼개져 지나가며 집히므로 `82A→82F→82B`
+      // 같은 뒤로가기가 없다(한 업체를 한 번에 다 하지 않아도 됨 — 사용자 선택). 행
+      // 아이템은 이미 존 오름차순이라 같은 층끼리 연속으로 모여 있어, 층 블록으로 묶고
+      // 홀수번째 층 블록만 통째로 뒤집으면 82층은 올림(A→…→O)/83층은 내림(O→…→A)이
+      // 되어, 존 순서상 82 꼭대기(82O) 바로 뒤에 83 꼭대기(83O)가 와서 경계 작업자가
+      // 82O→83O로 매끄럽게 이어진다(계단이 각 층 끝 O에 있다는 전제). 층 분리(82 전부
+      // 앞·83 전부 뒤)·경계 1명 크로스·각 층 단일 방향(층 안 뒤로가기 0) 유지.
+      var rowItems = getAssignRowItems(floorInput, selectedDates);
       var floorBlocks = [];
       var curFloor = null;
-      companyItems.forEach(function (it) {
-        var f = getFloor(it.rows[0].zone); // 층-분리 덕에 아이템은 단일 층
+      rowItems.forEach(function (it) {
+        var f = getFloor(it.rows[0].zone);
         if (f !== curFloor) { floorBlocks.push([]); curFloor = f; }
         floorBlocks[floorBlocks.length - 1].push(it);
       });
