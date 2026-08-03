@@ -564,7 +564,7 @@ function renderDashboard(data) {
 
         const badgeClass = isActive ? "bg-indigo-700 text-indigo-100" : "bg-slate-100 text-slate-500";
         const deleteIconClass = isActive ? "text-indigo-200 hover:text-white" : "text-slate-300 hover:text-rose-500";
-        tabBtn.innerHTML = `<span>${date}</span><span class="tab-badge px-2 py-0.5 text-xs font-bold rounded-full ${badgeClass}">${data[date].length}건</span><span class="tab-delete-icon ml-1 cursor-pointer ${deleteIconClass}" onclick="event.stopPropagation(); deleteDateData('${date}')" title="이 날짜 데이터 삭제"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></span>`;
+        tabBtn.innerHTML = `<span>${date}</span><span class="tab-badge px-2 py-0.5 text-xs font-bold rounded-full ${badgeClass}">${data[date].length}건</span><span class="tab-delete-icon ml-1 cursor-pointer ${deleteIconClass}" onclick="event.stopPropagation(); deleteDateData('${date}')" title="이 날짜 데이터 삭제"><svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></span>`;
         tabsContainer.appendChild(tabBtn);
 
         // Render Table Block Template
@@ -616,7 +616,7 @@ function renderDashboard(data) {
                     <td class="px-4 py-3 w-32 text-right font-bold text-teal-600 bg-teal-50/30" id="calc24-${safeTabDate}-${itemIdx}">${exp24}</td>
                     <td class="px-3 py-2 w-12 text-center">
                         <button onclick="deleteTruckRow('${date}', ${itemIdx})" class="text-slate-300 hover:text-rose-500" title="삭제">
-                            <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            <svg class="w-4 h-4 inline" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
                         </button>
                     </td>
                 </tr>
@@ -1213,7 +1213,7 @@ function renderCycleTable() {
                 </td>
                 <td class="px-3 py-2 w-16 text-center">
                     <button onclick="deleteCycleRow('${row.date}', ${row.idx})" class="text-slate-300 hover:text-rose-500" title="삭제">
-                        <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        <svg class="w-4 h-4 inline" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
                     </button>
                 </td>
             </tr>

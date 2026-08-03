@@ -282,7 +282,10 @@
     // 업로드했을 때 예전 날짜/필터 조건에 걸려 화면에 아무 것도 안 보이는
     // 문제가 있었다 — 전체 데이터가 곧바로 보이도록 "전체" 탭+필터 없음으로 되돌린다.
     state.activeDateTabs = [];
+    state.homeViewStateByDate = {};
     Object.keys(state.filters).forEach(function (key) { state.filters[key] = null; });
+    state.sortRules = Pick.makeInitialSortRules();
+    state.zoneOPriority = false;
     saveDateTabState();
     els.pasteArea.value = "";
     els.fileName.textContent = "";

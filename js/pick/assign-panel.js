@@ -796,10 +796,12 @@
   function updateAssignSelectionBar(count) {
     if (!count) {
       els.assignSelectionBar.classList.add("hidden");
+      window.setFloatingBarVisible("assignSelectionBar", false);
       return;
     }
     els.assignSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행";
     els.assignSelectionBar.classList.remove("hidden");
+    window.setFloatingBarVisible("assignSelectionBar", true);
   }
 
   var assignRowDragController = createRowDragMoveController({

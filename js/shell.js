@@ -53,6 +53,22 @@
   };
 })();
 
+// 화면 하단에 fixed로 뜨는 플로팅 바(#homeSelectionBar/#assignSelectionBar)가 마지막
+// 데이터 행을 가리지 않도록, 하나라도 떠 있으면 body에 여백 클래스를 건다
+// (실제 여백값은 index.html의 `body.has-floating-bar` 규칙 — Tailwind 유틸리티로 하면
+// 브라우저 JIT가 런타임 추가 클래스의 CSS를 만들지 않아 동작하지 않는다).
+// lockBodyScroll의 참조 카운트와 같은 취지로, 바가 늘어나거나 두 개가 동시에 떠도
+// 어긋나지 않게 id 집합으로 관리한다.
+(function () {
+  "use strict";
+  var visibleBars = {};
+  window.setFloatingBarVisible = function (id, visible) {
+    if (visible) visibleBars[id] = true;
+    else delete visibleBars[id];
+    document.body.classList.toggle("has-floating-bar", Object.keys(visibleBars).length > 0);
+  };
+})();
+
 // 두 앱(집품현황/트럭현황) 공용 토스트 알림 — 생성/출력 완료 등 짧은 완료
 // 안내에 사용. app.js/truck.js가 로드된 뒤(이벤트 핸들러 안에서) 호출되므로
 // 스크립트 로드 순서와 무관하게 안전하다.
@@ -65,17 +81,20 @@
     if (!toastContainer) return;
     type = type || "success";
     var toast = document.createElement("div");
-    toast.className = "p-4 rounded-xl shadow-lg border text-sm font-medium flex items-center space-x-2 bg-white transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto";
+    // 컨테이너가 pointer-events-none인데 카드에서 auto로 되돌리면, 토스트가 떠 있는
+    // 4초 남짓 동안 그 자리(주로 표 우측)의 클릭을 가로챈다 — 토스트에 클릭 동작이
+    // 하나도 없으므로 auto로 되돌리지 않고 클릭이 그대로 통과하게 둔다.
+    toast.className = "p-4 rounded-xl shadow-lg border text-sm font-medium flex items-center space-x-2 bg-white transition-all duration-300 transform translate-y-2 opacity-0";
 
     if (type === "success") {
       toast.classList.add("border-emerald-200", "text-emerald-800", "bg-emerald-50/80");
-      toast.innerHTML = '<svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span></span>';
+      toast.innerHTML = '<svg class="w-5 h-5 text-emerald-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg><span></span>';
     } else if (type === "info") {
       toast.classList.add("border-blue-200", "text-blue-800", "bg-blue-50/80");
-      toast.innerHTML = '<svg class="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span></span>';
+      toast.innerHTML = '<svg class="w-5 h-5 text-blue-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 0 0 1.5h.253a.25.25 0 0 1 .244.304l-.459 2.066A1.75 1.75 0 0 0 10.747 15H11a.75.75 0 0 0 0-1.5h-.253a.25.25 0 0 1-.244-.304l.459-2.066A1.75 1.75 0 0 0 9.253 9H9Z" clip-rule="evenodd"/></svg><span></span>';
     } else {
       toast.classList.add("border-rose-200", "text-rose-800", "bg-rose-50/80");
-      toast.innerHTML = '<svg class="w-5 h-5 text-rose-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg><span></span>';
+      toast.innerHTML = '<svg class="w-5 h-5 text-rose-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg><span></span>';
     }
     toast.querySelector("span").textContent = message;
 
