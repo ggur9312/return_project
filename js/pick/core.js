@@ -58,7 +58,8 @@
   var customAssignSeq = 0;
 
   var STORAGE_KEY = "pickListData";
-  var SORT_RULES_KEY = "pickListSortRules";
+  var SORT_RULES_KEY = "pickListSortRules"; // 구버전(날짜 구분 없는 단일 정렬) — 이관용으로만 읽음
+  var SORT_RULES_BY_DATE_KEY = "pickListSortRulesByDate";
   var ZONE_O_PRIORITY_KEY = "pickListZoneOPriority";
   var LABOR_STORAGE_KEY = "pickListLaborInput";
   var LABOR_STORAGE_KEY_FILTERED = "pickListLaborInputFiltered";
@@ -89,19 +90,29 @@
   var ASSIGN_TAB_ACTIVE = "px-4 py-2.5 text-sm font-semibold rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100 flex items-center gap-2 transition-all duration-200";
   var ASSIGN_TAB_INACTIVE = "px-4 py-2.5 text-sm font-medium rounded-lg bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-all duration-200";
 
-  var initialFilters = {};
-  COLUMNS.forEach(function (c) { initialFilters[c.key] = null; }); // null = 전체 허용(필터 없음)
-  initialFilters[AGG_COLUMN.key] = null;
-  initialFilters[ZONE_COUNT_COLUMN.key] = null;
+  // 날짜 스코프마다 자기 필터 세트를 갖게 되므로(아래 homeViewStateByDate), 하나의
+  // 객체를 공유하지 않도록 매번 새로 만든다 — 예전엔 모듈 변수 하나를 state.filters가
+  // 그대로 참조해서, 복사 없이 나눠 쓰면 버킷끼리 값이 새어나간다.
+  function makeInitialFilters() {
+    var f = {};
+    COLUMNS.forEach(function (c) { f[c.key] = null; }); // null = 전체 허용(필터 없음)
+    f[AGG_COLUMN.key] = null;
+    f[ZONE_COUNT_COLUMN.key] = null;
+    return f;
+  }
+
+  // 정렬 기준 목록의 기본값: 존 오름차순 -> 수량 내림차순. 새로 업로드/붙여넣기한
+  // 데이터도 존별로 묶이고 수량이 많은 순으로 보이게 함.
+  function makeInitialSortRules() {
+    return [{ key: "zone", dir: 1 }, { key: "quantity", dir: -1 }];
+  }
 
   var state = {
     rows: [],
-    // 정렬 기준 목록(우선순위 순서대로 적용). 기본값: 존 오름차순 -> 수량 내림차순,
-    // 새로 업로드/붙여넣기한 데이터도 존별로 묶이고 수량이 많은 순으로 보이게 함.
-    sortRules: [{ key: "zone", dir: 1 }, { key: "quantity", dir: -1 }],
+    sortRules: makeInitialSortRules(),
     // 72/73층 O존 우선 정렬 체크박스 상태 — 체크 시 zone 비교에서 O존을 72/73층보다 앞으로 보냄
     zoneOPriority: false,
-    filters: initialFilters,
+    filters: makeInitialFilters(),
     statusBadgeMap: {},
     assignConfigs: [],
     assignActiveId: null,
@@ -111,7 +122,12 @@
     gtPrinted: [],
     // 활성 날짜 탭(들) — 빈 배열이면 "전체", 아니면 선택된 "YYYY-MM-DD" 문자열 목록
     // (일반 클릭은 항상 원소 1개짜리 배열로 교체, Ctrl/Cmd+클릭은 배열에 토글 추가/제거)
-    activeDateTabs: []
+    activeDateTabs: [],
+    // 날짜 스코프별 필터/정렬 보관함 — { [getDateScopeKey()]: {filters, sortRules, zoneOPriority} }.
+    // 위의 filters/sortRules/zoneOPriority는 "지금 보고 있는 날짜 스코프의 작업 사본"이고,
+    // 날짜 탭이 바뀌는 순간에만 switchDateScope()가 이 보관함에 넣고 빼낸다 — 덕분에 이
+    // 값들을 직접 읽는 수십 개 지점과 두 컨트롤러는 전혀 손대지 않아도 된다.
+    homeViewStateByDate: {}
   };
 
   var els = {
@@ -405,22 +421,101 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.rows));
   }
 
+  // --- 날짜 스코프별 필터/정렬 ---
+
+  // 현재 활성 날짜 탭 조합을 보관함의 키로 만든다 — 빈 문자열이 "전체" 탭.
+  // 선택 순서가 달라도 같은 조합이면 같은 키가 되도록 정렬해서 잇는다.
+  function getDateScopeKey() {
+    return state.activeDateTabs.slice().sort().join("|");
+  }
+
+  // 지금 화면에 걸려 있는 필터/정렬을 현재 날짜 스코프의 보관함에 써 넣는다.
+  function stashHomeViewState() {
+    state.homeViewStateByDate[getDateScopeKey()] = {
+      filters: Object.assign({}, state.filters),
+      sortRules: state.sortRules.slice(),
+      zoneOPriority: state.zoneOPriority
+    };
+  }
+
+  // 날짜 탭 변경의 단일 진입점. carryOver=true면 아직 보관함에 없는 새 조합에
+  // 지금 걸려 있는 필터/정렬을 그대로 물려준다(Ctrl/Cmd+클릭으로 날짜를 더하거나
+  // 뺄 때 — 범위를 넓히는 조작이라 필터가 사라지면 당황스럽기 때문).
+  // carryOver=false면 저장된 게 없는 날짜는 기본값(필터 없음 + 기본 정렬)으로 시작한다.
+  function switchDateScope(nextTabs, carryOver) {
+    stashHomeViewState();
+    var carried = carryOver
+      ? state.homeViewStateByDate[getDateScopeKey()]
+      : null;
+    state.activeDateTabs = nextTabs;
+    var saved = state.homeViewStateByDate[getDateScopeKey()] || carried;
+    state.filters = saved ? Object.assign({}, saved.filters) : makeInitialFilters();
+    state.sortRules = saved ? saved.sortRules.slice() : makeInitialSortRules();
+    state.zoneOPriority = saved ? saved.zoneOPriority : false;
+    stashHomeViewState();
+    saveDateTabState();
+    saveSortRules();
+  }
+
   // 정렬 상태(state.sortRules)는 기존엔 저장되지 않아 브라우저가 새로고침되면
   // (모바일에서 다른 앱 갔다 오는 사이 탭이 새로고침되는 경우 포함) 기본 정렬로
   // 되돌아갔다 — 집품 데이터(state.rows)와 마찬가지로 localStorage에 저장/복원한다.
+  // 날짜 스코프별로 나뉜 뒤로는 보관함 전체를 저장한다(필터는 예전부터 저장 대상이
+  // 아니라 그대로 세션 한정 — 새로고침하면 필터만 초기화된다).
   function saveSortRules() {
-    localStorage.setItem(SORT_RULES_KEY, JSON.stringify(state.sortRules));
-    localStorage.setItem(ZONE_O_PRIORITY_KEY, state.zoneOPriority ? "1" : "");
+    stashHomeViewState();
+    var byDate = {};
+    Object.keys(state.homeViewStateByDate).forEach(function (key) {
+      var s = state.homeViewStateByDate[key];
+      byDate[key] = { sortRules: s.sortRules, zoneOPriority: s.zoneOPriority };
+    });
+    localStorage.setItem(SORT_RULES_BY_DATE_KEY, JSON.stringify(byDate));
   }
 
   function loadSortRules() {
+    var byDate = null;
     try {
-      var raw = localStorage.getItem(SORT_RULES_KEY);
-      if (raw) state.sortRules = JSON.parse(raw);
+      var raw = localStorage.getItem(SORT_RULES_BY_DATE_KEY);
+      if (raw) byDate = JSON.parse(raw);
     } catch (e) {
-      // 저장된 값이 손상됐으면 state의 기본 정렬을 그대로 사용
+      // 저장된 값이 손상됐으면 기본 정렬로 시작
     }
-    state.zoneOPriority = localStorage.getItem(ZONE_O_PRIORITY_KEY) === "1";
+    if (!byDate) {
+      // 날짜별로 나뉘기 이전(정렬 규칙 배열 하나 + O존 플래그)에 저장된 값 이관 —
+      // 그 시절엔 스코프 구분이 없었으므로 현재 스코프의 값으로 받아들인다.
+      byDate = {};
+      try {
+        var legacy = localStorage.getItem(SORT_RULES_KEY);
+        if (legacy) {
+          byDate[getDateScopeKey()] = {
+            sortRules: JSON.parse(legacy),
+            zoneOPriority: localStorage.getItem(ZONE_O_PRIORITY_KEY) === "1"
+          };
+        }
+      } catch (e2) {
+        // 구버전 값도 손상됐으면 그냥 기본값으로
+      }
+    }
+    state.homeViewStateByDate = {};
+    Object.keys(byDate).forEach(function (key) {
+      state.homeViewStateByDate[key] = {
+        filters: makeInitialFilters(), // 필터는 저장 대상이 아님
+        sortRules: Array.isArray(byDate[key].sortRules) ? byDate[key].sortRules : makeInitialSortRules(),
+        zoneOPriority: !!byDate[key].zoneOPriority
+      };
+    });
+    applyHomeViewStateForCurrentScope();
+  }
+
+  // 현재 날짜 스코프의 보관함 값을 작업 사본(state.filters/sortRules/zoneOPriority)에
+  // 얹는다. loadSortRules()가 loadDateTabState()보다 **먼저** 실행되므로(main.js의 init
+  // 순서), 날짜 탭을 읽어들인 직후에 loadDateTabState()가 이 함수를 다시 호출해야
+  // 저장된 탭에 맞는 정렬이 실제로 반영된다.
+  function applyHomeViewStateForCurrentScope() {
+    var saved = state.homeViewStateByDate[getDateScopeKey()];
+    state.filters = saved ? Object.assign({}, saved.filters) : makeInitialFilters();
+    state.sortRules = saved ? saved.sortRules.slice() : makeInitialSortRules();
+    state.zoneOPriority = saved ? saved.zoneOPriority : false;
   }
 
   function setStatusMsg(msg, kind) {
@@ -1494,6 +1589,7 @@
     var raw = localStorage.getItem(DATE_TAB_KEY);
     if (!raw) {
       state.activeDateTabs = [];
+      applyHomeViewStateForCurrentScope();
       return;
     }
     try {
@@ -1503,6 +1599,8 @@
       // 구버전엔 순수 문자열 하나만(JSON 아님) 저장했음 — 그 값을 배열로 감싸 하위호환.
       state.activeDateTabs = [raw];
     }
+    // 이 시점에야 활성 날짜 스코프가 정해지므로, 그 스코프에 저장돼 있던 정렬을 반영한다.
+    applyHomeViewStateForCurrentScope();
   }
 
   function getAllCreatedDates() {
@@ -1517,8 +1615,7 @@
     allBtn.className = !state.activeDateTabs.length ? ASSIGN_TAB_ACTIVE : ASSIGN_TAB_INACTIVE;
     allBtn.innerHTML = "<span>전체</span>";
     allBtn.addEventListener("click", function () {
-      state.activeDateTabs = [];
-      saveDateTabState();
+      switchDateScope([], false);
       Pick.refreshAll();
     });
     els.dateTabsContainer.appendChild(allBtn);
@@ -1536,16 +1633,16 @@
           return;
         }
         if (e.ctrlKey || e.metaKey) {
-          // Ctrl/Cmd+클릭: 이 날짜를 다중선택에 토글(있으면 빼고, 없으면 더함)
+          // Ctrl/Cmd+클릭: 이 날짜를 다중선택에 토글(있으면 빼고, 없으면 더함).
+          // 범위를 넓히고 좁히는 조작이므로 지금 걸린 필터/정렬을 그대로 물려준다.
           var idx = state.activeDateTabs.indexOf(date);
-          state.activeDateTabs = idx !== -1
+          switchDateScope(idx !== -1
             ? state.activeDateTabs.slice(0, idx).concat(state.activeDateTabs.slice(idx + 1))
-            : state.activeDateTabs.concat([date]);
+            : state.activeDateTabs.concat([date]), true);
         } else {
-          // 일반 클릭: 기존과 동일하게 이 날짜 하나만 선택
-          state.activeDateTabs = [date];
+          // 일반 클릭: 이 날짜 하나만 선택 — 그 날짜에 저장해둔 필터/정렬로 갈아탄다.
+          switchDateScope([date], false);
         }
-        saveDateTabState();
         Pick.refreshAll();
       });
       els.dateTabsContainer.appendChild(tabBtn);
@@ -1556,9 +1653,12 @@
     var count = state.rows.filter(function (r) { return getCreatedDate(r) === date; }).length;
     if (!(await window.confirmModal("생성일자 '" + date + "' 데이터 " + count + "건을 모두 삭제할까요?"))) return;
     state.rows = state.rows.filter(function (r) { return getCreatedDate(r) !== date; });
-    state.activeDateTabs = state.activeDateTabs.filter(function (d) { return d !== date; });
+    // 사라진 날짜가 들어간 스코프의 필터/정렬 보관함도 같이 정리한다.
+    Object.keys(state.homeViewStateByDate).forEach(function (key) {
+      if (key && key.split("|").indexOf(date) !== -1) delete state.homeViewStateByDate[key];
+    });
+    switchDateScope(state.activeDateTabs.filter(function (d) { return d !== date; }), true);
     saveToStorage();
-    saveDateTabState();
     Pick.refreshAll();
     if (window.showToast) window.showToast("생성일자 '" + date + "' 데이터 " + count + "건이 삭제되었습니다.", "info");
   }
@@ -1674,7 +1774,10 @@
   Pick.NAV_BTN_INACTIVE = NAV_BTN_INACTIVE;
   Pick.ASSIGN_TAB_ACTIVE = ASSIGN_TAB_ACTIVE;
   Pick.ASSIGN_TAB_INACTIVE = ASSIGN_TAB_INACTIVE;
-  Pick.initialFilters = initialFilters;
+  Pick.makeInitialFilters = makeInitialFilters;
+  Pick.makeInitialSortRules = makeInitialSortRules;
+  Pick.getDateScopeKey = getDateScopeKey;
+  Pick.switchDateScope = switchDateScope;
   Pick.state = state;
   Pick.els = els;
   Pick.trim = trim;

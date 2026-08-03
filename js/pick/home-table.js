@@ -125,6 +125,7 @@
   function updateHomeSelectionSummary() {
     if (!homeMarkedIds.size) {
       els.homeSelectionBar.classList.add("hidden");
+      window.setFloatingBarVisible("homeSelectionBar", false);
       return;
     }
     var qty = 0;
@@ -134,6 +135,7 @@
     });
     els.homeSelectionSummary.textContent = "선택 " + homeMarkedIds.size.toLocaleString("ko-KR") + "행 · " + qty.toLocaleString("ko-KR") + "개";
     els.homeSelectionBar.classList.remove("hidden");
+    window.setFloatingBarVisible("homeSelectionBar", true);
   }
 
   function clearHomeSelection() {

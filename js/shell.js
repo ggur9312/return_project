@@ -53,6 +53,22 @@
   };
 })();
 
+// 화면 하단에 fixed로 뜨는 플로팅 바(#homeSelectionBar/#assignSelectionBar)가 마지막
+// 데이터 행을 가리지 않도록, 하나라도 떠 있으면 body에 여백 클래스를 건다
+// (실제 여백값은 index.html의 `body.has-floating-bar` 규칙 — Tailwind 유틸리티로 하면
+// 브라우저 JIT가 런타임 추가 클래스의 CSS를 만들지 않아 동작하지 않는다).
+// lockBodyScroll의 참조 카운트와 같은 취지로, 바가 늘어나거나 두 개가 동시에 떠도
+// 어긋나지 않게 id 집합으로 관리한다.
+(function () {
+  "use strict";
+  var visibleBars = {};
+  window.setFloatingBarVisible = function (id, visible) {
+    if (visible) visibleBars[id] = true;
+    else delete visibleBars[id];
+    document.body.classList.toggle("has-floating-bar", Object.keys(visibleBars).length > 0);
+  };
+})();
+
 // 두 앱(집품현황/트럭현황) 공용 토스트 알림 — 생성/출력 완료 등 짧은 완료
 // 안내에 사용. app.js/truck.js가 로드된 뒤(이벤트 핸들러 안에서) 호출되므로
 // 스크립트 로드 순서와 무관하게 안전하다.
@@ -65,7 +81,10 @@
     if (!toastContainer) return;
     type = type || "success";
     var toast = document.createElement("div");
-    toast.className = "p-4 rounded-xl shadow-lg border text-sm font-medium flex items-center space-x-2 bg-white transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto";
+    // 컨테이너가 pointer-events-none인데 카드에서 auto로 되돌리면, 토스트가 떠 있는
+    // 4초 남짓 동안 그 자리(주로 표 우측)의 클릭을 가로챈다 — 토스트에 클릭 동작이
+    // 하나도 없으므로 auto로 되돌리지 않고 클릭이 그대로 통과하게 둔다.
+    toast.className = "p-4 rounded-xl shadow-lg border text-sm font-medium flex items-center space-x-2 bg-white transition-all duration-300 transform translate-y-2 opacity-0";
 
     if (type === "success") {
       toast.classList.add("border-emerald-200", "text-emerald-800", "bg-emerald-50/80");

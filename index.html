@@ -13,6 +13,11 @@
 <style>
   html { font-size: 17px; }
   body { font-family: 'Inter', 'Noto Sans KR', sans-serif; }
+  /* 화면 하단에 고정(fixed)되는 플로팅 바(#homeSelectionBar/#assignSelectionBar)가 떠 있는
+     동안 페이지 끝까지 스크롤해도 마지막 행이 바 밑에 깔리지 않도록 여백을 확보한다.
+     window.setFloatingBarVisible()(js/shell.js)이 이 클래스를 토글한다 — Tailwind 유틸리티
+     클래스로 하면 안 된다(브라우저 JIT 빌드라 런타임에 추가된 클래스는 CSS가 생성되지 않음). */
+  body.has-floating-bar { padding-bottom: 7rem; }
   button:not(:disabled), [role="button"] {
     cursor: pointer;
     transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1), transform 100ms cubic-bezier(0.4,0,0.2,1);
