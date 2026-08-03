@@ -16,8 +16,16 @@
   /* 화면 하단에 고정(fixed)되는 플로팅 바(#homeSelectionBar/#assignSelectionBar)가 떠 있는
      동안 페이지 끝까지 스크롤해도 마지막 행이 바 밑에 깔리지 않도록 여백을 확보한다.
      window.setFloatingBarVisible()(js/shell.js)이 이 클래스를 토글한다 — Tailwind 유틸리티
-     클래스로 하면 안 된다(브라우저 JIT 빌드라 런타임에 추가된 클래스는 CSS가 생성되지 않음). */
-  body.has-floating-bar { padding-bottom: 7rem; }
+     클래스로 하면 안 된다(브라우저 JIT 빌드라 런타임에 추가된 클래스는 CSS가 생성되지 않음).
+     이 여백은 반드시 **앱 컨테이너(flex 아이템) 안쪽**에 줘야 하고 `body`에 주면 안 된다 —
+     `#appSidebar`는 `div.flex.min-h-screen` 안의 `sticky top-0 h-screen` 요소이고 sticky는
+     자기 컨테이닝 블록(그 flex 래퍼) 밖으로 못 나가는데, `body`에 패딩을 주면 그 7rem이
+     래퍼 *바깥*에 생겨서 맨 아래까지 스크롤했을 때 사이드바가 딱 그만큼(7rem) 위로 밀려
+     올라가 하단이 잘린다. 앱 컨테이너에 주면 래퍼의 콘텐츠 높이 자체가 늘어나 sticky 구간도
+     같이 늘어나므로 사이드바가 끝까지 고정된다. */
+  body.has-floating-bar #dashboardApp,
+  body.has-floating-bar #pickApp,
+  body.has-floating-bar #truckApp { padding-bottom: 7rem; }
   button:not(:disabled), [role="button"] {
     cursor: pointer;
     transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1), transform 100ms cubic-bezier(0.4,0,0.2,1);
