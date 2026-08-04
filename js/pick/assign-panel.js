@@ -22,6 +22,7 @@
   var openModalWithTransition = Pick.openModalWithTransition;
   var saveAssignState = Pick.saveAssignState;
   var state = Pick.state;
+  var sumQtyByIds = Pick.sumQtyByIds;
   var switchView = Pick.switchView;
   var trim = Pick.trim;
   var uniqueValuesFrom = Pick.uniqueValuesFrom;
@@ -793,13 +794,14 @@
   // #assignView 자체의 드래그선택 요약 바 — 홈 화면의 #homeSelectionBar와 같은 위치/스타일의
   // 페이지 레벨 플로팅 바지만, 여기서는 "할당" 버튼이 필요 없어(이미 할당 화면 안이므로)
   // 요약 문구 + 선택 해제 버튼만 보여준다.
-  function updateAssignSelectionBar(count) {
+  function updateAssignSelectionBar(count, markedIds) {
     if (!count) {
       els.assignSelectionBar.classList.add("hidden");
       window.setFloatingBarVisible("assignSelectionBar", false);
       return;
     }
-    els.assignSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행";
+    var qty = sumQtyByIds(getActiveAssignGroups(), markedIds);
+    els.assignSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행 · " + qty.toLocaleString("ko-KR") + "개";
     els.assignSelectionBar.classList.remove("hidden");
     window.setFloatingBarVisible("assignSelectionBar", true);
   }
@@ -1134,12 +1136,13 @@
 
   // #assignCreateModal 미리보기 안에서 드래그선택 시 나오는 요약 바 — 모달 밖으로
   // 플로팅되지 않고 모달 안, 미리보기 영역과 확정/취소 버튼 사이에 고정 표시된다.
-  function updateAssignPreviewSelectionBar(count) {
+  function updateAssignPreviewSelectionBar(count, markedIds) {
     if (!count) {
       els.assignPreviewSelectionBar.classList.add("hidden");
       return;
     }
-    els.assignPreviewSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행";
+    var qty = sumQtyByIds(assignPreviewGroups, markedIds);
+    els.assignPreviewSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행 · " + qty.toLocaleString("ko-KR") + "개";
     els.assignPreviewSelectionBar.classList.remove("hidden");
   }
 

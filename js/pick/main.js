@@ -90,6 +90,7 @@
   var saveGtState = Pick.saveGtState;
   var updateSparePrintPreview = Pick.updateSparePrintPreview;
   var clearHomeSelection = Pick.clearHomeSelection;
+  var sumQtyByIds = Pick.sumQtyByIds;
   var renderTable = Pick.renderTable;
   var resetHomeMarkedIds = Pick.resetHomeMarkedIds;
   var setupHomeRowSelection = Pick.setupHomeRowSelection;
@@ -164,12 +165,13 @@
   // #customAssignModal 미리보기 안에서 드래그선택 시 나오는 요약 바 — assign-panel.js의
   // assignPreviewRowDragController/updateAssignPreviewSelectionBar와 같은 패턴, 모달 안
   // 미리보기 영역과 확정/취소 버튼 사이에 고정 표시된다.
-  function updateCustomAssignPreviewSelectionBar(count) {
+  function updateCustomAssignPreviewSelectionBar(count, markedIds) {
     if (!count) {
       els.customAssignPreviewSelectionBar.classList.add("hidden");
       return;
     }
-    els.customAssignPreviewSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행";
+    var qty = sumQtyByIds(customAssignGroups, markedIds);
+    els.customAssignPreviewSelectionSummary.textContent = "선택 " + count.toLocaleString("ko-KR") + "행 · " + qty.toLocaleString("ko-KR") + "개";
     els.customAssignPreviewSelectionBar.classList.remove("hidden");
   }
 

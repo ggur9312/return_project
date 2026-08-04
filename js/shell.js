@@ -139,6 +139,17 @@
     pickSubnav.className = SUBNAV_BASE + (view === "pick" ? SUBNAV_OPEN : SUBNAV_CLOSED);
     truckSubnav.className = SUBNAV_BASE + (view === "truck" ? SUBNAV_OPEN : SUBNAV_CLOSED);
     try { localStorage.setItem(STORAGE_KEY, view); } catch (e) {}
+    // 집품현황의 플로팅 선택 바(#homeSelectionBar/#assignSelectionBar)는 <body>의 직계
+    // 자식이라 #pickApp에 hidden이 걸려도 같이 사라지지 않는다 — 집품현황을 벗어날 때
+    // 선택 자체를 명시적으로 해제해 바까지 내린다(집품현황 내부 서브뷰 전환에서
+    // switchView()(core.js)가 하는 것과 같은 처리를 최상위 탭 전환에도 적용).
+    // 두 해제 함수가 각자 요약 갱신 → setFloatingBarVisible(id,false)까지 부르므로
+    // has-floating-bar 여백도 함께 풀린다. window.Pick 가드는 아래 refreshAll과 같은
+    // 이유로 필수 — shell.js는 js/pick/*보다 먼저 로드되고 parse-time에 한 번 실행된다.
+    if (view !== "pick" && window.Pick) {
+      if (window.Pick.clearHomeSelection) window.Pick.clearHomeSelection();
+      if (window.Pick.assignRowDragController) window.Pick.assignRowDragController.clearSelection();
+    }
     // 대시보드의 존/층 막대그래프는 집품현황의 state.rows를 사용하는데, 대시보드가
     // 숨겨진 동안은 refreshAll()이 렌더를 건너뛰므로 돌아올 때 다시 그려 따라잡는다.
     // window.Pick이 아직 없는 최초 parse-time apply() 호출에는 안전하게 무시된다.
