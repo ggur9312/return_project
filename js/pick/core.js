@@ -824,7 +824,9 @@
     //   selectedRowClass,        // 기본 "bg-emerald-100"
     //   hoverClassToSuppress,    // 선택된 행에서 꺼줄 hover 유틸(선택)
     //   getBadgeLabel(count)     // 기본 "N개 이동중"
-    //   onSelectionChange(count) // 선택된 행 수가 바뀔 때마다 호출(선택) — 요약 바 갱신용
+    //   onSelectionChange(count, markedIds) // 선택된 행 수가 바뀔 때마다 호출(선택) —
+    //     요약 바 갱신용. 두 번째 인자는 선택된 행 id의 Set으로, 호출자가 자기 화면의
+    //     행 배열에서 수량 합계 등을 계산할 수 있게 함(sumQtyByIds 참고).
     // }
     var selectedRowClass = options.selectedRowClass || "bg-emerald-100";
     var DRAG_THRESHOLD = 6;
@@ -856,7 +858,7 @@
         tr.classList.toggle(selectedRowClass, marked);
         if (options.hoverClassToSuppress) tr.classList.toggle(options.hoverClassToSuppress, !marked);
       });
-      if (options.onSelectionChange) options.onSelectionChange(markedIds.size);
+      if (options.onSelectionChange) options.onSelectionChange(markedIds.size, markedIds);
     }
     function applyRange(fromId, toId) {
       var order = rowOrder || rowsInGroup(groupKey).map(function (tr) { return tr.dataset.rowId; });
@@ -1399,6 +1401,22 @@
     return rows.reduce(function (sum, r) { return sum + (r.quantity || 0); }, 0);
   }
 
+  // 드래그 선택 요약 바("선택 N행 · M개")의 수량 합계 — createRowDragMoveController의
+  // onSelectionChange가 넘겨주는 선택 id Set과, 그 화면이 실제로 렌더한 작업자별 행
+  // 배열(groups)을 받아 교집합의 수량을 더한다. state.rows를 조회하지 않는 이유는
+  // 집품 할당 화면/미리보기 모달의 행이 생성 시점 스냅샷이라, 이후 홈 데이터가 바뀌어도
+  // 화면에 보이는 값과 어긋나지 않게 하기 위함이다.
+  function sumQtyByIds(groups, idSet) {
+    var total = 0;
+    if (!idSet) return total;
+    (groups || []).forEach(function (g) {
+      (g || []).forEach(function (r) {
+        if (idSet.has(r.id)) total += r.quantity || 0;
+      });
+    });
+    return total;
+  }
+
   // 필터 적용 결과 수량 요약 + 필터·정렬 활성 개수(이전엔 별도 #filterSortSummary
   // 줄에 있었으나, 하나의 강조 박스로 통합)를 함께 보여준다.
   // 요약 문장 하나로 뭉치지 않고, 집품리스트 테이블의 "상태" 배지와 같은
@@ -1826,6 +1844,7 @@
   Pick.getFloorFamily = getFloorFamily;
   Pick.floorSortKey = floorSortKey;
   Pick.sumQty = sumQty;
+  Pick.sumQtyByIds = sumQtyByIds;
   Pick.renderFilterQtySummary = renderFilterQtySummary;
   Pick.renderFloorPanel = renderFloorPanel;
   Pick.applyCardCollapsed = applyCardCollapsed;
