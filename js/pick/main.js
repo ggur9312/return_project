@@ -220,14 +220,18 @@
   els.dashboardResetBtn.addEventListener("click", resetDashboardData);
   els.dashboardUploadBtn.addEventListener("click", openDashboardUploadModal);
   els.dashboardUploadCloseBtn.addEventListener("click", closeDashboardUploadModal);
-  els.dashboardFileSelectBtn.addEventListener("click", function () { els.dashboardFileInput.click(); });
-  els.dashboardFileInput.addEventListener("change", function (e) {
-    handleDashboardFile(e.target.files[0]);
-  });
   els.dashboardPasteApplyBtn.addEventListener("click", handleDashboardPaste);
 
+  // 모달을 "열 때" 전부 초기화한다(대시보드의 openDashboardUploadModal과 같은 패턴) —
+  // 붙여넣기 적용이 성공하면 handleParsedMatrix가 모달을 닫기만 하므로, 여기서 비우지
+  // 않으면 다시 열었을 때 이전에 붙여넣은 텍스트가 그대로 남는다. 적용 성공 시점이 아니라
+  // 열 때 비우는 이유는, 파싱 실패로 모달이 열린 채 남은 경우에는 입력을 보존해 사용자가
+  // 고쳐 쓸 수 있게 하기 위함이다. fileInput도 함께 비워야 같은 파일을 연속으로 골랐을 때
+  // change 이벤트가 안 뜨는 문제가 생기지 않는다.
   els.homeUploadBtn.addEventListener("click", function () {
+    els.fileInput.value = "";
     els.fileName.textContent = "";
+    els.pasteArea.value = "";
     setStatusMsg("", null);
     openModalWithTransition(els.homeUploadModal, els.homeUploadModalBox);
   });
@@ -235,36 +239,46 @@
     closeModalWithTransition(els.homeUploadModal, els.homeUploadModalBox);
   });
 
-  els.fileSelectBtn.addEventListener("click", function () { els.fileInput.click(); });
-  els.fileInput.addEventListener("change", function (e) {
-    handleFile(e.target.files[0]);
-  });
-
-  els.extractFileSelectBtn.addEventListener("click", function () { els.extractFileInput.click(); });
-  els.extractFileInput.addEventListener("change", function (e) {
-    handleExtractFile(e.target.files[0]);
-  });
   els.extractMergeBtn.addEventListener("click", mergeExtractedIntoHome);
   els.extractResetBtn.addEventListener("click", resetExtractPreview);
 
-  ["dragenter", "dragover"].forEach(function (evt) {
-    els.dropZone.addEventListener(evt, function (e) {
-      e.preventDefault();
-      els.dropZone.classList.remove("border-slate-300");
-      els.dropZone.classList.add("border-indigo-500", "bg-indigo-50/30");
+  // 3개 업로드 드롭존(집품리스트/대시보드/집품리스트 추출) 공통 배선 — 마크업이
+  // js/truck.js의 #truckDropZone과 같은 구조("클릭하거나 … 끌어다 놓으세요", 영역 전체가
+  // 클릭 대상)로 통일돼 있어 동작도 같아야 한다. 예전엔 각 화면에 "파일 선택" 버튼이
+  // 따로 있었고 드래그앤드롭은 집품리스트에만 있었다.
+  // change 후 input.value를 비우는 것은 같은 파일을 연속으로 골라도 change가 뜨게 하기
+  // 위함(트럭도 동일). 트럭은 window.Pick 밖의 별도 전역 스코프라 이 헬퍼를 공유하지
+  // 못하고 자기 사본을 그대로 유지한다.
+  function wireDropZone(zoneEl, inputEl, onFile) {
+    zoneEl.addEventListener("click", function () { inputEl.click(); });
+    ["dragenter", "dragover"].forEach(function (evt) {
+      zoneEl.addEventListener(evt, function (e) {
+        e.preventDefault();
+        zoneEl.classList.remove("border-slate-300");
+        zoneEl.classList.add("border-indigo-500", "bg-indigo-50/30");
+      });
     });
-  });
-  ["dragleave", "drop"].forEach(function (evt) {
-    els.dropZone.addEventListener(evt, function (e) {
-      e.preventDefault();
-      els.dropZone.classList.remove("border-indigo-500", "bg-indigo-50/30");
-      els.dropZone.classList.add("border-slate-300");
+    ["dragleave", "drop"].forEach(function (evt) {
+      zoneEl.addEventListener(evt, function (e) {
+        e.preventDefault();
+        zoneEl.classList.remove("border-indigo-500", "bg-indigo-50/30");
+        zoneEl.classList.add("border-slate-300");
+      });
     });
-  });
-  els.dropZone.addEventListener("drop", function (e) {
-    var file = e.dataTransfer.files && e.dataTransfer.files[0];
-    handleFile(file);
-  });
+    zoneEl.addEventListener("drop", function (e) {
+      var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) onFile(file);
+    });
+    inputEl.addEventListener("change", function (e) {
+      var file = e.target.files[0];
+      if (file) onFile(file);
+      inputEl.value = "";
+    });
+  }
+
+  wireDropZone(els.dropZone, els.fileInput, handleFile);
+  wireDropZone(els.dashboardDropZone, els.dashboardFileInput, handleDashboardFile);
+  wireDropZone(els.extractDropZone, els.extractFileInput, handleExtractFile);
 
   els.pasteApplyBtn.addEventListener("click", function () {
     var text = els.pasteArea.value;

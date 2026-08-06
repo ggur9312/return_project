@@ -595,12 +595,14 @@
     </div>
 
     <div class="print:hidden max-w-[1600px] mx-auto px-8 py-8 space-y-6">
-    <div id="extractDropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
-      <h2 class="text-sm font-semibold text-slate-900 mb-1">집품 리스트 추출용 엑셀 업로드</h2>
-      <p class="text-xs text-slate-500 mb-3">시트1: 집품 리스트(그룹번호~수량, 상태="집품대기"인 행) · 시트2: A~N열 원본 데이터(N열="집품대기"인 행의 H열 업체명과 시트1 업체명을 대조)</p>
-      <input type="file" id="extractFileInput" accept=".xlsx,.xls" hidden>
-      <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="extractFileSelectBtn">파일 선택</button>
-      <span id="extractFileName" class="ml-3 text-xs text-slate-500"></span>
+    <div id="extractDropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
+      <input type="file" id="extractFileInput" accept=".xlsx,.xls" class="hidden">
+      <div class="p-4 bg-indigo-50 rounded-full text-indigo-600 mb-4 shadow-inner">
+        <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>
+      </div>
+      <p class="text-sm font-semibold text-slate-900">클릭하거나 엑셀 파일을 이곳에 끌어다 놓으세요</p>
+      <p class="text-xs text-slate-400 mt-1">시트1: 집품 리스트(그룹번호~수량, 상태="집품대기"인 행) · 시트2: A~N열 원본 데이터(N열="집품대기"인 행의 H열 업체명과 시트1 업체명을 대조)</p>
+      <p id="extractFileName" class="text-xs text-slate-500 mt-2"></p>
     </div>
 
     <div id="extractStatusMsg" class="text-xs text-slate-500"></div>
@@ -1291,9 +1293,13 @@
         </div>
       </div>
 
-      <div class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200 text-center">
-        <input type="file" id="dashboardFileInput" accept=".xlsx,.xls" hidden>
-        <button type="button" id="dashboardFileSelectBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150">파일 선택</button>
+      <div id="dashboardDropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
+        <input type="file" id="dashboardFileInput" accept=".xlsx,.xls" class="hidden">
+        <div class="p-4 bg-indigo-50 rounded-full text-indigo-600 mb-4 shadow-inner">
+          <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>
+        </div>
+        <p class="text-sm font-semibold text-slate-900">클릭하거나 엑셀 파일을 이곳에 끌어다 놓으세요</p>
+        <p class="text-xs text-slate-400 mt-1">XLSX, XLS 파일 형식만 지원</p>
         <p id="dashboardFileName" class="text-xs text-slate-500 mt-2"></p>
       </div>
 
@@ -1341,12 +1347,14 @@
         </div>
       </div>
 
-      <div id="dropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-6 shadow-sm hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
-        <h2 class="text-sm font-semibold text-slate-900 mb-1">엑셀 업로드</h2>
-        <p class="text-xs text-slate-500 mb-3">.xlsx / .xls / .csv 파일을 끌어다 놓거나 선택하세요</p>
-        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
-        <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all duration-150" id="fileSelectBtn">파일 선택</button>
-        <span id="fileName" class="ml-3 text-xs text-slate-500"></span>
+      <div id="dropZone" class="bg-white border-2 border-dashed border-slate-300 rounded-2xl p-8 shadow-sm flex flex-col items-center justify-center text-center cursor-pointer hover:border-indigo-500 hover:bg-slate-50/50 transition-all duration-200">
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden">
+        <div class="p-4 bg-indigo-50 rounded-full text-indigo-600 mb-4 shadow-inner">
+          <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>
+        </div>
+        <p class="text-sm font-semibold text-slate-900">클릭하거나 엑셀 파일을 이곳에 끌어다 놓으세요</p>
+        <p class="text-xs text-slate-400 mt-1">XLSX, XLS, CSV 파일 형식만 지원</p>
+        <p id="fileName" class="text-xs text-slate-500 mt-2"></p>
       </div>
 
       <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
