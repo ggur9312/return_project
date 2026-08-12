@@ -1094,6 +1094,7 @@
     // options: { columns, containerEl, resetBtn, getFilters(), setFilter(key, valueOrNull), getCandidateValues(key), onApply() }
     var filterEls = {};
     var pendingDrafts = {}; // key -> Set, 드롭다운이 열려있는 동안의 임시 선택 상태(미적용)
+    var numericDrafts = {}; // key -> 미커밋 숫자 술어(입력 중). 목록 미리보기 전용, 테이블/state.filters 안 건드림
 
     function getEffectiveSet(key) {
       if (pendingDrafts[key]) return new Set(pendingDrafts[key]);
@@ -1114,6 +1115,16 @@
       if (!term) return values;
       var lower = term.toLowerCase();
       return values.filter(function (v) { return String(v).toLowerCase().indexOf(lower) !== -1; });
+    }
+
+    // 목록에 실제로 보여줄 값 — 검색어(substring)에 더해, 입력 중인(미커밋) 숫자
+    // 조건이 있으면 그 predicate로도 좁힌다. 검색창이 목록을 실시간으로 좁히는 것과
+    // 똑같이, 숫자 조건도 목록만 좁히고 테이블(onApply)은 건드리지 않는다.
+    function getVisibleValues(key, term) {
+      var values = getSearchedValues(key, term);
+      var pred = numericDrafts[key];
+      if (pred) values = values.filter(function (v) { return filterMatches(pred, v); });
+      return values;
     }
 
     function commitFilterSet(key, set) {
@@ -1193,7 +1204,7 @@
 
       searchInput.addEventListener("input", debounce(function () {
         var term = searchInput.value;
-        var visible = getSearchedValues(key, term);
+        var visible = getVisibleValues(key, term);
         pendingDrafts[key] = new Set(visible);
         renderDropdownItems(key);
       }, 150));
@@ -1204,7 +1215,7 @@
         // 아직 pendingDrafts를 채우기 전일 수 있다 — 그 경합만 동기적으로 메꾼다
         // (이미 draft가 있으면 사용자가 손댄 선택이므로 덮어쓰지 않는다).
         if (pendingDrafts[key] === undefined && searchInput.value.trim() !== "") {
-          pendingDrafts[key] = new Set(getSearchedValues(key, searchInput.value));
+          pendingDrafts[key] = new Set(getVisibleValues(key, searchInput.value));
         }
         applyFilter(key);
       });
@@ -1212,10 +1223,19 @@
       var numOpEl = div.querySelector(".th-filter-num-op");
       if (numOpEl) {
         var numBEl = div.querySelector(".th-filter-num-b");
+        // 검색창 debounce와 동일: 입력 중인 숫자 조건으로 아래 값 목록만 실시간으로
+        // 좁혀 미리보기한다(테이블/state.filters는 적용/Enter 전까지 그대로).
+        var numericPreview = debounce(function () {
+          numericDrafts[key] = readNumericPredicate(filterEls[key].dropdown);
+          pendingDrafts[key] = new Set(getVisibleValues(key, searchInput.value));
+          renderDropdownItems(key);
+        }, 150);
         numOpEl.addEventListener("change", function () {
           numBEl.classList.toggle("hidden", numOpEl.value !== "between");
+          numericPreview();
         });
         Array.prototype.forEach.call(div.querySelectorAll(".th-filter-num-a, .th-filter-num-b"), function (inp) {
+          inp.addEventListener("input", numericPreview);
           inp.addEventListener("keydown", function (e) {
             if (e.key === "Enter") { e.preventDefault(); applyFilter(key); }
           });
@@ -1224,7 +1244,7 @@
 
       selectAllCb.addEventListener("change", function () {
         var term = searchInput.value;
-        var visible = getSearchedValues(key, term);
+        var visible = getVisibleValues(key, term);
         var set = getEffectiveSet(key);
         visible.forEach(function (v) {
           if (selectAllCb.checked) set.add(v); else set.delete(v);
@@ -1241,6 +1261,7 @@
         options.setFilter(key, null);
         delete pendingDrafts[key];
         clearNumericInputs(div);
+        numericDrafts[key] = null;
         renderDropdownItems(key);
         options.onApply();
       });
@@ -1273,6 +1294,8 @@
       } else {
         clearNumericInputs(dropdown);
       }
+      // 재열람 시 목록도 커밋된(또는 비어있는) 조건에 맞춰 좁혀 보이도록 미리보기 드래프트 동기화
+      numericDrafts[key] = readNumericPredicate(dropdown);
     }
 
     function renderDropdownItems(key) {
@@ -1282,7 +1305,7 @@
       var selectAllCb = dropdown.querySelector(".th-filter-selectall-cb");
       var listEl = dropdown.querySelector(".th-filter-list");
       var term = searchInput.value;
-      var visible = getSearchedValues(key, term);
+      var visible = getVisibleValues(key, term);
       var effectiveSet = getEffectiveSet(key);
       var col = options.columns.find(function (c) { return c.key === key; });
 
@@ -1330,6 +1353,7 @@
       if (!entry.dropdown || entry.dropdown.classList.contains("hidden")) return;
       entry.dropdown.classList.add("hidden");
       delete pendingDrafts[key]; // 적용 없이 닫으면 임시 선택은 버림
+      delete numericDrafts[key]; // 숫자 미리보기 드래프트도 폐기(다음 열 때 커밋값에서 재동기화)
       var searchInput = entry.dropdown.querySelector(".th-filter-search");
       if (searchInput) searchInput.value = ""; // 검색창에 직접 입력한 검색어도 닫으면 초기화
     }
