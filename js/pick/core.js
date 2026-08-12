@@ -648,12 +648,33 @@
       for (var i = 0; i < columns.length; i++) {
         var col = columns[i];
         if (col.key === exceptKey) continue;
-        var filterSet = filters[col.key];
-        if (filterSet === null || filterSet === undefined) continue;
-        if (!filterSet.has(String(r[col.key]))) return false;
+        var filterVal = filters[col.key];
+        if (filterVal === null || filterVal === undefined) continue;
+        if (!filterMatches(filterVal, r[col.key])) return false;
       }
       return true;
     });
+  }
+
+  // 필터 값 매칭 — filterVal은 세 형태 중 하나: null/undefined(필터 없음),
+  // 문자열 Set(값 다중선택), 숫자 술어 객체 {op, a, b}(엑셀식 숫자필터).
+  // 숫자 컬럼(수량/업체 총수량/업체 존 개수)만 술어 객체를 저장할 수 있고,
+  // 나머지는 예전처럼 Set만 저장한다.
+  function filterMatches(filterVal, rawCellValue) {
+    if (filterVal === null || filterVal === undefined) return true;
+    if (filterVal instanceof Set) return filterVal.has(String(rawCellValue));
+    var n = parseFloat(rawCellValue);
+    if (isNaN(n)) return false;
+    switch (filterVal.op) {
+      case ">": return n > filterVal.a;
+      case ">=": return n >= filterVal.a;
+      case "<": return n < filterVal.a;
+      case "<=": return n <= filterVal.a;
+      case "=": return n === filterVal.a;
+      case "!=": return n !== filterVal.a;
+      case "between": return n >= filterVal.a && n <= filterVal.b;
+      default: return true;
+    }
   }
 
   function getPreFilteredRowsFrom(baseRows) {
@@ -720,14 +741,14 @@
     var aggFilterSet = state.filters[AGG_COLUMN.key];
     var rowsForKey = (aggFilterSet === null || aggFilterSet === undefined)
       ? withAgg
-      : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+      : withAgg.filter(function (r) { return filterMatches(aggFilterSet, r.groupCompanyTotal); });
     var zoneCountFilterSet = state.filters[ZONE_COUNT_COLUMN.key];
     if (zoneCountFilterSet !== null && zoneCountFilterSet !== undefined) {
-      rowsForKey = rowsForKey.filter(function (r) { return zoneCountFilterSet.has(String(r.companyZoneCount)); });
+      rowsForKey = rowsForKey.filter(function (r) { return filterMatches(zoneCountFilterSet, r.companyZoneCount); });
     }
     var assignedFilterSet = state.filters[ASSIGNED_COLUMN.key];
     if (assignedFilterSet !== null && assignedFilterSet !== undefined) {
-      rowsForKey = rowsForKey.filter(function (r) { return assignedFilterSet.has(r.assigned); });
+      rowsForKey = rowsForKey.filter(function (r) { return filterMatches(assignedFilterSet, r.assigned); });
     }
     var values = uniqueValuesFrom(rowsForKey, function (r) { return r[key]; });
     var col = COLUMNS.find(function (c) { return c.key === key; });
@@ -759,14 +780,14 @@
     var aggFilterSet = state.filters[AGG_COLUMN.key];
     var filtered = (aggFilterSet === null || aggFilterSet === undefined)
       ? withAgg
-      : withAgg.filter(function (r) { return aggFilterSet.has(String(r.groupCompanyTotal)); });
+      : withAgg.filter(function (r) { return filterMatches(aggFilterSet, r.groupCompanyTotal); });
     var zoneCountFilterSet = state.filters[ZONE_COUNT_COLUMN.key];
     if (zoneCountFilterSet !== null && zoneCountFilterSet !== undefined) {
-      filtered = filtered.filter(function (r) { return zoneCountFilterSet.has(String(r.companyZoneCount)); });
+      filtered = filtered.filter(function (r) { return filterMatches(zoneCountFilterSet, r.companyZoneCount); });
     }
     var assignedFilterSet = state.filters[ASSIGNED_COLUMN.key];
     if (assignedFilterSet !== null && assignedFilterSet !== undefined) {
-      filtered = filtered.filter(function (r) { return assignedFilterSet.has(r.assigned); });
+      filtered = filtered.filter(function (r) { return filterMatches(assignedFilterSet, r.assigned); });
     }
     return filtered;
   }
@@ -1073,12 +1094,20 @@
     // options: { columns, containerEl, resetBtn, getFilters(), setFilter(key, valueOrNull), getCandidateValues(key), onApply() }
     var filterEls = {};
     var pendingDrafts = {}; // key -> Set, 드롭다운이 열려있는 동안의 임시 선택 상태(미적용)
+    var numericDrafts = {}; // key -> 미커밋 숫자 술어(입력 중). 목록 미리보기 전용, 테이블/state.filters 안 건드림
 
     function getEffectiveSet(key) {
       if (pendingDrafts[key]) return new Set(pendingDrafts[key]);
       var s = options.getFilters()[key];
-      if (s === null || s === undefined) return new Set(options.getCandidateValues(key));
+      // null/undefined(필터 없음)이거나 숫자 술어 객체(Set이 아님)면 체크리스트는 "전체 체크"로.
+      if (!(s instanceof Set)) return new Set(options.getCandidateValues(key));
       return new Set(s);
+    }
+
+    function isNumericCol(key) {
+      if (!options.enableNumericFilters) return false;
+      var col = options.columns.find(function (c) { return c.key === key; });
+      return !!(col && col.type === "number");
     }
 
     function getSearchedValues(key, term) {
@@ -1088,15 +1117,79 @@
       return values.filter(function (v) { return String(v).toLowerCase().indexOf(lower) !== -1; });
     }
 
+    // 목록에 실제로 보여줄 값 — 검색어(substring)에 더해, 입력 중인(미커밋) 숫자
+    // 조건이 있으면 그 predicate로도 좁힌다. 검색창이 목록을 실시간으로 좁히는 것과
+    // 똑같이, 숫자 조건도 목록만 좁히고 테이블(onApply)은 건드리지 않는다.
+    function getVisibleValues(key, term) {
+      var values = getSearchedValues(key, term);
+      var pred = numericDrafts[key];
+      if (pred) values = values.filter(function (v) { return filterMatches(pred, v); });
+      return values;
+    }
+
     function commitFilterSet(key, set) {
       var allValues = options.getCandidateValues(key);
       options.setFilter(key, set.size === allValues.length ? null : set);
+    }
+
+    // 숫자 컬럼일 때만 드롭다운 맨 위에 끼우는 엑셀식 연산자 UI(값 입력 시 체크리스트보다 우선).
+    function numericSectionHtml() {
+      var inputCls = "w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500";
+      return (
+        '<div class="th-filter-numeric mb-2 pb-2 border-b border-slate-200 flex flex-col gap-1.5">' +
+        '<select class="th-filter-num-op ' + inputCls + '">' +
+        '<option value=">=">≥ 크거나 같음</option>' +
+        '<option value="<=">≤ 작거나 같음</option>' +
+        '<option value=">">&gt; 초과</option>' +
+        '<option value="<">&lt; 미만</option>' +
+        '<option value="=">= 같음</option>' +
+        '<option value="!=">≠ 같지 않음</option>' +
+        '<option value="between">범위 (이상~이하)</option>' +
+        "</select>" +
+        '<input type="number" class="th-filter-num-a ' + inputCls + '" placeholder="값">' +
+        '<input type="number" class="th-filter-num-b hidden ' + inputCls + '" placeholder="이하 값">' +
+        "</div>"
+      );
+    }
+
+    // 숫자 입력에 유효한 값이 있으면 그 조건이 체크리스트보다 우선 적용된다.
+    function readNumericPredicate(dropdown) {
+      var opEl = dropdown.querySelector(".th-filter-num-op");
+      if (!opEl) return null;
+      var aEl = dropdown.querySelector(".th-filter-num-a");
+      if (!aEl || aEl.value.trim() === "") return null;
+      var a = parseFloat(aEl.value);
+      if (isNaN(a)) return null;
+      var op = opEl.value;
+      if (op === "between") {
+        var bEl = dropdown.querySelector(".th-filter-num-b");
+        var b = bEl ? parseFloat(bEl.value) : NaN;
+        if (isNaN(b)) return null;
+        return { op: op, a: a, b: b };
+      }
+      return { op: op, a: a, b: null };
+    }
+
+    function applyFilter(key) {
+      var entry = filterEls[key];
+      var predicate = readNumericPredicate(entry.dropdown);
+      if (predicate) {
+        options.setFilter(key, predicate);
+        delete pendingDrafts[key];
+        options.onApply();
+      } else if (pendingDrafts[key]) {
+        commitFilterSet(key, pendingDrafts[key]);
+        delete pendingDrafts[key];
+        options.onApply();
+      }
+      closeDropdown(key);
     }
 
     function buildDropdown(key) {
       var div = document.createElement("div");
       div.className = "th-filter-dropdown hidden absolute top-full left-0 mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 font-normal whitespace-normal text-left";
       div.innerHTML =
+        (isNumericCol(key) ? numericSectionHtml() : "") +
         '<input type="text" class="th-filter-search w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs mb-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="검색...">' +
         '<label class="flex items-center gap-1.5 text-xs pb-1.5 mb-1.5 border-b border-slate-200 text-slate-500"><input type="checkbox" class="th-filter-selectall-cb accent-indigo-600"> 전체 선택</label>' +
         '<div class="th-filter-list max-h-44 overflow-y-auto flex flex-col gap-1"></div>' +
@@ -1111,14 +1204,47 @@
 
       searchInput.addEventListener("input", debounce(function () {
         var term = searchInput.value;
-        var visible = getSearchedValues(key, term);
+        var visible = getVisibleValues(key, term);
         pendingDrafts[key] = new Set(visible);
         renderDropdownItems(key);
       }, 150));
+      searchInput.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        // 검색어를 치고 곧바로 Enter를 누르면 debounce(150ms)된 input 핸들러가
+        // 아직 pendingDrafts를 채우기 전일 수 있다 — 그 경합만 동기적으로 메꾼다
+        // (이미 draft가 있으면 사용자가 손댄 선택이므로 덮어쓰지 않는다).
+        if (pendingDrafts[key] === undefined && searchInput.value.trim() !== "") {
+          pendingDrafts[key] = new Set(getVisibleValues(key, searchInput.value));
+        }
+        applyFilter(key);
+      });
+
+      var numOpEl = div.querySelector(".th-filter-num-op");
+      if (numOpEl) {
+        var numBEl = div.querySelector(".th-filter-num-b");
+        // 검색창 debounce와 동일: 입력 중인 숫자 조건으로 아래 값 목록만 실시간으로
+        // 좁혀 미리보기한다(테이블/state.filters는 적용/Enter 전까지 그대로).
+        var numericPreview = debounce(function () {
+          numericDrafts[key] = readNumericPredicate(filterEls[key].dropdown);
+          pendingDrafts[key] = new Set(getVisibleValues(key, searchInput.value));
+          renderDropdownItems(key);
+        }, 150);
+        numOpEl.addEventListener("change", function () {
+          numBEl.classList.toggle("hidden", numOpEl.value !== "between");
+          numericPreview();
+        });
+        Array.prototype.forEach.call(div.querySelectorAll(".th-filter-num-a, .th-filter-num-b"), function (inp) {
+          inp.addEventListener("input", numericPreview);
+          inp.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") { e.preventDefault(); applyFilter(key); }
+          });
+        });
+      }
 
       selectAllCb.addEventListener("change", function () {
         var term = searchInput.value;
-        var visible = getSearchedValues(key, term);
+        var visible = getVisibleValues(key, term);
         var set = getEffectiveSet(key);
         visible.forEach(function (v) {
           if (selectAllCb.checked) set.add(v); else set.delete(v);
@@ -1128,22 +1254,48 @@
       });
 
       div.querySelector(".th-filter-apply").addEventListener("click", function () {
-        if (pendingDrafts[key]) {
-          commitFilterSet(key, pendingDrafts[key]);
-          delete pendingDrafts[key];
-          options.onApply();
-        }
-        closeDropdown(key);
+        applyFilter(key);
       });
 
       div.querySelector(".th-filter-reset").addEventListener("click", function () {
         options.setFilter(key, null);
         delete pendingDrafts[key];
+        clearNumericInputs(div);
+        numericDrafts[key] = null;
         renderDropdownItems(key);
         options.onApply();
       });
 
       return div;
+    }
+
+    function clearNumericInputs(dropdown) {
+      var opEl = dropdown.querySelector(".th-filter-num-op");
+      if (!opEl) return;
+      opEl.value = ">=";
+      var aEl = dropdown.querySelector(".th-filter-num-a");
+      var bEl = dropdown.querySelector(".th-filter-num-b");
+      if (aEl) aEl.value = "";
+      if (bEl) { bEl.value = ""; bEl.classList.add("hidden"); }
+    }
+
+    // 드롭다운을 열 때 커밋된 술어를 숫자 입력에 반영(재열람 시 현재 조건이 보이도록).
+    function syncNumericInputs(key) {
+      var dropdown = filterEls[key].dropdown;
+      var opEl = dropdown.querySelector(".th-filter-num-op");
+      if (!opEl) return;
+      var committed = options.getFilters()[key];
+      if (committed && !(committed instanceof Set)) {
+        opEl.value = committed.op;
+        dropdown.querySelector(".th-filter-num-a").value = committed.a;
+        var bEl = dropdown.querySelector(".th-filter-num-b");
+        bEl.classList.toggle("hidden", committed.op !== "between");
+        bEl.value = (committed.op === "between" && committed.b !== null) ? committed.b : "";
+      } else {
+        clearNumericInputs(dropdown);
+      }
+      // 재열람 시 목록도 커밋된(또는 비어있는) 조건에 맞춰 좁혀 보이도록 미리보기 드래프트 동기화
+      numericDrafts[key] = readNumericPredicate(dropdown);
     }
 
     function renderDropdownItems(key) {
@@ -1153,7 +1305,7 @@
       var selectAllCb = dropdown.querySelector(".th-filter-selectall-cb");
       var listEl = dropdown.querySelector(".th-filter-list");
       var term = searchInput.value;
-      var visible = getSearchedValues(key, term);
+      var visible = getVisibleValues(key, term);
       var effectiveSet = getEffectiveSet(key);
       var col = options.columns.find(function (c) { return c.key === key; });
 
@@ -1191,6 +1343,7 @@
         entry.wrapper.appendChild(entry.dropdown);
       }
       delete pendingDrafts[key]; // 매번 열 때 커밋된 상태에서 새로 시작
+      syncNumericInputs(key);
       renderDropdownItems(key);
       entry.dropdown.classList.remove("hidden");
     }
@@ -1200,6 +1353,7 @@
       if (!entry.dropdown || entry.dropdown.classList.contains("hidden")) return;
       entry.dropdown.classList.add("hidden");
       delete pendingDrafts[key]; // 적용 없이 닫으면 임시 선택은 버림
+      delete numericDrafts[key]; // 숫자 미리보기 드래프트도 폐기(다음 열 때 커밋값에서 재동기화)
       var searchInput = entry.dropdown.querySelector(".th-filter-search");
       if (searchInput) searchInput.value = ""; // 검색창에 직접 입력한 검색어도 닫으면 초기화
     }
@@ -1275,6 +1429,7 @@
     columns: ALL_COLUMNS,
     containerEl: els.filterButtonsContainer,
     resetBtn: els.filterResetAllBtn,
+    enableNumericFilters: true,
     getFilters: function () { return state.filters; },
     setFilter: function (key, value) { state.filters[key] = value; },
     getCandidateValues: getCandidateValues,
